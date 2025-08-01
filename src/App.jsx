@@ -247,7 +247,7 @@ export default function App() {
         <p className="text-white">Fant ingen bilferger i nærheten.</p>
       )}
 
-      <div className="w-full max-w-md space-y-6">
+      <div className="w-full max-w-md space-y-6 px-4 sm:px-0">
         {ferryStops.map(({ place, distance, departures }, i) => {
           const isHighlighted = highlightedStop && highlightedStop.place.id === place.id;
           return (
@@ -275,9 +275,9 @@ export default function App() {
               {/* Avgang og ETA */}
               {departures && departures.length > 0 ? (
                 <>
-                  <div className="flex justify-between items-center text-lg mt-2">
-                    <span className="text-gray-700">
-                      {departures[0].aimedDepartureTime && (
+                  <div className="mt-2 text-lg">
+                    <div className="text-gray-700">
+                      {departures[0].aimedDepartureTime ? (
                         <>
                           Neste avgang:{' '}
                           <span className="font-extrabold">
@@ -285,22 +285,23 @@ export default function App() {
                           </span>
                           {' '}– om {' '}
                           <span className="text-green-600 font-bold">
-                            {formatMinutes(
-                              Math.max(
-                                0,
-                                Math.round(
-                                  (new Date(departures[0].aimedDepartureTime) - new Date()) / 60000
+                            <span className="text-sm text-green-600 font-bold align-middle">
+                              {formatMinutes(
+                                Math.max(
+                                  0,
+                                  Math.round(
+                                    (new Date(departures[0].aimedDepartureTime) - new Date()) / 60000
+                                  )
                                 )
-                              )
-                            )}
+                              )}
+                            </span>
                           </span>
                         </>
-                      )}
-                      {!departures[0].aimedDepartureTime && 'Neste avgang: ?'}
-                    </span>
-                    <span>
+                      ) : 'Neste avgang: ?'}
+                    </div>
+                    <div className="text-gray-500 text-base leading-tight">
                       {departures[0].destinationDisplay?.frontText || ''}
-                    </span>
+                    </div>
                   </div>
                   {/* Ekstra avganger hvis valgt */}
                   {isHighlighted && departures.length > 1 && (

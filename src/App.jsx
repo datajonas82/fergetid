@@ -227,7 +227,7 @@ export default function App() {
         </p>
       )}
 
-      {error && <p className="text-red-600 font-bold">{error}</p>}
+      {error && <p className="text-black font-bold">{error}</p>}
 
       {ferryStops.length === 0 && (
         <p className="text-white">Fant ingen bilferger i nærheten.</p>

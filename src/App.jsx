@@ -9,7 +9,7 @@ const NEARBY_QUERY = gql`
     nearest(
       latitude: $latitude,
       longitude: $longitude,
-      maximumDistance: 500000,
+      maximumDistance: 5000000,
       maximumResults: 30,
       filterByModes: [water]
     ) {

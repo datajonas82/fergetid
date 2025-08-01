@@ -355,7 +355,7 @@ function formatMinutes(mins) {
 //   return (
 //     lowered.includes('ferje') ||
 //     lowered.includes('fergekai') ||
-//     lowered.includes('kai') ||
+//     lowered.includes('kai') || lowered.includes('lalala') ||
 //     lowered.includes('ferry')
 //   );
 // }

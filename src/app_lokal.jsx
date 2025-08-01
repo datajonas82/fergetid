@@ -172,15 +172,6 @@ export default function AppLokal() {
     }
   }, []);
 
-  // Automatisk oppdatering hvert 15. minutt
-  useEffect(() => {
-    if (!location) return;
-    const interval = setInterval(() => {
-      fetchAndStoreStops(location);
-    }, 15 * 60 * 1000); // 15 minutter
-    return () => clearInterval(interval);
-  }, [location, fetchAndStoreStops]);
-
   useEffect(() => {
     if (!location) return;
     // Prøv localStorage først
@@ -250,7 +241,7 @@ export default function AppLokal() {
         disabled={refreshing}
         className="mb-4 px-4 py-2 bg-white text-fuchsia-700 font-bold rounded-lg shadow hover:bg-fuchsia-100 transition disabled:opacity-50"
       >
-        {refreshing ? 'Oppdaterer...' : 'Oppdater fergetider'}
+        {refreshing ? 'Oppdaterer...' : 'Oppdater fergekaier'}
       </button>
       {locationName && (
         <div className="text-lg text-white mb-4 text-center">
@@ -320,10 +311,36 @@ export default function AppLokal() {
                     </div>
                   </div>
                   {isHighlighted && departures.length > 1 && (
-                    <SenereAvganger
-                      departures={departures}
-                      stopId={highlightedStop.place.id}
-                    />
+                    <div className="mt-4">
+                      <div className="text-lg text-gray-700 font-normal mb-1">Senere avganger:</div>
+                      <ul>
+                        {departures.slice(1, 6).map((dep, idx, arr) => {
+                          const mins = Math.max(
+                            0,
+                            Math.round(
+                              (new Date(dep.aimedDepartureTime) - new Date()) / 60000
+                            )
+                          );
+                          const thisTime = new Date(dep.aimedDepartureTime);
+                          const next = departures
+                            .map((d) => new Date(d.aimedDepartureTime))
+                            .filter((t) => t > thisTime)
+                            .sort((a, b) => a - b)[0];
+                          const diffToNext = next ? (next - thisTime) / (1000 * 60 * 60) : null;
+                          const isLastInList = idx === arr.length - 1;
+                          const isLastOverall = !next;
+                          const markRed = (diffToNext !== null && diffToNext > 8) || (isLastInList && isLastOverall && (diffToNext === null || diffToNext > 1));
+                          return (
+                            <li key={dep.aimedDepartureTime + '-' + idx} className={"flex justify-between py-1 " + (markRed ? "text-red-600 font-bold" : "")}> 
+                              <span className="flex items-center gap-1">
+                                <span className="font-bold">{new Date(dep.aimedDepartureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> – <span className="text-green-600 text-sm font-bold align-middle">{formatMinutes(mins)}</span>
+                              </span>
+                              <span className={markRed ? "text-red-600 font-bold" : "text-gray-500"}>{dep.destinationDisplay?.frontText}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
                   )}
                 </>
               ) : (
@@ -337,8 +354,6 @@ export default function AppLokal() {
   );
 }
 
-// --- Hjelpefunksjoner og komponenter ---
-
 function formatMinutes(mins) {
   if (mins < 60) return `${mins} min`;
   const hours = Math.floor(mins / 60);
@@ -347,77 +362,6 @@ function formatMinutes(mins) {
     return `${hours} ${hours === 1 ? 'time' : 'timer'}`;
   }
   return `${hours} ${hours === 1 ? 'time' : 'timer'} ${minutes} min`;
-}
-
-function SenereAvganger({ departures, stopId }) {
-  const [allDepartures, setAllDepartures] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-    async function fetchAllDepartures() {
-      setLoading(true);
-      try {
-        // Hent alle avganger for dagen (maks 50 for sikkerhet)
-        const ALL_DEPARTURES_QUERY = gql`
-          query StopPlaceDepartures($id: String!) {
-            stopPlace(id: $id) {
-              estimatedCalls(timeRange: 86400, numberOfDepartures: 50) {
-                aimedDepartureTime
-                destinationDisplay { frontText }
-                serviceJourney { journeyPattern { line { transportMode transportSubmode } } }
-              }
-            }
-          }
-        `;
-        const data = await client.request(ALL_DEPARTURES_QUERY, { id: stopId });
-        if (isMounted) {
-          setAllDepartures(data.stopPlace?.estimatedCalls || []);
-        }
-      } catch {
-        if (isMounted) setAllDepartures(null);
-      }
-      setLoading(false);
-    }
-    fetchAllDepartures();
-    return () => { isMounted = false; };
-  }, [stopId]);
-
-  function findNextInAll(thisTime) {
-    if (!allDepartures) return null;
-    return allDepartures
-      .map((d) => new Date(d.aimedDepartureTime))
-      .filter((t) => t > thisTime)
-      .sort((a, b) => a - b)[0] || null;
-  }
-
-  if (loading || !allDepartures) {
-    return <div className="text-gray-500 text-sm">Laster flere avganger...</div>;
-  }
-
-  return (
-    <div className="mt-4">
-      <div className="text-lg text-gray-700 font-normal mb-1">Senere avganger:</div>
-      <ul>
-        {departures.slice(1, 6).map((dep, idx, arr) => {
-          const mins = Math.max(
-            0,
-            Math.round(
-              (new Date(dep.aimedDepartureTime) - new Date()) / 60000
-            )
-          );
-          return (
-            <li key={dep.aimedDepartureTime + '-' + idx} className="flex justify-between py-1">
-              <span className="flex items-center gap-1">
-                <span className="font-bold">{new Date(dep.aimedDepartureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> – <span className="text-green-600 text-sm font-bold align-middle">{formatMinutes(mins)}</span>
-              </span>
-              <span className="text-gray-500">{dep.destinationDisplay?.frontText}</span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
 }
 
 // Merk: Entur sitt API gir ikke ut "alle avganger for alle stopp" i én bulk, men du kan cache stopp og avganger for ditt område.

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { GraphQLClient, gql } from 'graphql-request';
 
 const ENTUR_ENDPOINT = 'https://api.entur.io/journey-planner/v3/graphql';
@@ -54,9 +54,7 @@ const DEPARTURES_QUERY = gql`
   }
 `;
 
-const LOCAL_KEY = 'fergetid_ferrystops_v1';
-
-export default function AppLokal() {
+export default function App() {
   const [location, setLocation] = useState(null);
   const [locationName, setLocationName] = useState(null);
   const [ferryStops, setFerryStops] = useState([]);
@@ -64,9 +62,7 @@ export default function AppLokal() {
   const [departures, setDepartures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
 
-  // Geolokasjon og stedsnavn
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -82,6 +78,8 @@ export default function AppLokal() {
           );
           const data = await res.json();
           const address = data.address || {};
+
+          // Prøv å finne beste stedsnavn
           const mainPlace =
             address.city ||
             address.town ||
@@ -89,6 +87,7 @@ export default function AppLokal() {
             address.hamlet ||
             address.locality ||
             address.suburb;
+
           let name;
           if (mainPlace) {
             name = mainPlace;
@@ -97,6 +96,7 @@ export default function AppLokal() {
             address.state ||
             address.region
           ) {
+            // Hvis bare county/state/region finnes, vis "i nærheten av [nærmeste større sted]"
             const nearby =
               address.city ||
               address.town ||
@@ -117,12 +117,14 @@ export default function AppLokal() {
           } else {
             name = address.country || 'ukjent sted';
           }
+
           setLocationName(name);
         } catch {
           setLocationName('ukjent sted');
         }
       },
       (err) => {
+        console.error('Geolokasjon feilet:', err);
         setError('Geolokasjon feilet, kan ikke hente posisjon');
         setLoading(false);
       },
@@ -130,87 +132,70 @@ export default function AppLokal() {
     );
   }, []);
 
-  // Hent stopp og avganger fra localStorage eller API
-  const fetchAndStoreStops = useCallback(async (coords) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await client.request(NEARBY_QUERY, {
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-      });
-      const places = [];
-      const seenIds = new Set();
-      for (const e of data.nearest.edges) {
-        const { place, distance } = e.node;
-        if (place && !seenIds.has(place.id)) {
-          let departures = [];
-          try {
-            const depData = await client.request(DEPARTURES_QUERY, { id: place.id });
-            const calls = depData.stopPlace?.estimatedCalls || [];
-            departures = calls
-              .filter((call) => {
-                const line = call.serviceJourney?.journeyPattern?.line;
-                return line && line.transportSubmode === 'localCarFerry';
-              })
-              .slice(0, 5);
-          } catch {
-            departures = [];
-          }
-          if (departures.length > 0) {
-            places.push({ place, distance, departures });
-            seenIds.add(place.id);
+  useEffect(() => {
+    if (!location) return;
+
+    const fetchStops = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await client.request(NEARBY_QUERY, {
+          latitude: location.latitude,
+          longitude: location.longitude,
+        });
+
+        const places = [];
+        const seenIds = new Set();
+
+        for (const e of data.nearest.edges) {
+          const { place, distance } = e.node;
+          if (place && !seenIds.has(place.id)) {
+            // Hent avganger for hvert stoppested
+            let departures = [];
+            try {
+              const depData = await client.request(DEPARTURES_QUERY, { id: place.id });
+              const calls = depData.stopPlace?.estimatedCalls || [];
+              departures = calls
+                .filter((call) => {
+                  const line = call.serviceJourney?.journeyPattern?.line;
+                  return line && line.transportSubmode === 'localCarFerry';
+                })
+                .slice(0, 5);
+            } catch {
+              departures = [];
+            }
+            // Only add stop if it has carferry departures
+            if (departures.length > 0) {
+              places.push({ place, distance, departures });
+              seenIds.add(place.id);
+            }
           }
         }
+
+        setFerryStops(places);
+        setLoading(false);
+      } catch (err) {
+        console.error('Feil ved henting av fergekaier:', err);
+        setError('Kunne ikke hente fergekaier');
+        setLoading(false);
       }
-      localStorage.setItem(LOCAL_KEY, JSON.stringify(places));
-      setFerryStops(places);
-      setLoading(false);
-    } catch (err) {
-      setError('Kunne ikke hente fergekaier');
-      setLoading(false);
-    }
-  }, []);
+    };
 
-  // Automatisk oppdatering hvert 15. minutt
-  useEffect(() => {
-    if (!location) return;
-    const interval = setInterval(() => {
-      fetchAndStoreStops(location);
-    }, 15 * 60 * 1000); // 15 minutter
-    return () => clearInterval(interval);
-  }, [location, fetchAndStoreStops]);
+    fetchStops();
+  }, [location]);
 
-  useEffect(() => {
-    if (!location) return;
-    // Prøv localStorage først
-    const cached = localStorage.getItem(LOCAL_KEY);
-    if (cached) {
-      setFerryStops(JSON.parse(cached));
-      setLoading(false);
-    } else {
-      fetchAndStoreStops(location);
-    }
-  }, [location, fetchAndStoreStops]);
-
-  // Manuell oppdatering (pull to refresh)
-  const handleRefresh = async () => {
-    if (!location) return;
-    setRefreshing(true);
-    await fetchAndStoreStops(location);
-    setRefreshing(false);
-  };
-
-  // Hent avganger for valgt stopp (alltid live)
   useEffect(() => {
     if (!highlightedStop) {
       setDepartures([]);
       return;
     }
+
     const fetchDepartures = async () => {
       try {
         const data = await client.request(DEPARTURES_QUERY, { id: highlightedStop.place.id });
         const calls = data.stopPlace?.estimatedCalls || [];
+
+        // Filtrer avganger med relevant transportmodus
         const ferryDepartures = calls.filter((call) => {
           const line = call.serviceJourney?.journeyPattern?.line;
           if (!line) return false;
@@ -219,11 +204,14 @@ export default function AppLokal() {
             line.transportMode === 'water'
           );
         });
+
         setDepartures(ferryDepartures);
       } catch (err) {
+        console.error('Kunne ikke hente avganger:', err);
         setError('Kunne ikke hente avganger for valgt fergekai');
       }
     };
+
     fetchDepartures();
   }, [highlightedStop]);
 
@@ -232,6 +220,7 @@ export default function AppLokal() {
       <div className="min-h-screen bg-fuchsia-500 flex flex-col items-center justify-center py-6">
         <h1 className="text-5xl font-extrabold text-white tracking-widest mb-6">FERGETID</h1>
         <div className="flex flex-col items-center">
+          {/* Kul spinner med farger og bevegelse */}
           <span className="relative flex h-12 w-12 mb-4">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-40"></span>
             <span className="relative inline-flex rounded-full h-12 w-12 border-4 border-t-fuchsia-200 border-b-fuchsia-700 border-l-white border-r-white animate-spin"></span>
@@ -245,13 +234,7 @@ export default function AppLokal() {
   return (
     <div className="min-h-screen bg-fuchsia-500 flex flex-col items-center py-6">
       <h1 className="text-5xl font-extrabold text-white tracking-widest mb-6">FERGETID</h1>
-      <button
-        onClick={handleRefresh}
-        disabled={refreshing}
-        className="mb-4 px-4 py-2 bg-white text-fuchsia-700 font-bold rounded-lg shadow hover:bg-fuchsia-100 transition disabled:opacity-50"
-      >
-        {refreshing ? 'Oppdaterer...' : 'Oppdater fergetider'}
-      </button>
+
       {locationName && (
         <div className="text-lg text-white mb-4 text-center">
           <div>
@@ -262,10 +245,13 @@ export default function AppLokal() {
           </div>
         </div>
       )}
+
       {error && <p className="text-black font-bold">{error}</p>}
+
       {ferryStops.length === 0 && (
         <p className="text-white">Fant ingen bilferger i nærheten.</p>
       )}
+
       <div className="w-full max-w-md space-y-6 px-4 sm:px-0">
         {ferryStops.map(({ place, distance, departures }, i) => {
           const isHighlighted = highlightedStop && highlightedStop.place.id === place.id;
@@ -282,13 +268,16 @@ export default function AppLokal() {
                   : setHighlightedStop({ place, distance, departures })
               }
             >
+              {/* Avstand øverst til venstre */}
               <div className="absolute -top-4 -left-3 bg-white rounded-lg px-3 py-1 shadow text-base font-bold text-blue-600 border border-gray-200">
                 {distance ? `${Math.round(distance / 1000)} KM` : '? KM'}
               </div>
+              {/* Rutenavn */}
               <h2 className="text-3xl font-bold tracking-wide mb-2 text-gray-900">
                 {place.name}
               </h2>
               <hr className="my-2" />
+              {/* Avgang og ETA */}
               {departures && departures.length > 0 ? (
                 <>
                   <div className="mt-2 text-lg">
@@ -319,11 +308,39 @@ export default function AppLokal() {
                       {departures[0].destinationDisplay?.frontText || ''}
                     </div>
                   </div>
+                  {/* Ekstra avganger hvis valgt */}
                   {isHighlighted && departures.length > 1 && (
-                    <SenereAvganger
-                      departures={departures}
-                      stopId={highlightedStop.place.id}
-                    />
+                    <div className="mt-4">
+                      <div className="text-lg text-gray-700 font-normal mb-1">Senere avganger:</div>
+                      <ul>
+                        {departures.slice(1, 6).map((dep, idx, arr) => {
+                          const mins = Math.max(
+                            0,
+                            Math.round(
+                              (new Date(dep.aimedDepartureTime) - new Date()) / 60000
+                            )
+                          );
+                          const thisTime = new Date(dep.aimedDepartureTime);
+                          const next = departures
+                            .map((d) => new Date(d.aimedDepartureTime))
+                            .filter((t) => t > thisTime)
+                            .sort((a, b) => a - b)[0];
+                          const diffToNext = next ? (next - thisTime) / (1000 * 60 * 60) : null;
+                          // Rød hvis >8 timer til neste, eller hvis siste avgang og ingen ny avgang innen 1 time
+                          const isLastInList = idx === arr.length - 1;
+                          const isLastOverall = !next;
+                          const markRed = (diffToNext !== null && diffToNext > 8) || (isLastInList && isLastOverall && (diffToNext === null || diffToNext > 1));
+                          return (
+                            <li key={dep.aimedDepartureTime + '-' + idx} className={"flex justify-between py-1 " + (markRed ? "text-red-600 font-bold" : "")}> 
+                              <span className="flex items-center gap-1">
+                                <span className="font-bold">{new Date(dep.aimedDepartureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> – <span className="text-green-600 text-sm font-bold align-middle">{formatMinutes(mins)}</span>
+                              </span>
+                              <span className={markRed ? "text-red-600 font-bold" : "text-gray-500"}>{dep.destinationDisplay?.frontText}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
                   )}
                 </>
               ) : (
@@ -337,8 +354,6 @@ export default function AppLokal() {
   );
 }
 
-// --- Hjelpefunksjoner og komponenter ---
-
 function formatMinutes(mins) {
   if (mins < 60) return `${mins} min`;
   const hours = Math.floor(mins / 60);
@@ -349,76 +364,13 @@ function formatMinutes(mins) {
   return `${hours} ${hours === 1 ? 'time' : 'timer'} ${minutes} min`;
 }
 
-function SenereAvganger({ departures, stopId }) {
-  const [allDepartures, setAllDepartures] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-    async function fetchAllDepartures() {
-      setLoading(true);
-      try {
-        // Hent alle avganger for dagen (maks 50 for sikkerhet)
-        const ALL_DEPARTURES_QUERY = gql`
-          query StopPlaceDepartures($id: String!) {
-            stopPlace(id: $id) {
-              estimatedCalls(timeRange: 86400, numberOfDepartures: 50) {
-                aimedDepartureTime
-                destinationDisplay { frontText }
-                serviceJourney { journeyPattern { line { transportMode transportSubmode } } }
-              }
-            }
-          }
-        `;
-        const data = await client.request(ALL_DEPARTURES_QUERY, { id: stopId });
-        if (isMounted) {
-          setAllDepartures(data.stopPlace?.estimatedCalls || []);
-        }
-      } catch {
-        if (isMounted) setAllDepartures(null);
-      }
-      setLoading(false);
-    }
-    fetchAllDepartures();
-    return () => { isMounted = false; };
-  }, [stopId]);
-
-  function findNextInAll(thisTime) {
-    if (!allDepartures) return null;
-    return allDepartures
-      .map((d) => new Date(d.aimedDepartureTime))
-      .filter((t) => t > thisTime)
-      .sort((a, b) => a - b)[0] || null;
-  }
-
-  if (loading || !allDepartures) {
-    return <div className="text-gray-500 text-sm">Laster flere avganger...</div>;
-  }
-
-  return (
-    <div className="mt-4">
-      <div className="text-lg text-gray-700 font-normal mb-1">Senere avganger:</div>
-      <ul>
-        {departures.slice(1, 6).map((dep, idx, arr) => {
-          const mins = Math.max(
-            0,
-            Math.round(
-              (new Date(dep.aimedDepartureTime) - new Date()) / 60000
-            )
-          );
-          return (
-            <li key={dep.aimedDepartureTime + '-' + idx} className="flex justify-between py-1">
-              <span className="flex items-center gap-1">
-                <span className="font-bold">{new Date(dep.aimedDepartureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> – <span className="text-green-600 text-sm font-bold align-middle">{formatMinutes(mins)}</span>
-              </span>
-              <span className="text-gray-500">{dep.destinationDisplay?.frontText}</span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-// Merk: Entur sitt API gir ikke ut "alle avganger for alle stopp" i én bulk, men du kan cache stopp og avganger for ditt område.
-// For Vilde: localStorage fungerer i browser og PWA, men ikke i SSR. Dette oppsettet er trygt for Vilde.
+// function isFerryStopName(name) {
+//   if (!name) return false;
+//   const lowered = name.toLowerCase();
+//   return (
+//     lowered.includes('ferje') ||
+//     lowered.includes('fergekai') ||
+//     lowered.includes('kai') || lowered.includes('lalala') ||
+//     lowered.includes('ferry')
+//   );
+// }

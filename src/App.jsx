@@ -215,7 +215,21 @@ export default function App() {
     fetchDepartures();
   }, [highlightedStop]);
 
-  if (loading) return <p>Laster posisjon og fergekaier...</p>;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-fuchsia-500 flex flex-col items-center justify-center py-6">
+        <h1 className="text-5xl font-extrabold text-white tracking-widest mb-6">FERGETID</h1>
+        <div className="flex flex-col items-center">
+          {/* Kul spinner med farger og bevegelse */}
+          <span className="relative flex h-12 w-12 mb-4">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-40"></span>
+            <span className="relative inline-flex rounded-full h-12 w-12 border-4 border-t-fuchsia-200 border-b-fuchsia-700 border-l-white border-r-white animate-spin"></span>
+          </span>
+          <p className="text-lg text-white font-semibold">Laster posisjon og fergekaier...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-fuchsia-500 flex flex-col items-center py-6">

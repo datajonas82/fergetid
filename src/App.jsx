@@ -1,3 +1,8 @@
+// Hjelpefunksjon for å oversette nynorsk 'ferjekai' til bokmål 'fergekai'
+function bokmaalify(text) {
+  if (!text) return text;
+  return text.replace(/ferjekai/gi, 'fergekai');
+}
 import { useEffect, useState, useCallback } from 'react';
 import { GraphQLClient, gql } from 'graphql-request';
 
@@ -286,7 +291,7 @@ export default function AppLokal() {
                 {distance ? `${Math.round(distance / 1000)} KM` : '? KM'}
               </div>
               <h2 className="text-3xl font-bold tracking-wide mb-2 text-gray-900">
-                {place.name}
+                {bokmaalify(place.name)}
               </h2>
               <hr className="my-2" />
               {departures && departures.length > 0 ? (
@@ -316,7 +321,7 @@ export default function AppLokal() {
                       ) : 'Neste avgang: ?'}
                     </div>
                     <div className="text-gray-500 text-base leading-tight">
-                      {departures[0].destinationDisplay?.frontText || ''}
+                      {bokmaalify(departures[0].destinationDisplay?.frontText || '')}
                     </div>
                   </div>
                   {isHighlighted && departures.length > 1 && (
@@ -411,7 +416,7 @@ function SenereAvganger({ departures, stopId }) {
               <span className="flex items-center gap-1">
                 <span className="font-bold">{new Date(dep.aimedDepartureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> – <span className="text-green-600 text-sm font-bold align-middle">{formatMinutes(mins)}</span>
               </span>
-              <span className="text-gray-500">{dep.destinationDisplay?.frontText}</span>
+              <span className="text-gray-500">{bokmaalify(dep.destinationDisplay?.frontText)}</span>
             </li>
           );
         })}

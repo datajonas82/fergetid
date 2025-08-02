@@ -9,16 +9,26 @@ function BottomMenu({ page, setPage }) {
   return (
     <nav className="fixed bottom-0 left-0 w-full bg-white border-t border-fuchsia-200 flex justify-center z-50">
       <button
-        className={'flex-1 py-3 text-lg font-bold ' + (page === 'lokasjon' ? 'text-fuchsia-700' : 'text-gray-400')}
-        onClick={() => setPage('lokasjon')}
-      >
-        Auto GPS
-      </button>
-      <button
-        className={'flex-1 py-3 text-lg font-bold ' + (page === 'sok' ? 'text-fuchsia-700' : 'text-gray-400')}
+        className={
+          'flex-1 py-3 text-lg font-bold transition-colors duration-150 ' +
+          (page === 'sok' ? 'text-fuchsia-700 bg-f3c6ff' : 'text-gray-400') +
+          ' border-r border-[#f3c6ff] rounded-none focus:z-10'
+        }
+        style={{ borderTopLeftRadius: '1rem', borderBottomLeftRadius: '1rem' }}
         onClick={() => setPage('sok')}
       >
         Søk
+      </button>
+      <button
+        className={
+          'flex-1 py-3 text-lg font-bold transition-colors duration-150 ' +
+          (page === 'lokasjon' ? 'text-fuchsia-700 bg-f3c6ff' : 'text-gray-400') +
+          ' border-l border-[#f3c6ff] rounded-none focus:z-10'
+        }
+        style={{ borderTopRightRadius: '1rem', borderBottomRightRadius: '1rem' }}
+        onClick={() => setPage('lokasjon')}
+      >
+        Auto GPS
       </button>
     </nav>
   );
@@ -77,7 +87,7 @@ const DEPARTURES_QUERY = gql`
 `;
 
 function App() {
-  const [page, setPage] = useState('lokasjon');
+  const [page, setPage] = useState('sok');
   const [location, setLocation] = useState(null);
   const [locationName, setLocationName] = useState('');
   const [ferryStops, setFerryStops] = useState([]);
@@ -181,9 +191,6 @@ function App() {
       {locationName && (
         <div className="text-lg text-white mb-4 text-center">
           Din posisjon er <span className="font-bold">{locationName}</span>
-          <div>
-            Klokken er: <span className="font-bold">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-          </div>
         </div>
       )}
       {error && <p className="text-black font-bold">{error}</p>}

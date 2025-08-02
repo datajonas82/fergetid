@@ -103,11 +103,11 @@ export default function Search() {
 
   return (
     <div className="flex flex-col items-center py-8 pb-24">
-      <h1 className="text-5xl font-extrabold text-white tracking-widest mb-3 drop-shadow-lg" style={{letterSpacing:'0.08em'}}>FERGETID</h1>
-      <div className="text-base text-white font-semibold mb-6">Klokken er: <span className="font-bold">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
-      <form onSubmit={handleSearch} className="w-full max-w-xl flex mb-6 px-4 gap-2">
+      <h1 className="text-5xl font-extrabold text-white tracking-widest mb-3 drop-shadow-lg mx-auto" style={{letterSpacing:'0.08em', maxWidth: '260px'}}>FERGETID</h1>
+      {/* Klokken fjernet */}
+      <form onSubmit={handleSearch} className="mx-auto flex mb-6 px-0 gap-2" style={{maxWidth: '260px'}}>
         <input
-          className="flex-1 rounded-xl px-4 py-3 text-base border-2 border-fuchsia-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-400 bg-white shadow"
+          className="flex-1 rounded-xl px-1 py-3 text-base border-2 border-fuchsia-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-400 bg-white shadow"
           type="text"
           placeholder="Søk etter fergekai..."
           value={query}
@@ -115,15 +115,15 @@ export default function Search() {
         />
         <button
           type="submit"
-          className="bg-fuchsia-700 hover:bg-fuchsia-800 text-white font-bold px-6 py-3 rounded-xl shadow-lg text-base"
+          className="bg-fuchsia-700 hover:bg-fuchsia-800 text-white font-bold px-4 py-3 rounded-xl shadow-lg text-base"
           disabled={loading || !query.trim()}
         >
           Søk
         </button>
       </form>
-      {error && <p className="text-white font-bold mb-3 bg-fuchsia-900/80 px-3 py-2 rounded-xl shadow text-base">{error}</p>}
+      {error && <p className="text-white font-bold mb-3 bg-fuchsia-900/80 px-2 py-2 rounded-xl shadow text-base">{error}</p>}
       {loading && <p className="text-white mb-3 text-base animate-pulse">Laster...</p>}
-      <div className="w-full max-w-xl space-y-6 px-4 sm:px-0">
+      <div className="w-full max-w-xl space-y-6 px-3 sm:px-0">
         {results.map((stop) => {
           const calls = departuresMap[stop.id] || [];
           const now = new Date();

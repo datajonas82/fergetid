@@ -66,10 +66,18 @@ export default function Search() {
     setDeparturesMap({});
     try {
       const data = await client.request(ALL_FERRY_STOPS_QUERY);
+      // ...eksisterende kode...
+
+      const excludedSubmodes = ['nationalCarFerry', 'regionalPassengerFerry', 'localPassengerFerry', 'nationalPassengerFerry', 'sightSeeingService', 'highSpeedPassengerService'];
       const stops = (data.stopPlaces || []).filter(
-        (stop) =>
-          Array.isArray(stop.transportMode) && stop.transportMode.includes('water') &&
-          normalize(stop.name).includes(normalize(query))
+        (stop) => {
+          if (!Array.isArray(stop.transportMode) || !stop.transportMode.includes('water')) return false;
+          if (excludedSubmodes.includes(stop.transportSubmode)) return false;
+          const name = (stop.name || '').toLowerCase();
+          // Inkluder kun navn som inneholder 'fergekai' eller 'ferjekai'
+          if (!(name.includes('fergekai') || name.includes('ferjekai'))) return false;
+          return normalize(stop.name).includes(normalize(query));
+        }
       );
       setResults(stops);
       // Hent avganger for alle stopp parallelt

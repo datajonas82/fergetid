@@ -153,7 +153,7 @@ export default function Search() {
                   <span className="text-green-600 font-bold text-sm whitespace-nowrap">{timeDiffStr(now, next.aimed)}</span>
                 </div>
                 <div className="text-gray-500 text-base leading-tight">
-                  {next.destinationDisplay?.frontText || ''}
+                  {(next.destinationDisplay?.frontText || '').replace(/E39/gi, '').replace(/  +/g, ' ').trim()}
                 </div>
               </>
             );
@@ -170,7 +170,7 @@ export default function Search() {
                           <span className="text-green-600 font-bold text-sm whitespace-nowrap align-middle
                           ">{timeDiffStr(now, dep.aimed)}</span>
                         </span>
-                        <span className="w-24 text-gray-500 text-right">{dep.destinationDisplay?.frontText}</span>
+                        <span className="w-24 text-gray-500 text-right">{(dep.destinationDisplay?.frontText || '').replace(/E39/gi, '').replace(/  +/g, ' ').trim()}</span>
                       </li>
                     );
                   })}

@@ -238,7 +238,7 @@ function App() {
                       ) : 'Neste avgang: ?'}
                     </div>
                     <div className="text-gray-500 text-base leading-tight">
-                      {departures[0].destinationDisplay?.frontText || ''}
+                      {(departures[0].destinationDisplay?.frontText || '').replace(/E39/gi, '').replace(/  +/g, ' ').trim()}
                     </div>
                   </div>
                   {isHighlighted && departures.length > 1 && (
@@ -258,7 +258,7 @@ function App() {
                               <span className="flex-1 flex justify-center">
                                 <span className="text-green-600 text-sm font-bold align-middle whitespace-nowrap">{formatMinutes(mins)}</span>
                               </span>
-                              <span className="w-24 text-gray-500 text-right">{dep.destinationDisplay?.frontText}</span>
+                              <span className="w-24 text-gray-500 text-right">{(dep.destinationDisplay?.frontText || '').replace(/E39/gi, '').replace(/  +/g, ' ').trim()}</span>
                             </li>
                           );
                         })}

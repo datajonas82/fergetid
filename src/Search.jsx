@@ -102,7 +102,7 @@ export default function Search() {
   }
 
   return (
-    <div className="bg-[#d95cff] flex flex-col items-center py-8 pb-24">
+    <div className="flex flex-col items-center py-8 pb-24">
       <h1 className="text-5xl font-extrabold text-white tracking-widest mb-3 drop-shadow-lg" style={{letterSpacing:'0.08em'}}>FERGETID</h1>
       <div className="text-base text-white font-semibold mb-6">Klokken er: <span className="font-bold">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
       <form onSubmit={handleSearch} className="w-full max-w-xl flex mb-6 px-4 gap-2">

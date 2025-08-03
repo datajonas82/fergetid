@@ -75,7 +75,8 @@ export default function Search() {
     const generateSuggestions = async () => {
       try {
         const data = await client.request(ALL_FERRY_STOPS_QUERY);
-        const stops = (data.stopPlaces || []).filter(
+
+        let stops = (data.stopPlaces || []).filter(
           (stop) => {
             if (!Array.isArray(stop.transportMode) || !stop.transportMode.includes('water')) return false;
             if (EXCLUDED_SUBMODES.includes(stop.transportSubmode)) return false;
@@ -84,16 +85,26 @@ export default function Search() {
             return normalizeText(stop.name).includes(normalizeText(query));
           }
         );
-        
+        // Sorter slik at treff som starter med søkeordet kommer øverst
+        const normQuery = normalizeText(query).toLowerCase();
+        stops = stops.sort((a, b) => {
+          const aName = normalizeText(a.name).toLowerCase();
+          const bName = normalizeText(b.name).toLowerCase();
+          if (aName.startsWith(normQuery) && !bName.startsWith(normQuery)) return -1;
+          if (!aName.startsWith(normQuery) && bName.startsWith(normQuery)) return 1;
+          if (aName.includes(normQuery) && !bName.includes(normQuery)) return -1;
+          if (!aName.includes(normQuery) && bName.includes(normQuery)) return 1;
+          return aName.localeCompare(bName);
+        });
         // Limit to 5 suggestions and format them
         const formattedSuggestions = stops.slice(0, 5).map(stop => ({
           id: stop.id,
-          name: bokmaalify(stop.name),
+          name: bokmaalify(stop.name.replace(/fergekai|ferjekai/gi, '').replace(/  +/g, ' ').trim()),
           originalName: stop.name
         }));
         
-        setSuggestions(formattedSuggestions);
-        setShowSuggestions(formattedSuggestions.length > 0);
+        setSuggestions([]);
+        setShowSuggestions(false);
         setSelectedSuggestionIndex(-1);
       } catch (error) {
         console.error('Error generating suggestions:', error);
@@ -117,7 +128,7 @@ export default function Search() {
       const data = await client.request(ALL_FERRY_STOPS_QUERY);
       // ...eksisterende kode...
 
-      const stops = (data.stopPlaces || []).filter(
+      let stops = (data.stopPlaces || []).filter(
         (stop) => {
           if (!Array.isArray(stop.transportMode) || !stop.transportMode.includes('water')) return false;
           if (EXCLUDED_SUBMODES.includes(stop.transportSubmode)) return false;
@@ -127,6 +138,17 @@ export default function Search() {
           return normalizeText(stop.name).includes(normalizeText(query));
         }
       );
+      // Sorter slik at treff som starter med søkeordet kommer øverst
+      const normQuery = normalizeText(query).toLowerCase();
+      stops = stops.sort((a, b) => {
+        const aName = normalizeText(a.name).toLowerCase();
+        const bName = normalizeText(b.name).toLowerCase();
+        if (aName.startsWith(normQuery) && !bName.startsWith(normQuery)) return -1;
+        if (!aName.startsWith(normQuery) && bName.startsWith(normQuery)) return 1;
+        if (aName.includes(normQuery) && !bName.includes(normQuery)) return -1;
+        if (!aName.includes(normQuery) && bName.includes(normQuery)) return 1;
+        return aName.localeCompare(bName);
+      });
       setResults(stops);
       // Hent avganger for alle stopp parallelt
       const departuresResults = await Promise.all(
@@ -209,24 +231,7 @@ export default function Search() {
           </button>
         </form>
         
-        {/* Autocomplete suggestions */}
-        {showSuggestions && suggestions.length > 0 && (
-          <div className="absolute top-full left-0 right-0 z-50 bg-white rounded-xl shadow-lg border border-fuchsia-200 max-h-60 overflow-y-auto">
-            {suggestions.map((suggestion, index) => (
-              <div
-                key={suggestion.id}
-                className={`px-4 py-3 cursor-pointer transition-colors ${
-                  index === selectedSuggestionIndex 
-                    ? 'bg-fuchsia-100 text-fuchsia-700' 
-                    : 'hover:bg-gray-50 text-gray-700'
-                } ${index === 0 ? 'rounded-t-xl' : ''} ${index === suggestions.length - 1 ? 'rounded-b-xl' : ''}`}
-                onClick={() => handleSuggestionClick(suggestion)}
-              >
-                <div className="font-medium">{suggestion.name}</div>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Autocomplete er deaktivert */}
       {error && <p className="text-white font-bold mb-3 bg-fuchsia-900/80 px-2 py-2 rounded-xl shadow text-base">{error}</p>}
       {loading && <p className="text-white mb-3 text-base animate-pulse">Laster...</p>}
       <div className="w-full max-w-md space-y-8 px-4 sm:px-0">
@@ -313,7 +318,7 @@ export default function Search() {
               }}
             >
               <div className="flex flex-col">
-                <h2 className="text-3xl font-bold tracking-wide mb-2 text-gray-900">{bokmaalify(stop.name)}</h2>
+                <h2 className="ferry-quay-name">{bokmaalify(stop.name.replace(/fergekai|ferjekai/gi, '').replace(/  +/g, ' ').trim())}</h2>
                 <hr className="my-2" />
                 {/* Vis neste avgang alltid */}
                 {nextDepartureText || <div className="text-gray-400 text-sm italic">Ingen avganger funnet</div>}

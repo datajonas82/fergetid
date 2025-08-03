@@ -195,8 +195,8 @@ function App() {
               <div className="absolute -top-4 -left-3 distance-badge rounded-lg px-3 py-1 text-base font-bold text-blue-600">
                 {formatDistance(distance)}
               </div>
-              <h2 className="text-3xl font-bold tracking-wide mb-2 text-gray-900">
-                {place.name}
+              <h2 className="ferry-quay-name">
+                {(place.name || '').replace(/fergekai|ferjekai/gi, '').replace(/  +/g, ' ').trim()}
               </h2>
               <hr className="my-2" />
               {departures && departures.length > 0 ? (

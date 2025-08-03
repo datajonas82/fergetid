@@ -86,6 +86,7 @@ function App() {
   const [departuresMap, setDeparturesMap] = useState({});
   const [selectedStop, setSelectedStop] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [cardLoading, setCardLoading] = useState({}); // Separate loading state for individual cards
   const [error, setError] = useState(null);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [mode, setMode] = useState('search'); // 'search' or 'gps'
@@ -385,7 +386,7 @@ function App() {
     }
 
     // Hent avganger for første gang
-    setLoading(true);
+    setCardLoading(prev => ({ ...prev, [stop.id]: true }));
     try {
       const data = await client.request(DEPARTURES_QUERY, { id: stop.id });
       const calls = data.stopPlace.estimatedCalls || [];
@@ -415,7 +416,7 @@ function App() {
       console.error('Error fetching departures:', err);
       setSelectedStop(stop.id); // Fortsett å vise kortet som utvidet selv om det feiler
     } finally {
-      setLoading(false);
+      setCardLoading(prev => ({ ...prev, [stop.id]: false }));
     }
   };
 
@@ -469,11 +470,11 @@ function App() {
 
   return (
     <>
-      <div className="bg-gradient flex flex-col items-center py-6 pb-24">
-        <h1 className="text-5xl font-extrabold text-white tracking-widest mb-6 drop-shadow-lg">{APP_NAME}</h1>
+      <div className="bg-gradient flex flex-col items-center py-4 sm:py-6 pb-16 sm:pb-24">
+        <h1 className="text-5xl sm:text-7xl font-extrabold text-white tracking-widest mb-4 sm:mb-6 drop-shadow-lg">{APP_NAME}</h1>
       
       {/* Search Section */}
-      <div className="w-full max-w-md mb-8 px-4">
+      <div className="w-full max-w-[350px] sm:max-w-md mb-6 sm:mb-8 px-3 sm:px-4">
         <div className="flex gap-2">
           <div className="flex-1 relative">
             <input
@@ -524,7 +525,7 @@ function App() {
 
       {/* GPS Location Display */}
       {mode === 'gps' && locationName && (
-        <div className="text-lg text-white mb-4 text-center">
+        <div className="text-base sm:text-lg text-white mb-4 text-center px-3">
           Din posisjon er <span className="font-bold">{locationName}</span>
           <div>
             Klokken er: <span className="font-bold">{getCurrentTime()}</span>
@@ -534,7 +535,7 @@ function App() {
 
                  {/* Results */}
          {hasInteracted && !loading && ferryStops.length > 0 && (
-           <div className="w-full max-w-md space-y-8 px-4 sm:px-0 mx-auto">
+           <div className="w-full max-w-[350px] sm:max-w-md space-y-6 sm:space-y-8 px-3 sm:px-4 sm:px-0 mx-auto">
              {ferryStops.map((stop, i) => {
                // Handle both GPS format (with nextDeparture) and search format (with departures array)
                const isGPSFormat = stop.nextDeparture !== undefined;
@@ -585,14 +586,14 @@ function App() {
                  <div
                    id={`ferry-card-${stopData.id}`}
                    key={stopData.id + '-' + (distance || '')}
-                   className={`relative rounded-2xl p-5 glass-card card-expand w-full max-w-[370px] ${
+                   className={`relative rounded-2xl p-4 sm:p-5 glass-card card-expand w-full max-w-[350px] sm:max-w-[370px] ${
                      isExpanded ? 'expanded' : 'cursor-pointer'
                    }`}
-                   style={{ minWidth: '320px', maxWidth: '370px' }}
+                   style={{ minWidth: '280px', maxWidth: '350px' }}
                    onClick={() => handleShowDepartures(stopData)}
                  >
                    {distance && (
-                     <div className="absolute -top-4 -left-3 distance-badge rounded-lg px-3 py-1 text-base font-bold text-blue-600">
+                     <div className="absolute -top-3 sm:-top-4 -left-2 sm:-left-3 distance-badge rounded-lg px-2 sm:px-3 py-1 text-sm sm:text-base font-bold text-blue-600">
                        {formatDistance(distance)}
                      </div>
                    )}
@@ -611,7 +612,7 @@ function App() {
                    
                    {nextDeparture ? (
                      <>
-                       <div className="mt-2 text-lg">
+                       <div className="mt-2 text-base sm:text-lg">
                          <div className="text-gray-700 flex flex-row flex-wrap items-center gap-2">
                            <span>Neste avgang:</span>
                          </div>
@@ -638,7 +639,7 @@ function App() {
                        {/* Vis kun "Senere avganger" hvis vi har data eller kortet er utvidet */}
                        {(laterDepartures.length > 0 || isExpanded) && (
                          <div className="mt-4 departures-list">
-                           <div className="text-lg text-gray-700 font-normal mb-1">Senere avganger:</div>
+                           <div className="text-base sm:text-lg text-gray-700 font-normal mb-1">Senere avganger:</div>
                            <ul>
                              {laterDepartures.length > 0 ? (
                                laterDepartures.map((dep, idx) => {
@@ -665,7 +666,9 @@ function App() {
                                  );
                                })
                              ) : (
-                               <li className="text-gray-500 text-sm py-2">Laster senere avganger...</li>
+                               <li className="text-gray-500 text-sm py-2">
+                                 {cardLoading[stopData.id] ? "Laster senere avganger..." : "Ingen senere avganger"}
+                               </li>
                              )}
                            </ul>
                          </div>

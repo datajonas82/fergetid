@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { GraphQLClient, gql } from 'graphql-request';
+import { ENTUR_ENDPOINT, EXCLUDED_SUBMODES } from './constants';
+import { normalizeText, bokmaalify, cleanDestinationText, calculateTimeDiff, formatMinutes } from './utils/helpers';
 
-const ENTUR_ENDPOINT = 'https://api.entur.io/journey-planner/v3/graphql';
 const client = new GraphQLClient(ENTUR_ENDPOINT, {
   headers: { 'ET-Client-Name': 'fergetid-app' }
 });
@@ -41,10 +42,7 @@ const DEPARTURES_QUERY = gql`
   }
 `;
 
-function bokmaalify(text) {
-  if (!text) return text;
-  return text.replace(/ferjekai/gi, 'fergekai');
-}
+
 
 export default function Search() {
   const [query, setQuery] = useState('');
@@ -54,9 +52,7 @@ export default function Search() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  function normalize(str) {
-    return (str || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
-  }
+
 
   async function handleSearch(e) {
     e.preventDefault();
@@ -68,15 +64,14 @@ export default function Search() {
       const data = await client.request(ALL_FERRY_STOPS_QUERY);
       // ...eksisterende kode...
 
-      const excludedSubmodes = ['nationalCarFerry', 'regionalPassengerFerry', 'localPassengerFerry', 'nationalPassengerFerry', 'sightSeeingService', 'highSpeedPassengerService'];
       const stops = (data.stopPlaces || []).filter(
         (stop) => {
           if (!Array.isArray(stop.transportMode) || !stop.transportMode.includes('water')) return false;
-          if (excludedSubmodes.includes(stop.transportSubmode)) return false;
+          if (EXCLUDED_SUBMODES.includes(stop.transportSubmode)) return false;
           const name = (stop.name || '').toLowerCase();
           // Inkluder kun navn som inneholder 'fergekai' eller 'ferjekai'
           if (!(name.includes('fergekai') || name.includes('ferjekai'))) return false;
-          return normalize(stop.name).includes(normalize(query));
+          return normalizeText(stop.name).includes(normalizeText(query));
         }
       );
       setResults(stops);
@@ -115,7 +110,7 @@ export default function Search() {
       {/* Klokken fjernet */}
       <form onSubmit={handleSearch} className="mx-auto flex mb-6 px-0 gap-2" style={{maxWidth: '260px'}}>
         <input
-          className="flex-1 rounded-xl px-1 py-3 text-base border-2 border-fuchsia-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-400 bg-white shadow"
+          className="flex-1 rounded-xl px-1 py-3 text-base border-2 border-fuchsia-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-400 bg-white/90 backdrop-blur-sm shadow-lg"
           type="text"
           placeholder="Søk etter fergekai..."
           value={query}
@@ -123,7 +118,7 @@ export default function Search() {
         />
         <button
           type="submit"
-          className="bg-fuchsia-700 hover:bg-fuchsia-800 text-white font-bold px-4 py-3 rounded-xl shadow-lg text-base"
+          className="bg-fuchsia-700/90 hover:bg-fuchsia-800/90 backdrop-blur-sm text-white font-bold px-4 py-3 rounded-xl shadow-lg text-base transition-all duration-200"
           disabled={loading || !query.trim()}
         >
           Søk
@@ -131,7 +126,7 @@ export default function Search() {
       </form>
       {error && <p className="text-white font-bold mb-3 bg-fuchsia-900/80 px-2 py-2 rounded-xl shadow text-base">{error}</p>}
       {loading && <p className="text-white mb-3 text-base animate-pulse">Laster...</p>}
-      <div className="w-full max-w-xl space-y-6 px-3 sm:px-0">
+      <div className="w-full max-w-md space-y-8 px-4 sm:px-0">
         {results.map((stop) => {
           const calls = departuresMap[stop.id] || [];
           const now = new Date();
@@ -154,7 +149,7 @@ export default function Search() {
             }
             nextDepartureText = (
               <>
-                <div className="flex flex-row flex-wrap items-center gap-2 mt-1 text-lg">
+                <div className="flex flex-row flex-wrap items-center gap-2 mt-2 text-lg">
                   <span className="text-gray-700">Neste avgang:</span>
                   <span className="font-extrabold text-black text-lg leading-tight">{next.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   <span className="text-gray-700 text-base font-normal">–</span>
@@ -166,17 +161,16 @@ export default function Search() {
               </>
             );
             laterDepartures = later.length > 0 ? (
-              <div className="mt-4">
+              <div className="mt-4 departures-list">
                 <div className="text-lg text-gray-700 font-normal mb-1">Senere avganger:</div>
                 <ul>
                   {later.map((dep, idx) => {
                     const mins = Math.max(0, Math.round((dep.aimed - now) / 60000));
                     return (
                       <li key={dep.aimedDepartureTime + '-' + idx} className="flex items-center py-1">
-                        <span className="font-bold text-left">{dep.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="font-bold w-16 text-left">{dep.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         <span className="flex-1 flex justify-center">
-                          <span className="text-green-600 font-bold text-sm whitespace-nowrap align-middle
-                          ">{timeDiffStr(now, dep.aimed)}</span>
+                          <span className="text-green-600 text-sm font-bold align-middle whitespace-nowrap">{timeDiffStr(now, dep.aimed)}</span>
                         </span>
                         <span className="w-24 text-gray-500 text-right">{(dep.destinationDisplay?.frontText || '').replace(/E39/gi, '').replace(/  +/g, ' ').trim()}</span>
                       </li>
@@ -190,15 +184,14 @@ export default function Search() {
             <div
               key={stop.id}
               className={
-                'relative rounded-3xl p-6 shadow-2xl bg-white border-4 border-white transition-all duration-200 cursor-pointer group overflow-hidden' +
-                (selectedStop && selectedStop.id === stop.id ? ' ring-4 ring-fuchsia-400 scale-105 z-10' : '')
+                'relative rounded-2xl p-5 glass-card card-expand cursor-pointer group overflow-hidden w-full' +
+                (selectedStop && selectedStop.id === stop.id ? ' ring-4 ring-fuchsia-400 scale-105 z-10 expanded' : '')
               }
-              style={{ background: '#fff' }}
               onClick={() => handleShowDepartures(stop)}
             >
-              <div className="flex flex-col gap-1">
-                <h2 className="text-2xl font-extrabold tracking-wide text-gray-900 mb-1">{bokmaalify(stop.name)}</h2>
-                <hr className="mb-1 border-gray-200" />
+              <div className="flex flex-col">
+                <h2 className="text-3xl font-bold tracking-wide mb-2 text-gray-900">{bokmaalify(stop.name)}</h2>
+                <hr className="my-2" />
                 {/* Vis neste avgang alltid */}
                 {nextDepartureText || <div className="text-gray-400 text-sm italic">Ingen avganger funnet</div>}
               </div>

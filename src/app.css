@@ -1,8 +1,0 @@
-/* Bakgrunnsmønster for hele appen */
-body {
-  background-color: #d95cff;
-  background-image: url('/sveler.png');
-  background-repeat: repeat;
-  background-size: 300px;
-  background-position: center;
-}

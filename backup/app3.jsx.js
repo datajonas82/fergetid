@@ -5,8 +5,8 @@ const ENTUR_ENDPOINT = 'https://api.entur.io/journey-planner/v3/graphql';
 const client = new GraphQLClient(ENTUR_ENDPOINT);
 
 const NEARBY_QUERY = gql`
-  query NearestFerryStops($latitude: Float!, $longitude: Float!) {
-    nearest(latitude: $latitude, longitude: $longitude, maximumDistance: 100000, maximumResults: 20) {
+  query NearestStops($latitude: Float!, $longitude: Float!) {
+    nearest(latitude: $latitude, longitude: $longitude, maximumDistance: 70000, maximumResults: 20) {
       edges {
         node {
           distance
@@ -38,6 +38,7 @@ const DEPARTURES_QUERY = gql`
         serviceJourney {
           journeyPattern {
             line {
+              transportMode
               transportSubmode
             }
           }
@@ -46,6 +47,17 @@ const DEPARTURES_QUERY = gql`
     }
   }
 `;
+
+function isFerryStopName(name) {
+  if (!name) return false;
+  const lowered = name.toLowerCase();
+  return (
+    lowered.includes('ferje') ||
+    lowered.includes('fergekai') ||
+    lowered.includes('kai') ||
+    lowered.includes('ferry')
+  );
+}
 
 export default function App() {
   const [location, setLocation] = useState(null);
@@ -78,9 +90,8 @@ export default function App() {
       },
       (err) => {
         console.error('Geolokasjon feilet:', err);
-        setError('Geolokasjon feilet, bruker fallback-posisjon Ålesund');
-        setLocation({ latitude: 62.4723, longitude: 6.154 });
-        setLocationName('Ålesund (fallback)');
+        setError('Geolokasjon feilet, kan ikke hente posisjon');
+        setLoading(false);
       },
       { enableHighAccuracy: true }
     );
@@ -98,22 +109,15 @@ export default function App() {
           longitude: location.longitude,
         });
 
-        const placesWithDistance = data.nearest.edges
-          .map((e) => ({
-            ...e.node.place,
-            distance: e.node.distance,
-          }))
-          .filter(
-            (p) =>
-              p &&
-              p.transportMode?.includes('water') &&
-              p.transportSubmode?.includes('localCarFerry')
-          )
-          .sort((a, b) => a.distance - b.distance)
-          .slice(0, 5);
+        // Vi lager et array av { place, distance } for stopp som er ferge
+        const places = data.nearest.edges
+          .map((e) => e.node)
+          .filter((n) => n.place && isFerryStopName(n.place.name))
+          .slice(0, 5)
+          .map(({ place, distance }) => ({ place, distance }));
 
-        setFerryStops(placesWithDistance);
-        setHighlightedStop(placesWithDistance[0] || null);
+        setFerryStops(places);
+        setHighlightedStop(places[0] || null);
         setLoading(false);
       } catch (err) {
         console.error('Feil ved henting av fergekaier:', err);
@@ -133,14 +137,19 @@ export default function App() {
 
     const fetchDepartures = async () => {
       try {
-        const data = await client.request(DEPARTURES_QUERY, { id: highlightedStop.id });
+        const data = await client.request(DEPARTURES_QUERY, { id: highlightedStop.place.id });
         const calls = data.stopPlace?.estimatedCalls || [];
 
-        // Filtrer kun avganger med serviceJourney.line.transportSubmode === 'localCarFerry'
-        const ferryDepartures = calls.filter(
-          (call) =>
-            call.serviceJourney?.journeyPattern?.line?.transportSubmode === 'localCarFerry'
-        );
+        // Filtrer avganger med relevant transportmodus
+        const ferryDepartures = calls.filter((call) => {
+          const line = call.serviceJourney?.journeyPattern?.line;
+          if (!line) return false;
+          return (
+            line.transportSubmode === 'localCarFerry' ||
+            line.transportMode === 'water' ||
+            line.transportMode === 'buswater'
+          );
+        });
 
         setDepartures(ferryDepartures);
       } catch (err) {
@@ -152,30 +161,33 @@ export default function App() {
     fetchDepartures();
   }, [highlightedStop]);
 
-  if (loading) return <p>Laster posisjon og bilfergekaier...</p>;
+  if (loading) return <p>Laster posisjon og fergekaier...</p>;
 
   return (
-    <div className="p-4 space-y-6 max-w-md mx-auto">
+    <div className="p-4 space-y-6">
       {error && <p className="text-red-600 font-bold">{error}</p>}
 
       {locationName && <p className="text-lg font-medium">📍 Din posisjon er {locationName}.</p>}
 
       {ferryStops.length === 0 && <p>❌ Fant ingen bilferge-stopp i nærheten.</p>}
 
-      {ferryStops.map((stop, i) => (
+      {ferryStops.map(({ place, distance }, i) => (
         <div
-          key={stop.id}
-          className={`rounded-xl p-4 shadow-md ${
-            i === 0 ? 'bg-blue-100 border-2 border-blue-500' : 'bg-white'
+          key={place.id}
+          onClick={() => setHighlightedStop({ place, distance })}
+          className={`cursor-pointer rounded-xl p-4 shadow-md ${
+            highlightedStop?.place.id === place.id
+              ? 'bg-blue-100 border-2 border-blue-500'
+              : 'bg-white'
           }`}
         >
-          <h2 className="text-xl font-bold">{stop.name}</h2>
-          <p className="text-sm text-gray-600">Avstand: {stop.distance.toFixed(0)} m</p>
+          <h2 className="text-xl font-bold">{place.name}</h2>
+          <p className="text-sm text-gray-600">Avstand: {distance ? distance.toFixed(0) : '?'} m</p>
 
-          {i === 0 && departures.length > 0 && (
+          {highlightedStop?.place.id === place.id && departures.length > 0 && (
             <>
               <p className="mt-2 font-semibold">Neste bilfergeavganger:</p>
-              <ul className="mt-1 text-sm list-disc list-inside">
+              <ul className="mt-1 text-sm">
                 {departures.map((dep, idx) => (
                   <li key={idx}>
                     🕒{' '}

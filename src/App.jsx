@@ -1,28 +1,26 @@
 import { useEffect, useState } from 'react';
 import Search from './Search';
 import { GraphQLClient, gql } from 'graphql-request';
+import BottomMenu from './components/BottomMenu';
+import LoadingSpinner from './components/LoadingSpinner';
+import { 
+  ENTUR_ENDPOINT, 
+  NEARBY_SEARCH_CONFIG, 
+  TRANSPORT_MODES, 
+  PAGES, 
+  APP_NAME,
+  GEOLOCATION_OPTIONS 
+} from './constants';
+import { 
+  formatMinutes, 
+  formatDistance, 
+  getCurrentTime, 
+  calculateTimeDiff, 
+  cleanDestinationText,
+  extractLocationName 
+} from './utils/helpers';
 
-const ENTUR_ENDPOINT = 'https://api.entur.io/journey-planner/v3/graphql';
 const client = new GraphQLClient(ENTUR_ENDPOINT);
-
-function BottomMenu({ page, setPage }) {
-  return (
-    <nav className="fixed bottom-0 left-0 w-full bg-white border-t border-fuchsia-200 flex justify-center z-50">
-      <button
-        className={'flex-1 py-3 text-lg font-bold ' + (page === 'sok' ? 'text-fuchsia-700' : 'text-gray-400')}
-        onClick={() => setPage('sok')}
-      >
-        Søk
-      </button>
-      <button
-        className={'flex-1 py-3 text-lg font-bold ' + (page === 'lokasjon' ? 'text-fuchsia-700' : 'text-gray-400')}
-        onClick={() => setPage('lokasjon')}
-      >
-        Auto GPS
-      </button>
-    </nav>
-  );
-}
 
 
 const NEARBY_QUERY = gql`
@@ -30,9 +28,9 @@ const NEARBY_QUERY = gql`
     nearest(
       latitude: $latitude,
       longitude: $longitude,
-      maximumDistance: 50000,
-      maximumResults: 80,
-      filterByModes: [water]
+      maximumDistance: ${NEARBY_SEARCH_CONFIG.maximumDistance},
+      maximumResults: ${NEARBY_SEARCH_CONFIG.maximumResults},
+      filterByModes: [${TRANSPORT_MODES.WATER}]
     ) {
       edges {
         node {
@@ -53,15 +51,6 @@ const NEARBY_QUERY = gql`
   }
 `;
 
-// Hjelpefunksjon for å vise tid til neste avgang
-function formatMinutes(mins) {
-  if (mins < 1) return 'nå';
-  if (mins < 60) return mins + ' min';
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return `${h} time${h > 1 ? 'r' : ''}${m > 0 ? ` ${m} min` : ''}`;
-}
-
 const DEPARTURES_QUERY = gql`
   query StopPlaceDepartures($id: String!) {
     stopPlace(id: $id) {
@@ -77,7 +66,7 @@ const DEPARTURES_QUERY = gql`
 `;
 
 function App() {
-  const [page, setPage] = useState('sok');
+  const [page, setPage] = useState(PAGES.SEARCH);
   const [location, setLocation] = useState(null);
   const [locationName, setLocationName] = useState('');
   const [ferryStops, setFerryStops] = useState([]);
@@ -86,7 +75,7 @@ function App() {
   const [highlightedStop, setHighlightedStop] = useState(null);
 
   useEffect(() => {
-    if (page !== 'lokasjon') return;
+    if (page !== PAGES.LOCATION) return;
     setLoading(true);
     setError(null);
     navigator.geolocation.getCurrentPosition(
@@ -97,17 +86,7 @@ function App() {
         try {
           const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`);
           const data = await resp.json();
-          // Prøv å finne by, tettsted, eller lignende
-          let sted =
-            data.address?.city ||
-            data.address?.town ||
-            data.address?.village ||
-            data.address?.suburb ||
-            data.address?.hamlet ||
-            data.address?.municipality ||
-            data.address?.county ||
-            null;
-          setLocationName(sted || 'Ukjent sted');
+          setLocationName(extractLocationName(data));
         } catch {
           setLocationName('Ukjent sted');
         }
@@ -124,8 +103,8 @@ function App() {
                 const depData = await client.request(DEPARTURES_QUERY, { id: place.id });
                 const calls = depData.stopPlace?.estimatedCalls || [];
                 departures = calls.filter((call) => {
-                  const line = call.serviceJourney?.journeyPattern?.line;
-                  return line && line.transportSubmode === 'localCarFerry';
+                                  const line = call.serviceJourney?.journeyPattern?.line;
+                return line && line.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY;
                 }).slice(0, 5);
               } catch {
                 departures = [];
@@ -146,13 +125,13 @@ function App() {
         setError('Geolokasjon feilet, kan ikke hente posisjon');
         setLoading(false);
       },
-      { enableHighAccuracy: true }
+      GEOLOCATION_OPTIONS
     );
   }, [page]);
 
-  if (page === 'sok') {
+  if (page === PAGES.SEARCH) {
     return (
-      <div className="min-h-screen bg-[#d95cff] flex flex-col items-center py-6 pb-24">
+      <div className="bg-gradient flex flex-col items-center py-6 pb-24">
         <Search />
         <BottomMenu page={page} setPage={setPage} />
       </div>
@@ -161,28 +140,21 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#d95cff] flex flex-col items-center justify-center py-6">
-        <h1 className="text-5xl font-extrabold text-white tracking-widest mb-6">FERGETID</h1>
-        <div className="flex flex-col items-center">
-          <span className="relative flex h-12 w-12 mb-4">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-40"></span>
-            <span className="relative inline-flex rounded-full h-12 w-12 border-4 border-t-fuchsia-200 border-b-fuchsia-700 border-l-white border-r-white animate-spin"></span>
-          </span>
-          <p className="text-lg text-white font-semibold">Laster posisjon og fergekaier...</p>
-        </div>
+      <>
+        <LoadingSpinner />
         <BottomMenu page={page} setPage={setPage} />
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#d95cff] flex flex-col items-center py-6 pb-24">
-      <h1 className="text-5xl font-extrabold text-white tracking-widest mb-6">FERGETID</h1>
+    <div className="bg-gradient flex flex-col items-center py-6 pb-24">
+      <h1 className="text-5xl font-extrabold text-white tracking-widest mb-6 drop-shadow-lg">{APP_NAME}</h1>
       {locationName && (
         <div className="text-lg text-white mb-4 text-center">
           Din posisjon er <span className="font-bold">{locationName}</span>
           <div>
-            Klokken er: <span className="font-bold">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            Klokken er: <span className="font-bold">{getCurrentTime()}</span>
           </div>
         </div>
       )}
@@ -197,8 +169,8 @@ function App() {
             <div
               key={place.id + '-' + distance}
               className={
-                "relative rounded-2xl p-5 shadow-lg bg-white transition-all duration-200 " +
-                (isHighlighted ? "ring-4 ring-fuchsia-400 scale-105 z-10" : "cursor-pointer")
+                "relative rounded-2xl p-5 glass-card card-expand w-full " +
+                (isHighlighted ? "ring-4 ring-fuchsia-400 scale-105 z-10 expanded" : "cursor-pointer")
               }
               onClick={() =>
                 isHighlighted
@@ -206,8 +178,8 @@ function App() {
                   : setHighlightedStop({ place, distance, departures })
               }
             >
-              <div className="absolute -top-4 -left-3 bg-white rounded-lg px-3 py-1 shadow text-base font-bold text-blue-600 border border-gray-200">
-                {distance ? `${Math.round(distance / 1000)} KM` : '? KM'}
+              <div className="absolute -top-4 -left-3 distance-badge rounded-lg px-3 py-1 text-base font-bold text-blue-600">
+                {formatDistance(distance)}
               </div>
               <h2 className="text-3xl font-bold tracking-wide mb-2 text-gray-900">
                 {place.name}
@@ -225,40 +197,28 @@ function App() {
                           </span>
                           <span className="text-gray-700 text-base font-normal">–</span>
                           <span className="text-green-600 font-bold text-sm whitespace-nowrap">
-                            {formatMinutes(
-                              Math.max(
-                                0,
-                                Math.round(
-                                  (new Date(departures[0].aimedDepartureTime) - new Date()) / 60000
-                                )
-                              )
-                            )}
+                            {formatMinutes(calculateTimeDiff(departures[0].aimedDepartureTime))}
                           </span>
                         </>
                       ) : 'Neste avgang: ?'}
                     </div>
                     <div className="text-gray-500 text-base leading-tight">
-                      {(departures[0].destinationDisplay?.frontText || '').replace(/E39/gi, '').replace(/  +/g, ' ').trim()}
+                      {cleanDestinationText(departures[0].destinationDisplay?.frontText)}
                     </div>
                   </div>
                   {isHighlighted && departures.length > 1 && (
-                    <div className="mt-4">
+                    <div className="mt-4 departures-list">
                       <div className="text-lg text-gray-700 font-normal mb-1">Senere avganger:</div>
                       <ul>
                         {departures.slice(1, 6).map((dep, idx) => {
-                          const mins = Math.max(
-                            0,
-                            Math.round(
-                              (new Date(dep.aimedDepartureTime) - new Date()) / 60000
-                            )
-                          );
+                          const mins = calculateTimeDiff(dep.aimedDepartureTime);
                           return (
                             <li key={dep.aimedDepartureTime + '-' + idx} className="flex items-center py-1">
                               <span className="font-bold w-16 text-left">{new Date(dep.aimedDepartureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                               <span className="flex-1 flex justify-center">
                                 <span className="text-green-600 text-sm font-bold align-middle whitespace-nowrap">{formatMinutes(mins)}</span>
                               </span>
-                              <span className="w-24 text-gray-500 text-right">{(dep.destinationDisplay?.frontText || '').replace(/E39/gi, '').replace(/  +/g, ' ').trim()}</span>
+                              <span className="w-24 text-gray-500 text-right">{cleanDestinationText(dep.destinationDisplay?.frontText)}</span>
                             </li>
                           );
                         })}

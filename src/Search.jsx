@@ -269,7 +269,7 @@ export default function Search() {
                 </div>
               </>
             );
-            laterDepartures = later.length > 0 ? (
+            laterDepartures = (
               <div className="mt-4 departures-list">
                 <div className="text-lg text-gray-700 font-normal mb-1">Senere avganger:</div>
                 <ul>
@@ -287,7 +287,7 @@ export default function Search() {
                   })}
                 </ul>
               </div>
-            ) : null;
+            );
           }
           // Top card is only expanded by default (when selectedStop is null)
           const isExpanded = selectedStop === false
@@ -324,7 +324,7 @@ export default function Search() {
                 {nextDepartureText || <div className="text-gray-400 text-sm italic">Ingen avganger funnet</div>}
               </div>
               {/* Utvidet visning for senere avganger */}
-              {isExpanded && laterDepartures}
+              {laterDepartures}
               {/* Symbol for å indikere utvidelse - kant i kant med kortet */}
               <div className="absolute left-1/2 -translate-x-1/2 bottom-[-12px] flex pointer-events-none select-none">
                 <span className="bg-gray-200 rounded-full px-2.5 py-0.5 flex items-center shadow-md" style={{minWidth:'31px', minHeight:'17px'}}>

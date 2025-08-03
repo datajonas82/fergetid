@@ -230,25 +230,23 @@ function App() {
                       <span className="w-24 text-gray-700 text-right font-semibold">{cleanDestinationText(nextDeparture.destinationDisplay?.frontText)}</span>
                     </div>
                   </div>
-                  {isHighlighted && laterDepartures.length > 0 && (
-                    <div className="mt-4 departures-list">
-                      <div className="text-lg text-gray-700 font-normal mb-1">Senere avganger:</div>
-                      <ul>
-                        {laterDepartures.map((dep, idx) => {
-                          const mins = Math.max(0, Math.round((dep.aimed - now) / 60000));
-                          return (
-                            <li key={dep.aimedDepartureTime + '-' + idx} className="flex items-center py-1">
-                              <span className="font-bold w-16 text-left">{dep.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                              <span className="flex-1 flex justify-center">
-                                <span className="text-green-600 text-sm font-bold align-middle whitespace-nowrap">{formatMinutes(mins)}</span>
-                              </span>
-                              <span className="w-24 text-gray-700 text-right font-semibold">{(dep.destinationDisplay?.frontText || '').replace(/E39/gi, '').replace(/  +/g, ' ').trim()}</span>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  )}
+                  <div className="mt-4 departures-list">
+                    <div className="text-lg text-gray-700 font-normal mb-1">Senere avganger:</div>
+                    <ul>
+                      {laterDepartures.map((dep, idx) => {
+                        const mins = Math.max(0, Math.round((dep.aimed - now) / 60000));
+                        return (
+                          <li key={dep.aimedDepartureTime + '-' + idx} className="flex items-center py-1">
+                            <span className="font-bold w-16 text-left">{dep.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span className="flex-1 flex justify-center">
+                              <span className="text-green-600 text-sm font-bold align-middle whitespace-nowrap">{formatMinutes(mins)}</span>
+                            </span>
+                            <span className="w-24 text-gray-700 text-right font-semibold">{(dep.destinationDisplay?.frontText || '').replace(/E39/gi, '').replace(/  +/g, ' ').trim()}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
                   {/* Symbol for å indikere utvidelse - midtstilt og stikker ut */}
                   <div className="absolute left-1/2 -translate-x-1/2 bottom-[-12px] flex pointer-events-none select-none">
                     <span className="bg-gray-200 rounded-full px-2.5 py-0.5 flex items-center shadow-md" style={{minWidth:'31px', minHeight:'17px'}}>

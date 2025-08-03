@@ -62,19 +62,33 @@
   min-width: 100%;
 }
 
-.card-expand .departures-list {
+/* Departures list animation */
+.departures-list {
   max-height: 0;
   opacity: 0;
-  transform: translateY(-10px);
-  transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
-              opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-              transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateY(-15px);
+  transition: max-height 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), 
+              opacity 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   overflow: hidden;
 }
 
 .card-expand.expanded .departures-list {
-  max-height: 400px;
+  max-height: 600px;
   opacity: 1;
   transform: translateY(0);
+}
+
+/* Enhanced slide animation for better visual effect */
+.departures-list ul {
+  transform: translateY(-5px);
+  opacity: 0;
+  transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.02s,
+              opacity 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.02s;
+}
+
+.card-expand.expanded .departures-list ul {
+  transform: translateY(0);
+  opacity: 1;
 }
 

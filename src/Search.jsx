@@ -49,8 +49,12 @@ export default function Search() {
   const [results, setResults] = useState([]);
   const [departuresMap, setDeparturesMap] = useState({}); // { stopId: [calls] }
   const [selectedStop, setSelectedStop] = useState(null);
+  const [hasInteracted, setHasInteracted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const searchInputRef = useRef(null);
 
   // Auto-focus search input when component mounts
@@ -59,6 +63,48 @@ export default function Search() {
       searchInputRef.current.focus();
     }
   }, []);
+
+  // Generate suggestions based on query
+  useEffect(() => {
+    if (!query.trim()) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const generateSuggestions = async () => {
+      try {
+        const data = await client.request(ALL_FERRY_STOPS_QUERY);
+        const stops = (data.stopPlaces || []).filter(
+          (stop) => {
+            if (!Array.isArray(stop.transportMode) || !stop.transportMode.includes('water')) return false;
+            if (EXCLUDED_SUBMODES.includes(stop.transportSubmode)) return false;
+            const name = (stop.name || '').toLowerCase();
+            if (!(name.includes('fergekai') || name.includes('ferjekai'))) return false;
+            return normalizeText(stop.name).includes(normalizeText(query));
+          }
+        );
+        
+        // Limit to 5 suggestions and format them
+        const formattedSuggestions = stops.slice(0, 5).map(stop => ({
+          id: stop.id,
+          name: bokmaalify(stop.name),
+          originalName: stop.name
+        }));
+        
+        setSuggestions(formattedSuggestions);
+        setShowSuggestions(formattedSuggestions.length > 0);
+        setSelectedSuggestionIndex(-1);
+      } catch (error) {
+        console.error('Error generating suggestions:', error);
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    };
+
+    const timeoutId = setTimeout(generateSuggestions, 300); // Debounce
+    return () => clearTimeout(timeoutId);
+  }, [query]);
 
 
   async function handleSearch(e) {
@@ -111,11 +157,39 @@ export default function Search() {
     }
   }
 
+  function handleSuggestionClick(suggestion) {
+    setQuery(suggestion.name);
+    setShowSuggestions(false);
+    setSelectedSuggestionIndex(-1);
+  }
+
+  function handleKeyDown(e) {
+    if (!showSuggestions) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedSuggestionIndex(prev => 
+        prev < suggestions.length - 1 ? prev + 1 : 0
+      );
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedSuggestionIndex(prev => 
+        prev > 0 ? prev - 1 : suggestions.length - 1
+      );
+    } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
+      e.preventDefault();
+      handleSuggestionClick(suggestions[selectedSuggestionIndex]);
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+      setSelectedSuggestionIndex(-1);
+    }
+  }
+
   return (
     <div className="flex flex-col items-center py-8 pb-24">
       <h1 className="text-5xl font-extrabold text-white tracking-widest mb-3 drop-shadow-lg mx-auto" style={{letterSpacing:'0.08em', maxWidth: '260px'}}>FERGETID</h1>
       {/* Klokken fjernet */}
-      <form onSubmit={handleSearch} className="mx-auto flex mb-6 px-0 gap-2" style={{maxWidth: '260px'}}>
+      <form onSubmit={handleSearch} className="mx-auto flex mb-6 px-0 gap-2 relative" style={{maxWidth: '260px'}}>
         <input
           ref={searchInputRef}
           className="flex-1 rounded-xl px-1 py-3 text-base border-2 border-fuchsia-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-400 bg-white/90 backdrop-blur-sm shadow-lg"
@@ -123,19 +197,40 @@ export default function Search() {
           placeholder="Søk etter fergekai..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
         />
-        <button
-          type="submit"
-          className="bg-fuchsia-700/90 hover:bg-fuchsia-800/90 backdrop-blur-sm text-white font-bold px-4 py-3 rounded-xl shadow-lg text-base transition-all duration-200"
-          disabled={loading || !query.trim()}
-        >
-          Søk
-        </button>
-      </form>
+                  <button
+            type="submit"
+            className="bg-fuchsia-700/90 hover:bg-fuchsia-800/90 backdrop-blur-sm text-white font-bold px-4 py-3 rounded-xl shadow-lg text-base transition-all duration-200"
+            disabled={loading || !query.trim()}
+          >
+            Søk
+          </button>
+        </form>
+        
+        {/* Autocomplete suggestions */}
+        {showSuggestions && suggestions.length > 0 && (
+          <div className="absolute top-full left-0 right-0 z-50 bg-white rounded-xl shadow-lg border border-fuchsia-200 max-h-60 overflow-y-auto">
+            {suggestions.map((suggestion, index) => (
+              <div
+                key={suggestion.id}
+                className={`px-4 py-3 cursor-pointer transition-colors ${
+                  index === selectedSuggestionIndex 
+                    ? 'bg-fuchsia-100 text-fuchsia-700' 
+                    : 'hover:bg-gray-50 text-gray-700'
+                } ${index === 0 ? 'rounded-t-xl' : ''} ${index === suggestions.length - 1 ? 'rounded-b-xl' : ''}`}
+                onClick={() => handleSuggestionClick(suggestion)}
+              >
+                <div className="font-medium">{suggestion.name}</div>
+              </div>
+            ))}
+          </div>
+        )}
       {error && <p className="text-white font-bold mb-3 bg-fuchsia-900/80 px-2 py-2 rounded-xl shadow text-base">{error}</p>}
       {loading && <p className="text-white mb-3 text-base animate-pulse">Laster...</p>}
       <div className="w-full max-w-md space-y-8 px-4 sm:px-0">
-        {results.map((stop) => {
+        {results.map((stop, i) => {
           const calls = departuresMap[stop.id] || [];
           const now = new Date();
           const sortedCalls = calls
@@ -159,12 +254,13 @@ export default function Search() {
               <>
                 <div className="flex flex-row flex-wrap items-center gap-2 mt-2 text-lg">
                   <span className="text-gray-700">Neste avgang:</span>
-                  <span className="font-extrabold text-black text-lg leading-tight">{next.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  <span className="text-gray-700 text-base font-normal">–</span>
-                  <span className="text-green-600 font-bold text-sm whitespace-nowrap">{timeDiffStr(now, next.aimed)}</span>
                 </div>
-                <div className="text-gray-700 text-base leading-tight font-semibold">
-                  {(next.destinationDisplay?.frontText || '').replace(/E39/gi, '').replace(/  +/g, ' ').trim()}
+                <div className="flex items-center py-1">
+                  <span className="font-bold w-16 text-left">{next.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="flex-1 flex justify-center">
+                    <span className="text-green-600 text-sm font-bold align-middle whitespace-nowrap">{timeDiffStr(now, next.aimed)}</span>
+                  </span>
+                  <span className="w-24 text-gray-700 text-right font-semibold">{(next.destinationDisplay?.frontText || '').replace(/E39/gi, '').replace(/  +/g, ' ').trim()}</span>
                 </div>
               </>
             );
@@ -188,14 +284,32 @@ export default function Search() {
               </div>
             ) : null;
           }
+          // Top card is only expanded by default (when selectedStop is null)
+          const isExpanded = selectedStop === false
+            ? false
+            : selectedStop
+              ? selectedStop.id === stop.id
+              : (!hasInteracted && i === 0);
           return (
             <div
               key={stop.id}
               className={
-                'relative rounded-2xl p-5 glass-card card-expand cursor-pointer group overflow-hidden w-full' +
-                (selectedStop && selectedStop.id === stop.id ? ' ring-4 ring-fuchsia-400 scale-105 z-10 expanded' : '')
+                'relative rounded-2xl p-5 glass-card card-expand w-full ' +
+                (isExpanded ? 'ring-4 ring-fuchsia-400 scale-105 z-10 expanded' : 'cursor-pointer')
               }
-              onClick={() => handleShowDepartures(stop)}
+              onClick={() => {
+                setHasInteracted(true);
+                if (isExpanded) {
+                  // If top card is default expanded, clicking it sets selectedStop to false (no card expanded)
+                  if (!selectedStop && i === 0) {
+                    setSelectedStop(false);
+                  } else {
+                    setSelectedStop(null);
+                  }
+                } else {
+                  setSelectedStop(stop);
+                }
+              }}
             >
               <div className="flex flex-col">
                 <h2 className="text-3xl font-bold tracking-wide mb-2 text-gray-900">{bokmaalify(stop.name)}</h2>
@@ -204,7 +318,15 @@ export default function Search() {
                 {nextDepartureText || <div className="text-gray-400 text-sm italic">Ingen avganger funnet</div>}
               </div>
               {/* Utvidet visning for senere avganger */}
-              {selectedStop && selectedStop.id === stop.id && laterDepartures}
+              {isExpanded && laterDepartures}
+              {/* Symbol for å indikere utvidelse - kant i kant med kortet */}
+              <div className="absolute left-1/2 -translate-x-1/2 bottom-[-12px] flex pointer-events-none select-none">
+                <span className="bg-gray-200 rounded-full px-2.5 py-0.5 flex items-center shadow-md" style={{minWidth:'31px', minHeight:'17px'}}>
+                  <span className="mx-0.5 w-1 h-1 bg-gray-500 rounded-full inline-block"></span>
+                  <span className="mx-0.5 w-1 h-1 bg-gray-500 rounded-full inline-block"></span>
+                  <span className="mx-0.5 w-1 h-1 bg-gray-500 rounded-full inline-block"></span>
+                </span>
+              </div>
             </div>
           );
         })}

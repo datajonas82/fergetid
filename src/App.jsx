@@ -73,6 +73,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [highlightedStop, setHighlightedStop] = useState(null);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   useEffect(() => {
     if (page !== PAGES.LOCATION) return;
@@ -164,7 +165,12 @@ function App() {
       )}
       <div className="w-full max-w-md space-y-8 px-4 sm:px-0">
         {ferryStops.map(({ place, distance, departures }, i) => {
-          const isHighlighted = highlightedStop && highlightedStop.place.id === place.id;
+          // Top card is only expanded by default (when highlightedStop is null)
+          const isHighlighted = highlightedStop === false
+            ? false
+            : highlightedStop
+              ? highlightedStop.place.id === place.id
+              : (!hasInteracted && i === 0);
           return (
             <div
               key={place.id + '-' + distance}
@@ -172,11 +178,19 @@ function App() {
                 "relative rounded-2xl p-5 glass-card card-expand w-full " +
                 (isHighlighted ? "ring-4 ring-fuchsia-400 scale-105 z-10 expanded" : "cursor-pointer")
               }
-              onClick={() =>
-                isHighlighted
-                  ? setHighlightedStop(null)
-                  : setHighlightedStop({ place, distance, departures })
-              }
+              onClick={() => {
+                setHasInteracted(true);
+                if (isHighlighted) {
+                  // If top card is default expanded, clicking it sets highlightedStop to false (no card expanded)
+                  if (!highlightedStop && i === 0) {
+                    setHighlightedStop(false);
+                  } else {
+                    setHighlightedStop(null);
+                  }
+                } else {
+                  setHighlightedStop({ place, distance, departures });
+                }
+              }}
             >
               <div className="absolute -top-4 -left-3 distance-badge rounded-lg px-3 py-1 text-base font-bold text-blue-600">
                 {formatDistance(distance)}
@@ -192,19 +206,18 @@ function App() {
                       {departures[0].aimedDepartureTime ? (
                         <>
                           <span>Neste avgang:</span>
-                          <span className="font-extrabold">
-                            {new Date(departures[0].aimedDepartureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          <span className="text-gray-700 text-base font-normal">–</span>
-                          <span className="text-green-600 font-bold text-sm whitespace-nowrap">
-                            {formatMinutes(calculateTimeDiff(departures[0].aimedDepartureTime))}
-                          </span>
                         </>
                       ) : 'Neste avgang: ?'}
                     </div>
-                    <div className="text-gray-700 text-base leading-tight font-semibold">
-                      {cleanDestinationText(departures[0].destinationDisplay?.frontText)}
-                    </div>
+                    {departures[0].aimedDepartureTime && (
+                      <div className="flex items-center py-1">
+                        <span className="font-bold w-16 text-left">{new Date(departures[0].aimedDepartureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="flex-1 flex justify-center">
+                          <span className="text-green-600 text-sm font-bold align-middle whitespace-nowrap">{formatMinutes(calculateTimeDiff(departures[0].aimedDepartureTime))}</span>
+                        </span>
+                        <span className="w-24 text-gray-700 text-right font-semibold">{cleanDestinationText(departures[0].destinationDisplay?.frontText)}</span>
+                      </div>
+                    )}
                   </div>
                   {isHighlighted && departures.length > 1 && (
                     <div className="mt-4 departures-list">
@@ -225,6 +238,14 @@ function App() {
                       </ul>
                     </div>
                   )}
+                  {/* Symbol for å indikere utvidelse - midtstilt og stikker ut */}
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-[-12px] flex pointer-events-none select-none">
+                    <span className="bg-gray-200 rounded-full px-2.5 py-0.5 flex items-center shadow-md" style={{minWidth:'31px', minHeight:'17px'}}>
+                      <span className="mx-0.5 w-1 h-1 bg-gray-500 rounded-full inline-block"></span>
+                      <span className="mx-0.5 w-1 h-1 bg-gray-500 rounded-full inline-block"></span>
+                      <span className="mx-0.5 w-1 h-1 bg-gray-500 rounded-full inline-block"></span>
+                    </span>
+                  </div>
                 </>
               ) : (
                 <p className="mt-2 text-sm text-gray-500">Ingen avganger funnet</p>

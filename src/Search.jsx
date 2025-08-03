@@ -319,7 +319,7 @@ export default function Search() {
             >
               <div className="flex flex-col">
                 <h2 className="ferry-quay-name">{bokmaalify(stop.name.replace(/fergekai|ferjekai/gi, '').replace(/  +/g, ' ').trim())}</h2>
-                <hr className="my-2" />
+                <hr />
                 {/* Vis neste avgang alltid */}
                 {nextDepartureText || <div className="text-gray-400 text-sm italic">Ingen avganger funnet</div>}
               </div>

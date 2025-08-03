@@ -8,6 +8,12 @@
   line-height: 2rem;
   /* legg til flere egenskaper her ved behov */
 }
+
+/* Mindre avstand mellom fergekai-navn og hr-linje */
+.ferry-quay-name + hr {
+  margin-top: 0rem;
+  margin-bottom: 0rem;
+}
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

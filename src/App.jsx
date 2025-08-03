@@ -54,7 +54,7 @@ const NEARBY_QUERY = gql`
 const DEPARTURES_QUERY = gql`
   query StopPlaceDepartures($id: String!) {
     stopPlace(id: $id) {
-      estimatedCalls(timeRange: 7200, numberOfDepartures: 6) {
+      estimatedCalls(timeRange: 86400, numberOfDepartures: 50) {
         aimedDepartureTime
         destinationDisplay { frontText }
         serviceJourney {
@@ -104,9 +104,9 @@ function App() {
                 const depData = await client.request(DEPARTURES_QUERY, { id: place.id });
                 const calls = depData.stopPlace?.estimatedCalls || [];
                 departures = calls.filter((call) => {
-                                  const line = call.serviceJourney?.journeyPattern?.line;
-                return line && line.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY;
-                }).slice(0, 5);
+                  const line = call.serviceJourney?.journeyPattern?.line;
+                  return line && line.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY;
+                });
               } catch {
                 departures = [];
               }
@@ -171,6 +171,22 @@ function App() {
             : highlightedStop
               ? highlightedStop.place.id === place.id
               : (!hasInteracted && i === 0);
+          // Find the next and later departures (like Search.jsx)
+          const now = new Date();
+          let nextDeparture = null;
+          let laterDepartures = [];
+          if (departures && departures.length > 0) {
+            const sortedCalls = departures
+              .filter(dep => dep.aimedDepartureTime)
+              .map(dep => ({ ...dep, aimed: new Date(dep.aimedDepartureTime) }))
+              .sort((a, b) => a.aimed - b.aimed);
+            if (sortedCalls.length > 0) {
+              nextDeparture = sortedCalls.find(c => c.aimed > now) || sortedCalls[0];
+              const nextIdx = sortedCalls.indexOf(nextDeparture);
+              // Ta de neste 4 avgangene (inkludert neste dags avganger)
+              laterDepartures = sortedCalls.slice(nextIdx + 1, nextIdx + 5);
+            }
+          }
           return (
             <div
               key={place.id + '-' + distance}
@@ -199,40 +215,34 @@ function App() {
               <h2 className="ferry-quay-name">
                 {(place.name || '').replace(/fergekai|ferjekai/gi, '').replace(/  +/g, ' ').trim()}
               </h2>
-              <hr className="my-2" />
-              {departures && departures.length > 0 ? (
+              <hr />
+              {nextDeparture ? (
                 <>
                   <div className="mt-2 text-lg">
                     <div className="text-gray-700 flex flex-row flex-wrap items-center gap-2">
-                      {departures[0].aimedDepartureTime ? (
-                        <>
-                          <span>Neste avgang:</span>
-                        </>
-                      ) : 'Neste avgang: ?'}
+                      <span>Neste avgang:</span>
                     </div>
-                    {departures[0].aimedDepartureTime && (
-                      <div className="flex items-center py-1">
-                        <span className="font-bold w-16 text-left">{new Date(departures[0].aimedDepartureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        <span className="flex-1 flex justify-center">
-                          <span className="text-green-600 text-sm font-bold align-middle whitespace-nowrap">{formatMinutes(calculateTimeDiff(departures[0].aimedDepartureTime))}</span>
-                        </span>
-                        <span className="w-24 text-gray-700 text-right font-semibold">{cleanDestinationText(departures[0].destinationDisplay?.frontText)}</span>
-                      </div>
-                    )}
+                    <div className="flex items-center py-1">
+                      <span className="font-bold w-16 text-left">{nextDeparture.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span className="flex-1 flex justify-center">
+                        <span className="text-green-600 text-sm font-bold align-middle whitespace-nowrap">{formatMinutes(calculateTimeDiff(nextDeparture.aimedDepartureTime || nextDeparture.aimed))}</span>
+                      </span>
+                      <span className="w-24 text-gray-700 text-right font-semibold">{cleanDestinationText(nextDeparture.destinationDisplay?.frontText)}</span>
+                    </div>
                   </div>
-                  {isHighlighted && departures.length > 1 && (
+                  {isHighlighted && laterDepartures.length > 0 && (
                     <div className="mt-4 departures-list">
                       <div className="text-lg text-gray-700 font-normal mb-1">Senere avganger:</div>
                       <ul>
-                        {departures.slice(1, 6).map((dep, idx) => {
-                          const mins = calculateTimeDiff(dep.aimedDepartureTime);
+                        {laterDepartures.map((dep, idx) => {
+                          const mins = Math.max(0, Math.round((dep.aimed - now) / 60000));
                           return (
                             <li key={dep.aimedDepartureTime + '-' + idx} className="flex items-center py-1">
-                              <span className="font-bold w-16 text-left">{new Date(dep.aimedDepartureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              <span className="font-bold w-16 text-left">{dep.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                               <span className="flex-1 flex justify-center">
                                 <span className="text-green-600 text-sm font-bold align-middle whitespace-nowrap">{formatMinutes(mins)}</span>
                               </span>
-                              <span className="w-24 text-gray-700 text-right font-semibold">{cleanDestinationText(dep.destinationDisplay?.frontText)}</span>
+                              <span className="w-24 text-gray-700 text-right font-semibold">{(dep.destinationDisplay?.frontText || '').replace(/E39/gi, '').replace(/  +/g, ' ').trim()}</span>
                             </li>
                           );
                         })}

@@ -300,7 +300,7 @@ export default function Search() {
               key={stop.id}
               className={
                 'relative rounded-2xl p-5 glass-card card-expand w-full max-w-[370px] ' +
-                (isExpanded ? 'ring-4 ring-fuchsia-400 scale-105 z-10 expanded' : 'cursor-pointer')
+                (isExpanded ? 'ring-4 ring-fuchsia-400 z-10 expanded' : 'cursor-pointer')
               }
               style={{ minWidth: '320px', maxWidth: '370px' }}
               onClick={() => {

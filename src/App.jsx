@@ -483,7 +483,7 @@ function App() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Skriv for å søke etter fergekaier..."
+              placeholder="Søk fergekai eller klikk GPS"
               className="w-full px-4 py-3 rounded-lg bg-white/90 backdrop-blur-sm shadow-lg border border-fuchsia-200 focus:border-fuchsia-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-200"
             />
             
@@ -608,11 +608,11 @@ function App() {
                      {cleanDestinationText(stopData.name || '')}
                    </h2>
                    
-                   <hr />
                    
                    {nextDeparture ? (
                      <>
-                       <div className="mt-2 text-base sm:text-lg">
+                       <div className="mt-2 text-base sm:text-lg rounded-lg p-1 bg-gradient-to-r from-purple-400 to-purple-600">
+                         <div className="bg-white rounded-lg p-3">
                          <div className="text-gray-700 flex flex-row flex-wrap items-center gap-2">
                            <span>Neste avgang:</span>
                          </div>
@@ -633,6 +633,7 @@ function App() {
                            >
                              {cleanDestinationText(nextDeparture.destinationDisplay?.frontText)}
                            </span>
+                         </div>
                          </div>
                        </div>
                        

@@ -3,9 +3,9 @@ export const ENTUR_ENDPOINT = 'https://api.entur.io/journey-planner/v3/graphql';
 
 // Geolocation settings
 export const GEOLOCATION_OPTIONS = {
-  enableHighAccuracy: false,
-  timeout: 5000,
-  maximumAge: 300000
+  enableHighAccuracy: true,
+  timeout: 10000,
+  maximumAge: 60000
 };
 
 // Search parameters
@@ -29,9 +29,7 @@ export const EXCLUDED_SUBMODES = [
   'localPassengerFerry',
   'nationalPassengerFerry',
   'sightSeeingService',
-  'highSpeedPassengerService',
-  'highSpeedVehicleService',
-  'highSpeedCarFerry'
+  'highSpeedPassengerService'
 ];
 
 // UI Constants

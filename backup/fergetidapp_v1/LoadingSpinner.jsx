@@ -1,6 +1,9 @@
+import { APP_NAME } from '../constants';
+
 export default function LoadingSpinner({ message = "Laster posisjon og fergekaier..." }) {
   return (
-    <div className="flex flex-col items-center justify-center py-6">
+    <div className="bg-gradient flex flex-col items-center justify-center py-6">
+      <h1 className="text-5xl font-extrabold text-white tracking-widest mb-6">{APP_NAME}</h1>
       <div className="flex flex-col items-center">
         <span className="relative flex h-12 w-12 mb-4">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-40"></span>

@@ -1,10 +1,12 @@
 /* Felles styling for fergekai-navn */
 .ferry-quay-name {
+  font-size: 1.5rem; /* tilsvarer text-2xl */
   font-weight: bold;
   letter-spacing: 0.03em;
   margin-bottom: 0.5rem;
   color: #1a202c; /* tilsvarer text-gray-900 */
-  /* Font-størrelse settes dynamisk i JavaScript */
+  line-height: 2rem;
+  /* legg til flere egenskaper her ved behov */
 }
 
 /* Mindre avstand mellom fergekai-navn og hr-linje */
@@ -19,10 +21,11 @@
 /* Prevent double-tap zoom on mobile */
 /* Ferry quay name styling */
 .ferry-quay-name {
+  font-size: 1.5rem;
   font-weight: 700;
   color: #1f2937;
   margin-bottom: 0.5rem;
-  /* Font-størrelse settes dynamisk i JavaScript */
+  line-height: 1.2;
 }
 
 /* Double-tap zoom prevention */

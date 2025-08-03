@@ -35,7 +35,7 @@ export const EXCLUDED_SUBMODES = [
 ];
 
 // UI Constants
-export const APP_NAME = 'FERGETID';
+export const APP_NAME = 'FergeTid';
 
 // Distance formatting
 export const DISTANCE_UNITS = {

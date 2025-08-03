@@ -203,7 +203,7 @@ function App() {
         setFerryStops(formattedStops);
         setHasInteracted(true);
         setSelectedStop(formattedStops[0].id);
-        // Auto-scroll til det første kortet
+        // Auto-scroll til det første kortet med 4 sekunders delay
         setTimeout(() => {
           const cardElement = document.getElementById(`ferry-card-${formattedStops[0].id}`);
           if (cardElement) {
@@ -213,7 +213,7 @@ function App() {
               inline: 'nearest'
             });
           }
-        }, 100);
+        }, 4000);
       } else {
         setFerryStops([]);
         setHasInteracted(false);

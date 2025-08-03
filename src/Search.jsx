@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { GraphQLClient, gql } from 'graphql-request';
 import { ENTUR_ENDPOINT, EXCLUDED_SUBMODES } from './constants';
 import { normalizeText, bokmaalify, cleanDestinationText, calculateTimeDiff, formatMinutes } from './utils/helpers';
@@ -51,7 +51,14 @@ export default function Search() {
   const [selectedStop, setSelectedStop] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const searchInputRef = useRef(null);
 
+  // Auto-focus search input when component mounts
+  useEffect(() => {
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, []);
 
 
   async function handleSearch(e) {
@@ -110,6 +117,7 @@ export default function Search() {
       {/* Klokken fjernet */}
       <form onSubmit={handleSearch} className="mx-auto flex mb-6 px-0 gap-2" style={{maxWidth: '260px'}}>
         <input
+          ref={searchInputRef}
           className="flex-1 rounded-xl px-1 py-3 text-base border-2 border-fuchsia-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-400 bg-white/90 backdrop-blur-sm shadow-lg"
           type="text"
           placeholder="Søk etter fergekai..."
@@ -155,7 +163,7 @@ export default function Search() {
                   <span className="text-gray-700 text-base font-normal">–</span>
                   <span className="text-green-600 font-bold text-sm whitespace-nowrap">{timeDiffStr(now, next.aimed)}</span>
                 </div>
-                <div className="text-gray-500 text-base leading-tight">
+                <div className="text-gray-700 text-base leading-tight font-semibold">
                   {(next.destinationDisplay?.frontText || '').replace(/E39/gi, '').replace(/  +/g, ' ').trim()}
                 </div>
               </>
@@ -172,7 +180,7 @@ export default function Search() {
                         <span className="flex-1 flex justify-center">
                           <span className="text-green-600 text-sm font-bold align-middle whitespace-nowrap">{timeDiffStr(now, dep.aimed)}</span>
                         </span>
-                        <span className="w-24 text-gray-500 text-right">{(dep.destinationDisplay?.frontText || '').replace(/E39/gi, '').replace(/  +/g, ' ').trim()}</span>
+                        <span className="w-24 text-gray-700 text-right font-semibold">{(dep.destinationDisplay?.frontText || '').replace(/E39/gi, '').replace(/  +/g, ' ').trim()}</span>
                       </li>
                     );
                   })}

@@ -202,7 +202,7 @@ function App() {
                         </>
                       ) : 'Neste avgang: ?'}
                     </div>
-                    <div className="text-gray-500 text-base leading-tight">
+                    <div className="text-gray-700 text-base leading-tight font-semibold">
                       {cleanDestinationText(departures[0].destinationDisplay?.frontText)}
                     </div>
                   </div>
@@ -218,7 +218,7 @@ function App() {
                               <span className="flex-1 flex justify-center">
                                 <span className="text-green-600 text-sm font-bold align-middle whitespace-nowrap">{formatMinutes(mins)}</span>
                               </span>
-                              <span className="w-24 text-gray-500 text-right">{cleanDestinationText(dep.destinationDisplay?.frontText)}</span>
+                              <span className="w-24 text-gray-700 text-right font-semibold">{cleanDestinationText(dep.destinationDisplay?.frontText)}</span>
                             </li>
                           );
                         })}

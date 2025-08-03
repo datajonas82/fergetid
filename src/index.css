@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Prevent double-tap zoom on mobile */
+* {
+  touch-action: manipulation;
+}
+
 /* Modern gradient background */
 .bg-gradient {
   background: linear-gradient(135deg, #d95cff 0%, #c026d3 50%, #a855f7 100%);

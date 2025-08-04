@@ -1,5 +1,6 @@
 /* Felles styling for fergekai-navn */
 .ferry-quay-name {
+  font-family: 'Manrope', sans-serif;
   font-weight: bold;
   letter-spacing: 0.03em;
   margin-bottom: 0.5rem;
@@ -12,13 +13,29 @@
   margin-top: 0rem;
   margin-bottom: 0rem;
 }
+
+/* stylelint-disable-next-line at-rule-no-unknown */
 @tailwind base;
+/* stylelint-disable-next-line at-rule-no-unknown */
 @tailwind components;
+/* stylelint-disable-next-line at-rule-no-unknown */
 @tailwind utilities;
+
+/* Set Manrope as default font */
+body {
+  font-family: 'Manrope', sans-serif;
+}
+
+/* Fergetid title styling */
+.fergetid-title {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 800;
+}
 
 /* Prevent double-tap zoom on mobile */
 /* Ferry quay name styling */
 .ferry-quay-name {
+  font-family: 'Manrope', sans-serif;
   font-weight: 700;
   color: #1f2937;
   margin-bottom: 0.5rem;
@@ -38,7 +55,7 @@
 
 /* Glassmorphism effect for cards */
 .glass-card {
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(12px);
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);

@@ -471,10 +471,10 @@ function App() {
   return (
     <>
       <div className="bg-gradient flex flex-col items-center py-4 sm:py-6 pb-16 sm:pb-24">
-        <h1 className="text-5xl sm:text-7xl font-extrabold text-white tracking-widest mb-4 sm:mb-6 drop-shadow-lg fergetid-title">{APP_NAME}</h1>
+        <h1 className="text-5xl sm:text-7xl font-extrabold text-white tracking-tight mb-4 sm:mb-6 drop-shadow-lg fergetid-title">{APP_NAME}</h1>
       
       {/* Search Section */}
-      <div className="w-full max-w-[350px] sm:max-w-md mb-6 sm:mb-8 px-3 sm:px-4">
+      <div className="w-full max-w-[350px] sm:max-w-md mb-6 sm:mb-8 px-3 sm:px-4 mt-8 sm:mt-12">
         <div className="flex gap-2">
           <div className="flex-1 relative">
             <input

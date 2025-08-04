@@ -19,7 +19,7 @@ import {
   normalizeText,
   bokmaalify
 } from './utils/helpers';
-import { calculateDrivingTime, formatDrivingTime } from './utils/openRouteService';
+import { calculateDrivingTime, formatDrivingTime, generateTravelDescription } from './utils/openRouteService';
 
 const client = new GraphQLClient(ENTUR_ENDPOINT, {
   headers: { 'ET-Client-Name': 'fergetid-app' }
@@ -558,17 +558,17 @@ function App() {
               className="text-fuchsia-600"
             >
               {/* Outer circle */}
-              <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+              <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2"/>
               {/* Inner circle */}
               <circle cx="12" cy="12" r="4" fill="currentColor"/>
               {/* Crosshair lines - top */}
-              <line x1="12" y1="0" x2="12" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <line x1="12" y1="0" x2="12" y2="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
               {/* Crosshair lines - bottom */}
-              <line x1="12" y1="20" x2="12" y2="24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <line x1="12" y1="20" x2="12" y2="24" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
               {/* Crosshair lines - left */}
-              <line x1="0" y1="12" x2="4" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <line x1="0" y1="12" x2="4" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
               {/* Crosshair lines - right */}
-              <line x1="20" y1="12" x2="24" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <line x1="20" y1="12" x2="24" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             </svg>
           </button>
         </div>
@@ -665,13 +665,18 @@ function App() {
                    </h2>
                    
                    {distance && (
-                     <div className="text-sm text-gray-600 font-bold">
-                       {mode === 'gps' && drivingTimes[stopData.id] ? (
-                         <div>
-                           <span className="text-blue-600">{formatDistance(distance)}</span>
-                           <span className="text-gray-500"> / </span>
-                           <span className="text-cyan-600">{formatDrivingTime(drivingTimes[stopData.id])}</span>
-                         </div>
+                     <div className="text-sm text-gray-600">
+                                              {mode === 'gps' && drivingTimes[stopData.id] && nextDeparture ? (
+                         <div className="text-gray-700" style={{ 
+                           '--tw-text-opacity': '1'
+                         }} dangerouslySetInnerHTML={{
+               __html: generateTravelDescription(
+                 distance,
+                 drivingTimes[stopData.id],
+                 calculateTimeDiff(nextDeparture.aimedDepartureTime || nextDeparture.aimed),
+                 departures
+               )
+             }} />
                        ) : mode === 'gps' && drivingTimesLoading[stopData.id] ? (
                          <div>
                            <span className="text-blue-600">{formatDistance(distance)}</span>

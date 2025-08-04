@@ -39,7 +39,7 @@ export const APP_NAME = 'FergeTid';
 
 // Distance formatting
 export const DISTANCE_UNITS = {
-  KILOMETERS: 'KM',
+  KILOMETERS: 'km',
   METERS: 'M'
 };
 

@@ -19,7 +19,6 @@ import {
   normalizeText,
   bokmaalify
 } from './utils/helpers';
-import { calculateDrivingTime, formatDrivingTime } from './utils/openRouteService';
 
 const client = new GraphQLClient(ENTUR_ENDPOINT, {
   headers: { 'ET-Client-Name': 'fergetid-app' }
@@ -95,10 +94,6 @@ function App() {
   // Cache for all ferry stops (for autocomplete)
   const [allFerryStops, setAllFerryStops] = useState([]);
   const [ferryStopsLoaded, setFerryStopsLoaded] = useState(false);
-  
-  // Driving times state
-  const [drivingTimes, setDrivingTimes] = useState({});
-  const [drivingTimesLoading, setDrivingTimesLoading] = useState({});
 
   // Auto-focus search input when component mounts
   useEffect(() => {
@@ -154,8 +149,6 @@ function App() {
       setFerryStops([]);
       setHasInteracted(false);
       setSelectedStop(null);
-      setDrivingTimes({});
-      setDrivingTimesLoading({});
       return;
     }
 
@@ -225,8 +218,6 @@ function App() {
         setFerryStops([]);
         setHasInteracted(false);
         setSelectedStop(null);
-        setDrivingTimes({});
-        setDrivingTimesLoading({});
       }
     };
 
@@ -244,8 +235,6 @@ function App() {
     setFerryStops([]);
     setHasInteracted(false);
     setSelectedStop(null);
-    setDrivingTimes({});
-    setDrivingTimesLoading({});
     
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -309,30 +298,6 @@ function App() {
           
           setFerryStops(places);
           setHasInteracted(true);
-          
-          // Calculate driving times for all ferry stops
-          if (places.length > 0) {
-            const startCoords = { lat: latitude, lng: longitude };
-            
-            for (const place of places) {
-              const stopId = place.id;
-              setDrivingTimesLoading(prev => ({ ...prev, [stopId]: true }));
-              
-              try {
-                const endCoords = { lat: place.latitude, lng: place.longitude };
-                const drivingTime = await calculateDrivingTime(startCoords, endCoords);
-                
-                setDrivingTimes(prev => ({
-                  ...prev,
-                  [stopId]: drivingTime
-                }));
-              } catch (error) {
-                console.error(`Error calculating driving time for ${place.name}:`, error);
-              } finally {
-                setDrivingTimesLoading(prev => ({ ...prev, [stopId]: false }));
-              }
-            }
-          }
           
           // Automatisk utvid det første kortet hvis vi har resultater
           if (places.length > 0) {
@@ -492,15 +457,6 @@ function App() {
     return `${newSize}px`;
   };
 
-  const getDepartureTimeColor = (departureTime, drivingTime) => {
-    if (!drivingTime || mode !== 'gps') return 'text-green-600'; // Default green for search mode
-    
-    const timeToDeparture = calculateTimeDiff(departureTime);
-    const canMakeIt = timeToDeparture > drivingTime;
-    
-    return canMakeIt ? 'text-green-600' : 'text-red-600';
-  };
-
   const handleKeyDown = (e) => {
     switch (e.key) {
       case 'Escape':
@@ -508,8 +464,6 @@ function App() {
         setFerryStops([]);
         setHasInteracted(false);
         setSelectedStop(null);
-        setDrivingTimes({});
-        setDrivingTimesLoading({});
         break;
       case 'Enter':
         // Lukk tastaturet på mobil ved å fjerne fokus fra input-feltet
@@ -574,20 +528,11 @@ function App() {
         </div>
       </div>
 
-      {/* GPS Location Display */}
-      {mode === 'gps' && locationName && (
-        <div className="text-base sm:text-lg text-white mb-4 text-center px-3">
-          Din posisjon er <span className="font-bold">{locationName}</span>
-        </div>
-      )}
-
       {/* Loading and Error States */}
       {(loading || !ferryStopsLoaded) && (
-        <div className="mt-8 sm:mt-12">
-          <LoadingSpinner 
-            message={!ferryStopsLoaded ? "Laster fergekaier..." : "Laster posisjon og fergekaier..."} 
-          />
-        </div>
+        <LoadingSpinner 
+          message={!ferryStopsLoaded ? "Laster fergekaier..." : "Laster posisjon og fergekaier..."} 
+        />
       )}
       {error && (
         <div className="text-center text-white bg-red-500/20 p-4 rounded-lg mb-6 border border-red-300/30">
@@ -595,9 +540,16 @@ function App() {
         </div>
       )}
 
+      {/* GPS Location Display */}
+      {mode === 'gps' && locationName && (
+        <div className="text-base sm:text-lg text-white mb-4 text-center px-3">
+          Din posisjon er <span className="font-bold">{locationName}</span>
+        </div>
+      )}
+
                  {/* Results */}
          {hasInteracted && !loading && ferryStops.length > 0 && (
-           <div className="w-full max-w-[350px] sm:max-w-md space-y-10 sm:space-y-12 px-3 sm:px-4 sm:px-0 mx-auto mt-4">
+           <div className="w-full max-w-[350px] sm:max-w-md space-y-10 sm:space-y-12 px-3 sm:px-4 sm:px-0 mx-auto">
              {ferryStops.map((stop, i) => {
                // Handle both GPS format (with nextDeparture) and search format (with departures array)
                const isGPSFormat = stop.nextDeparture !== undefined;
@@ -654,6 +606,12 @@ function App() {
                    style={{ minWidth: '280px', maxWidth: '350px' }}
                    onClick={() => handleShowDepartures(stopData)}
                  >
+                   {distance && (
+                     <div className="absolute -top-5 sm:-top-6 -left-2 sm:-left-3 distance-badge rounded-lg px-2 sm:px-3 py-1 text-sm sm:text-base font-bold text-blue-600">
+                       {formatDistance(distance)}
+                     </div>
+                   )}
+                   
                    <h2 
                      className="ferry-quay-name"
                      style={{ 
@@ -663,26 +621,6 @@ function App() {
                    >
                      {cleanDestinationText(stopData.name || '')}
                    </h2>
-                   
-                   {distance && (
-                     <div className="text-sm text-gray-600 font-bold">
-                       {mode === 'gps' && drivingTimes[stopData.id] ? (
-                         <div>
-                           <span className="text-blue-600">{formatDistance(distance)}</span>
-                           <span className="text-gray-500"> / </span>
-                           <span className="text-cyan-600">{formatDrivingTime(drivingTimes[stopData.id])}</span>
-                         </div>
-                       ) : mode === 'gps' && drivingTimesLoading[stopData.id] ? (
-                         <div>
-                           <span className="text-blue-600">{formatDistance(distance)}</span>
-                           <span className="text-gray-500"> / </span>
-                           <span className="text-gray-400">Laster...</span>
-                         </div>
-                       ) : (
-                         <div className="text-blue-600">{formatDistance(distance)}</div>
-                       )}
-                     </div>
-                   )}
                    
                    
                    {nextDeparture ? (
@@ -696,7 +634,7 @@ function App() {
                              {nextDeparture.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                            </span>
                            <span className="flex-1 flex justify-center">
-                             <span className={`text-sm font-bold align-middle whitespace-nowrap ${getDepartureTimeColor(nextDeparture.aimedDepartureTime || nextDeparture.aimed, drivingTimes[stopData.id])}`}>
+                             <span className="text-green-600 text-sm font-bold align-middle whitespace-nowrap">
                                {formatMinutes(calculateTimeDiff(nextDeparture.aimedDepartureTime || nextDeparture.aimed))}
                              </span>
                            </span>
@@ -725,7 +663,7 @@ function App() {
                                        {dep.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                      </span>
                                      <span className="flex-1 flex justify-center">
-                                       <span className={`text-sm font-bold align-middle whitespace-nowrap ${getDepartureTimeColor(dep.aimedDepartureTime || dep.aimed, drivingTimes[stopData.id])}`}>
+                                       <span className="text-green-600 text-sm font-bold align-middle whitespace-nowrap">
                                          {formatMinutes(mins)}
                                        </span>
                                      </span>

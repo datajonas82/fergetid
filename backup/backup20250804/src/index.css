@@ -1,0 +1,119 @@
+/* Felles styling for fergekai-navn */
+.ferry-quay-name {
+  font-family: 'Manrope', sans-serif;
+  font-weight: bold;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.5rem;
+  color: #1a202c; /* tilsvarer text-gray-900 */
+  /* Font-størrelse settes dynamisk i JavaScript */
+}
+
+/* Mindre avstand mellom fergekai-navn og hr-linje */
+.ferry-quay-name + hr {
+  margin-top: 0rem;
+  margin-bottom: 0rem;
+}
+
+/* stylelint-disable-next-line at-rule-no-unknown */
+@tailwind base;
+/* stylelint-disable-next-line at-rule-no-unknown */
+@tailwind components;
+/* stylelint-disable-next-line at-rule-no-unknown */
+@tailwind utilities;
+
+/* Set Manrope as default font */
+body {
+  font-family: 'Manrope', sans-serif;
+}
+
+/* Fergetid title styling */
+.fergetid-title {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 1000;
+  font-size: 4rem
+;
+}
+
+/* Prevent double-tap zoom on mobile */
+/* Ferry quay name styling */
+.ferry-quay-name {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+  /* Font-størrelse settes dynamisk i JavaScript */
+}
+
+/* Double-tap zoom prevention */
+* {
+  touch-action: manipulation;
+}
+
+/* Modern gradient background */
+.bg-gradient {
+  background: linear-gradient(135deg, #d95cff 0%, #c026d3 50%, #a855f7 100%);
+  min-height: 100vh;
+}
+
+/* Glassmorphism effect for cards */
+.glass-card {
+  backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+/* Enhanced distance badge */
+.distance-badge {
+  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  position: absolute;
+  z-index: 10;
+}
+
+/* Smooth expansion animation for ferry cards */
+.card-expand {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: visible;
+  width: 100%;
+  min-width: 100%;
+}
+
+/* Departures list animation */
+.departures-list {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-15px);
+  transition: max-height 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), 
+              opacity 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  overflow: hidden;
+}
+
+.card-expand.expanded .departures-list {
+  max-height: 600px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Enhanced slide animation for better visual effect */
+.departures-list ul {
+  transform: translateY(-5px);
+  opacity: 0;
+  transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.02s,
+              opacity 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.02s;
+}
+
+.card-expand.expanded .departures-list ul {
+  transform: translateY(0);
+  opacity: 1;
+}
+

@@ -465,6 +465,12 @@ function App() {
         setHasInteracted(false);
         setSelectedStop(null);
         break;
+      case 'Enter':
+        // Lukk tastaturet på mobil ved å fjerne fokus fra input-feltet
+        if (searchInputRef.current) {
+          searchInputRef.current.blur();
+        }
+        break;
     }
   };
 

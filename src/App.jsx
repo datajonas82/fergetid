@@ -511,7 +511,18 @@ function App() {
               fill="currentColor" 
               className="text-fuchsia-600"
             >
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+              {/* Outer circle */}
+              <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+              {/* Inner circle */}
+              <circle cx="12" cy="12" r="4" fill="currentColor"/>
+              {/* Crosshair lines - top */}
+              <line x1="12" y1="0" x2="12" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              {/* Crosshair lines - bottom */}
+              <line x1="12" y1="20" x2="12" y2="24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              {/* Crosshair lines - left */}
+              <line x1="0" y1="12" x2="4" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              {/* Crosshair lines - right */}
+              <line x1="20" y1="12" x2="24" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
           </button>
         </div>
@@ -538,7 +549,7 @@ function App() {
 
                  {/* Results */}
          {hasInteracted && !loading && ferryStops.length > 0 && (
-           <div className="w-full max-w-[350px] sm:max-w-md space-y-6 sm:space-y-8 px-3 sm:px-4 sm:px-0 mx-auto">
+           <div className="w-full max-w-[350px] sm:max-w-md space-y-10 sm:space-y-12 px-3 sm:px-4 sm:px-0 mx-auto">
              {ferryStops.map((stop, i) => {
                // Handle both GPS format (with nextDeparture) and search format (with departures array)
                const isGPSFormat = stop.nextDeparture !== undefined;
@@ -596,7 +607,7 @@ function App() {
                    onClick={() => handleShowDepartures(stopData)}
                  >
                    {distance && (
-                     <div className="absolute -top-3 sm:-top-4 -left-2 sm:-left-3 distance-badge rounded-lg px-2 sm:px-3 py-1 text-sm sm:text-base font-bold text-blue-600">
+                     <div className="absolute -top-5 sm:-top-6 -left-2 sm:-left-3 distance-badge rounded-lg px-2 sm:px-3 py-1 text-sm sm:text-base font-bold text-blue-600">
                        {formatDistance(distance)}
                      </div>
                    )}

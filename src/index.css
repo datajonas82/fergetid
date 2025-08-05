@@ -44,10 +44,23 @@ body {
   /* Font-størrelse settes dynamisk i JavaScript */
 }
 
-/* Double-tap zoom prevention */
-* {
-  touch-action: manipulation;
+/* Double-tap zoom prevention - only on touch devices */
+@media (pointer: coarse) {
+  * {
+    touch-action: manipulation;
+  }
 }
+
+/* Simple fix for touchpad scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  -webkit-overflow-scrolling: touch;
+}
+
+
 
 /* Modern gradient background */
 .bg-gradient {
@@ -116,4 +129,6 @@ body {
   transform: translateY(0);
   opacity: 1;
 }
+
+
 

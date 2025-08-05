@@ -1,0 +1,32 @@
+{
+  "appId": "com.fergetid.app",
+  "appName": "Fergetid",
+  "webDir": "dist",
+  "ios": {
+    "buildOptions": {
+      "buildConfiguration": "Release"
+    },
+    "contentInset": "never",
+    "backgroundColor": "#d95cff",
+    "webView": {
+      "allowsBackForwardNavigationGestures": false,
+      "backgroundColor": "#d95cff",
+      "opaque": false,
+      "scrollEnabled": true,
+      "allowsLinkPreview": false,
+      "allowsInlineMediaPlayback": true,
+      "mediaTypesRequiringUserActionForPlayback": []
+    },
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 500,
+      "backgroundColor": "#d95cff",
+      "showSpinner": false
+    },
+    "Geolocation": {
+      "permissions": ["location"]
+    }
+  }
+}

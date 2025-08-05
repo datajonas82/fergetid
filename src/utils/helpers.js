@@ -9,9 +9,12 @@ export function formatMinutes(mins) {
   return `${h} time${h > 1 ? 'r' : ''}${m > 0 ? ` ${m} min` : ''}`;
 }
 
-// Format distance in kilometers
+// Format distance in kilometers or meters
 export function formatDistance(meters) {
   if (!meters) return '? ' + DISTANCE_UNITS.KILOMETERS;
+  if (meters < 1000) {
+    return `${Math.round(meters)} m`;
+  }
   return `${Math.round(meters / 1000)} ${DISTANCE_UNITS.KILOMETERS}`;
 }
 

@@ -1,12 +1,12 @@
+import { config } from '../config.js';
+
 // Google Maps API service for driving times and location names
 // Using the latest Google Maps APIs with proper configuration
 
-const GOOGLE_API_KEY = 'AIzaSyAVihtnKArRGgnSqUKHqjYNFO95dsgI8hA';
-
 // Calculate driving time using Google Maps Routes API (latest version)
 export const calculateDrivingTime = async (startCoords, endCoords) => {
-  if (!GOOGLE_API_KEY) {
-    throw new Error('Google Maps API key not configured');
+  if (!config.isGoogleMapsConfigured()) {
+    throw new Error('Google Maps API key not configured. Please set VITE_GOOGLE_MAPS_API_KEY in your .env file');
   }
 
   try {
@@ -46,7 +46,7 @@ export const calculateDrivingTime = async (startCoords, endCoords) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Goog-Api-Key': GOOGLE_API_KEY,
+        'X-Goog-Api-Key': config.getGoogleMapsApiKey(),
         'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters'
       },
       body: JSON.stringify(requestBody)
@@ -144,15 +144,76 @@ const calculateDrivingTimeWithOpenRoute = async (startCoords, endCoords) => {
 
 // Get location name from coordinates using Google Geocoding API
 export const getLocationName = async (coords) => {
-  if (!GOOGLE_API_KEY) {
+  console.log('📍 Getting location name for coords:', coords);
+  
+  // Check if we're on iOS and use native geocoding
+  console.log('🔍 Checking for iOS native geocoding...');
+  console.log('🔍 window.webkit exists:', !!window.webkit);
+  console.log('🔍 window.webkit.messageHandlers exists:', !!window.webkit?.messageHandlers);
+  console.log('🔍 window.webkit.messageHandlers.storekit exists:', !!window.webkit?.messageHandlers?.storekit);
+  
+  if (typeof window !== 'undefined' && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.storekit) {
+    console.log('📱 Using iOS native geocoding');
+    
+    return new Promise((resolve) => {
+      // Set up response handler
+      window.geocodingResponse = (data) => {
+        console.log('📱 iOS geocoding response:', data);
+        if (data.success && data.locationName) {
+          resolve(data.locationName);
+        } else {
+          console.log('📱 iOS geocoding failed:', data.error);
+          resolve(getFallbackLocationName(coords));
+        }
+      };
+      
+      // Send request to iOS
+      try {
+        window.webkit.messageHandlers.storekit.postMessage({
+          action: 'getLocationName',
+          lat: coords.lat,
+          lng: coords.lng
+        });
+        console.log('📱 iOS geocoding request sent');
+      } catch (error) {
+        console.log('📱 iOS geocoding request failed:', error);
+        resolve(getFallbackLocationName(coords));
+      }
+    });
+  }
+  
+  // Fallback to Google Maps API for web
+  console.log('🌐 Using Google Maps API for web');
+  
+  if (!config.isGoogleMapsConfigured()) {
+    console.log('❌ Google Maps not configured');
     return null;
   }
 
-  try {
-        const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coords.lat},${coords.lng}&key=${GOOGLE_API_KEY}&language=nb&region=no`;
+  const apiKey = config.getGoogleMapsApiKey();
+  console.log('🔑 Using API key:', apiKey.substring(0, 10) + '...');
 
-    const response = await fetch(url);
+  try {
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coords.lat},${coords.lng}&key=${apiKey}&language=nb&region=no`;
+    console.log('🌐 Fetching from URL:', url.replace(apiKey, 'API_KEY_HIDDEN'));
+
+    console.log('📱 iOS: Making fetch request...');
+    
+    // Add timeout for iOS
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
+    const response = await fetch(url, {
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    console.log('📱 iOS: Fetch response status:', response.status);
+    console.log('📱 iOS: Fetch response ok:', response.ok);
+    
     const data = await response.json();
+    console.log('📡 Geocoding response status:', data.status);
+    console.log('📡 Geocoding response:', data);
     
     if (data.status === 'OK' && data.results && data.results.length > 0) {
             const result = data.results[0];
@@ -174,11 +235,43 @@ export const getLocationName = async (coords) => {
 
       return cleanedName;
     } else {
-      return null;
+      console.log('⚠️ Geocoding failed, using fallback location name');
+      return getFallbackLocationName(coords);
     }
   } catch (error) {
-    return null;
+    if (error.name === 'AbortError') {
+      console.log('⏰ Geocoding timeout on iOS, using fallback location name');
+    } else {
+      console.log('❌ Geocoding error, using fallback location name:', error.message);
+    }
+    return getFallbackLocationName(coords);
   }
+};
+
+// Generate a fallback location name based on coordinates
+const getFallbackLocationName = (coords) => {
+  const { lat, lng } = coords;
+  
+  // Simple location description based on coordinates
+  // This is a basic fallback when Google Geocoding API is not available
+  const latStr = lat.toFixed(4);
+  const lngStr = lng.toFixed(4);
+  
+  // Try to give a more user-friendly description
+  let locationDesc = `Posisjon (${latStr}, ${lngStr})`;
+  
+  // Add some basic location hints based on coordinates
+  if (lat > 70) {
+    locationDesc = `Nord-Norge (${latStr}, ${lngStr})`;
+  } else if (lat > 65) {
+    locationDesc = `Midt-Norge (${latStr}, ${lngStr})`;
+  } else if (lat > 60) {
+    locationDesc = `Sør-Norge (${latStr}, ${lngStr})`;
+  } else if (lat > 58) {
+    locationDesc = `Østlandet (${latStr}, ${lngStr})`;
+  }
+  
+  return locationDesc;
 };
 
 // Format driving time for display

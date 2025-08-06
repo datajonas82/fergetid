@@ -1,3 +1,5 @@
+import { config } from './config.js';
+
 // API Configuration
 export const ENTUR_ENDPOINT = 'https://api.entur.io/journey-planner/v3/graphql';
 

@@ -10,6 +10,7 @@ import {
   GEOLOCATION_OPTIONS,
   EXCLUDED_SUBMODES
 } from './constants';
+import { config } from './config';
 import { 
   formatMinutes, 
   formatDistance, 
@@ -21,11 +22,11 @@ import {
   bokmaalify
 } from './utils/helpers';
 import { calculateDrivingTime, getLocationName, formatDrivingTime, generateTravelDescription } from './utils/googleMapsService';
-import { premiumService } from './utils/premiumService';
-import PremiumModal from './components/PremiumModal';
+import { storeKitService } from './utils/storeKitService';
+
 
 const client = new GraphQLClient(ENTUR_ENDPOINT, {
-  headers: { 'ET-Client-Name': 'fergetid-app' }
+  headers: { 'ET-Client-Name': config.ENTUR_CLIENT_NAME }
 });
 
 const NEARBY_QUERY = gql`
@@ -109,7 +110,6 @@ function App() {
   
   // Toggle for kjøretidsberegning
   const [showDrivingTimes, setShowDrivingTimes] = useState(false);
-  const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
   
   // Funksjon for å beregne kjøretider for eksisterende fergekaier
   const calculateDrivingTimesForExistingStops = async () => {
@@ -228,8 +228,8 @@ function App() {
       // Last fergekaier
       await loadAllFerryStops();
       
-      // Initialiser premium service
-      premiumService.initialize();
+      // Initialiser StoreKit service
+      storeKitService.initialize();
       
       // Skjul splash screen etter 2 sekunder
       setTimeout(async () => {
@@ -337,6 +337,8 @@ function App() {
 
   // GPS functionality
   const handleGPSLocation = async () => {
+    console.log('🚀 GPS button clicked!');
+    
     setMode('gps');
     setLoading(true);
     setError(null);
@@ -347,24 +349,31 @@ function App() {
     setDrivingTimes({});
     setDrivingTimesLoading({});
     
+    console.log('📍 Starting geolocation...');
+    
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
+        console.log('📍 Geolocation success:', pos.coords);
         const { latitude, longitude } = pos.coords;
         setLocation({ latitude, longitude });
         
         // Get location name using Google Maps API
+        console.log('📱 iOS: Getting location name for coordinates:', { lat: latitude, lng: longitude });
     
         try {
           const locationNameResult = await getLocationName({ lat: latitude, lng: longitude });
+          console.log('📱 iOS: Location name result:', locationNameResult);
+          
           if (locationNameResult) {
-
+            console.log('📱 iOS: Setting location name to:', locationNameResult);
             setLocationName(locationNameResult);
           } else {
-            
+            console.log('📱 iOS: No location name result, using fallback');
             // Fallback to simple location description
             setLocationName(`Posisjon (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
           }
         } catch (error) {
+          console.log('📱 iOS: Error getting location name:', error);
           // Fallback to simple location description
           setLocationName(`Posisjon (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
         }
@@ -487,6 +496,8 @@ function App() {
         }
       },
       (err) => {
+        console.log('❌ Geolocation error:', err);
+        
         // Ikke vis GPS-feilmelding hvis brukeren allerede har startet å søke
         if (mode !== 'search' && !query.trim()) {
           setError('Kunne ikke få tilgang til plassering');
@@ -765,12 +776,16 @@ function App() {
             <span className="text-white text-sm font-medium">Beregn kjøretid</span>
             <button
               onClick={async () => {
-                // Sjekk om brukeren har premium
-                const isPremium = premiumService.isPremiumUser();
+                // Check if user has premium
+                const isPremium = storeKitService.isPremiumUser();
                 
                 if (!isPremium) {
-                  // Vis premium modal
-                  setIsPremiumModalOpen(true);
+                  // Direct purchase - App Store handles the info
+                  const result = await storeKitService.purchasePremium();
+                  if (result.success) {
+                    setShowDrivingTimes(true);
+                    await calculateDrivingTimesForExistingStops();
+                  }
                   return;
                 }
                 
@@ -881,7 +896,7 @@ function App() {
                  <div key={stopData.id + '-' + (distance || '')} className="flex flex-col">
                    {/* Km-avstand som egen boks over fergekortet */}
                    {distance && (
-                     <div className="bg-blue-500 text-white text-sm font-bold px-2 py-1.5 rounded-full shadow-lg mb-[-10px] self-start relative z-20 -ml-2">
+                     <div className="bg-blue-500 text-white text-base font-bold px-2 py-1.5 rounded-full shadow-lg mb-[-10px] self-start relative z-20 -ml-2">
                        {formatDistance(distance)}
                      </div>
                    )}
@@ -1032,19 +1047,9 @@ function App() {
              }
            </div>
          )}
-       </div>
-       
-       {/* Premium Modal */}
-       <PremiumModal
-         isOpen={isPremiumModalOpen}
-         onClose={() => setIsPremiumModalOpen(false)}
-         onPurchaseSuccess={() => {
-           setShowDrivingTimes(true);
-           calculateDrivingTimesForExistingStops();
-         }}
-       />
-     </>
-  );
+              </div>
+       </>
+    );
 }
 
 export default App;

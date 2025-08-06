@@ -17,13 +17,25 @@
       "allowsInlineMediaPlayback": true,
       "mediaTypesRequiringUserActionForPlayback": []
     },
-    "limitsNavigationsToAppBoundDomains": false
+    "limitsNavigationsToAppBoundDomains": false,
+    "splashScreen": {
+      "backgroundColor": "#d95cff",
+      "showSpinner": true,
+      "spinnerColor": "#ffffff",
+      "spinnerStyle": "large"
+    }
   },
   "plugins": {
     "SplashScreen": {
-      "launchShowDuration": 500,
+      "launchShowDuration": 2000,
       "backgroundColor": "#d95cff",
-      "showSpinner": false
+      "showSpinner": true,
+      "spinnerColor": "#ffffff",
+      "splashFullScreen": true,
+      "splashImmersive": true,
+      "spinnerStyle": "large",
+      "androidSpinnerStyle": "large",
+      "iosSpinnerStyle": "large"
     },
     "Geolocation": {
       "permissions": ["location"]

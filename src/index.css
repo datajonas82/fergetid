@@ -40,7 +40,6 @@ body {
   font-family: 'Manrope', sans-serif;
   font-weight: 700;
   color: #1f2937;
-  margin-bottom: 0.5rem;
   /* Font-størrelse settes dynamisk i JavaScript */
 }
 
@@ -90,6 +89,20 @@ body {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   position: absolute;
   z-index: 10;
+}
+
+/* Gradient styles for distance badge */
+.bg-gradient-to-r {
+  background-image: linear-gradient(to right, var(--tw-gradient-stops));
+}
+
+.from-blue-500 {
+  --tw-gradient-from: #3b82f6;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(59, 130, 246, 0));
+}
+
+.to-blue-600 {
+  --tw-gradient-to: #2563eb;
 }
 
 /* Smooth expansion animation for ferry cards */

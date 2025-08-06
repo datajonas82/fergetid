@@ -1,5 +1,5 @@
 import React from 'react';
-import { generateTravelDescription } from '../utils/openRouteService';
+import { generateTravelDescription } from '../utils/googleMapsService';
 import { formatDistance, formatMinutes, calculateTimeDiff } from '../utils/helpers';
 import { cleanDestinationText } from '../utils/helpers';
 
@@ -25,20 +25,7 @@ const FerryCard = ({
   const departures = departuresMap[stop.id] || stop.departures || [];
   const departuresForDescription = departuresMap[stop.id] || [];
   
-  // Debug departures data
-  if (showDrivingTimes) {
-    console.log(`🔍 FerryCard ${stop.name} - Departures:`, {
-      stopId: stop.id,
-      showDrivingTimes,
-      hasDrivingTime: !!drivingTimes[stop.id],
-      drivingTime: drivingTimes[stop.id],
-      departuresMapHasData: !!departuresMap[stop.id],
-      departuresMapLength: departuresMap[stop.id]?.length || 0,
-      stopDeparturesLength: stop.departures?.length || 0,
-      finalDeparturesLength: departures.length,
-      finalDescriptionLength: departuresForDescription.length
-    });
-  }
+
   
 
   
@@ -70,36 +57,41 @@ const FerryCard = ({
   }
 
   return (
-    <div
-      id={`ferry-card-${stopData.id}`}
-      key={stopData.id + '-' + (distance || '')}
-      className={`relative rounded-2xl p-4 sm:p-5 glass-card card-expand w-full max-w-[350px] sm:max-w-[370px] ${
-        isExpanded ? 'expanded' : 'cursor-pointer'
-      }`}
-      style={{ minWidth: '280px', maxWidth: '350px' }}
-      onClick={() => onCardClick(stopData)}
-    >
-      {/* Blå km-boks i øvre venstre hjørne */}
+    <>
+      {/* Km-avstand som egen boks over fergekortet */}
       {distance && (
-        <div className="absolute top-2 left-2 bg-blue-500 text-white text-xs font-bold px-2 py-1 rounded-md shadow-sm z-10">
+        <div className="bg-blue-500 text-white text-sm font-bold px-3 py-1.5 rounded-full shadow-lg mb-2 self-start">
           {formatDistance(distance)}
         </div>
       )}
-      <h2 
-        className="ferry-quay-name"
-        style={{ 
-          fontSize: getOptimalFontSize(cleanDestinationText(stopData.name || '')),
-          lineHeight: '1.2'
-        }}
+      
+      <div
+        id={`ferry-card-${stopData.id}`}
+        key={stopData.id + '-' + (distance || '')}
+        className={`relative rounded-2xl p-5 sm:p-6 glass-card card-expand w-full max-w-[350px] sm:max-w-[370px] ${
+          isExpanded ? 'expanded' : 'cursor-pointer'
+        }`}
+        style={{ minWidth: '280px', maxWidth: '350px' }}
+        onClick={() => onCardClick(stopData)}
       >
-        {cleanDestinationText(stopData.name || '')}
-      </h2>
+        {/* Kul header med tittel */}
+        <div className="mb-3">
+          <h2 
+            className="ferry-quay-name"
+            style={{ 
+              fontSize: getOptimalFontSize(cleanDestinationText(stopData.name || '')),
+              lineHeight: '1.2'
+            }}
+          >
+            {cleanDestinationText(stopData.name || '')}
+          </h2>
+        </div>
       
       {/* Avstand og kjøretidsbeskrivelse - kun vist når toggle er aktivert */}
       {distance && showDrivingTimes && (
-        <div className="text-sm text-gray-600 mt-2">
+        <div className="text-sm text-gray-600 mb-4">
           {drivingTimes[stopData.id] ? (
-            <div className="text-gray-700" style={{ 
+            <div className="text-gray-700 bg-gray-50 rounded-lg p-3 border-l-4 border-blue-500" style={{ 
               '--tw-text-opacity': '1'
             }} dangerouslySetInnerHTML={{
               __html: (() => {
@@ -114,7 +106,7 @@ const FerryCard = ({
               })()
             }} />
           ) : drivingTimesLoading[stopData.id] ? (
-            <div>
+            <div className="bg-gray-50 rounded-lg p-3 border-l-4 border-gray-300">
               <span className="text-gray-500">Laster kjøretid...</span>
             </div>
           ) : null}
@@ -123,9 +115,9 @@ const FerryCard = ({
       
       {nextDeparture ? (
         <>
-          <div className="mt-2 text-base sm:text-lg">
-            <div className="text-gray-700 flex flex-row flex-wrap items-center gap-2">
-              <span>Neste avgang:</span>
+          <div className="text-base sm:text-lg">
+            <div className="text-gray-700 flex flex-row flex-wrap items-center gap-2 mb-2">
+              <span className="font-semibold text-gray-800">Neste avgang:</span>
             </div>
             <div className="flex items-center py-0.5">
               <span className="font-bold w-16 text-left">
@@ -137,13 +129,6 @@ const FerryCard = ({
                 </span>
                 {showDrivingTimes && drivingTimes[stopData.id] && (
                   (() => {
-                    const timeToDeparture = calculateTimeDiff(nextDeparture.aimedDepartureTime || nextDeparture.aimed);
-                    const margin = timeToDeparture - drivingTimes[stopData.id];
-                    if (margin > 0 && margin < 5) {
-                      return <span className="text-xs text-red-500 font-bold">⚠️</span>;
-                    } else if (margin > 0 && margin < 15) {
-                      return <span className="text-xs text-yellow-500 font-bold">⚡</span>;
-                    }
                     return null;
                   })()
                 )}
@@ -161,8 +146,8 @@ const FerryCard = ({
           
           {/* Vis kun "Senere avganger" hvis vi har data eller kortet er utvidet */}
           {(laterDepartures.length > 0 || isExpanded) && (
-            <div className="mt-4 departures-list">
-              <div className="text-base sm:text-lg text-gray-700 font-normal mb-0.5">Senere avganger:</div>
+            <div className="mt-5 departures-list">
+              <div className="text-base sm:text-lg text-gray-700 font-semibold mb-2 text-gray-800">Senere avganger:</div>
               <ul>
                 {laterDepartures.length > 0 ? (
                   laterDepartures.map((dep, idx) => {
@@ -178,13 +163,6 @@ const FerryCard = ({
                           </span>
                           {showDrivingTimes && drivingTimes[stopData.id] && (
                             (() => {
-                              const timeToDeparture = mins;
-                              const margin = timeToDeparture - drivingTimes[stopData.id];
-                              if (margin > 0 && margin < 5) {
-                                return <span className="text-xs text-red-500 font-bold">⚠️</span>;
-                              } else if (margin > 0 && margin < 15) {
-                                return <span className="text-xs text-yellow-500 font-bold">⚡</span>;
-                              }
                               return null;
                             })()
                           )}
@@ -221,8 +199,9 @@ const FerryCard = ({
       ) : (
         <p className="mt-2 text-sm text-gray-500">Ingen avganger funnet</p>
       )}
-    </div>
-  );
-};
+        </div>
+      </>
+    );
+  };
 
 export default FerryCard; 

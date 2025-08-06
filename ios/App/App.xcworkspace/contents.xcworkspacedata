@@ -2,6 +2,15 @@
 <Workspace
    version = "1.0">
    <FileRef
+      location = "group:../../../Desktop/1. FERGETID FILER/Solava&#x30a;gen.gpx">
+   </FileRef>
+   <FileRef
+      location = "group:../../../Desktop/1. FERGETID FILER/Sulesund.gpx">
+   </FileRef>
+   <FileRef
+      location = "group:../../../Desktop/1. FERGETID FILER/A&#x30a;lesund.gpx">
+   </FileRef>
+   <FileRef
       location = "group:../../../Desktop/1. FERGETID FILER/GPS.gpx">
    </FileRef>
    <FileRef

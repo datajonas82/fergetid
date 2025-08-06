@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="17132" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="22522" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
     <device id="retina4_7" orientation="portrait" appearance="light"/>
     <dependencies>
         <deployment identifier="iOS"/>
-        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="17105"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="22522"/>
         <capability name="System colors in document resources" minToolsVersion="11.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
@@ -32,15 +32,10 @@
 
                         </subviews>
                         <constraints>
-                            <constraint firstItem="snD-IY-ifK" firstAttribute="leading" secondItem="snD-IY-ifK" secondAttribute="leading" id="constraint1"/>
-                            <constraint firstItem="snD-IY-ifK" firstAttribute="trailing" secondItem="snD-IY-ifK" secondAttribute="trailing" id="constraint2"/>
-                            <constraint firstItem="snD-IY-ifK" firstAttribute="top" secondItem="snD-IY-ifK" secondAttribute="top" id="constraint3"/>
-                            <constraint firstItem="snD-IY-ifK" firstAttribute="bottom" secondItem="snD-IY-ifK" secondAttribute="bottom" id="constraint4"/>
                             <constraint firstItem="titleLabel" firstAttribute="centerX" secondItem="snD-IY-ifK" secondAttribute="centerX" id="titleConstraint1"/>
-                            <constraint firstItem="titleLabel" firstAttribute="centerY" secondItem="snD-IY-ifK" secondAttribute="centerY" constant="-30" id="titleConstraint2"/>
+                            <constraint firstItem="titleLabel" firstAttribute="centerY" secondItem="snD-IY-ifK" secondAttribute="centerY" constant="-60" id="titleConstraint2"/>
                             <constraint firstItem="loadingLabel" firstAttribute="centerX" secondItem="snD-IY-ifK" secondAttribute="centerX" id="loadingConstraint1"/>
-                            <constraint firstItem="loadingLabel" firstAttribute="top" secondItem="titleLabel" secondAttribute="bottom" constant="10" id="loadingConstraint2"/>
-
+                            <constraint firstItem="loadingLabel" firstAttribute="top" secondItem="titleLabel" secondAttribute="bottom" constant="60" id="loadingConstraint2"/>
                         </constraints>
                     </view>
                 </viewController>

@@ -1,0 +1,34 @@
+# Xcode Cloud CI Workflow Configuration
+# This file defines the build process for your Capacitor app
+
+version: 1.0
+
+# Pre-build actions
+pre_build:
+  - name: "Install Dependencies"
+    script: |
+      npm ci
+      npx cap sync ios
+
+# Build configuration
+build:
+  scheme: "App"
+  configuration: "Release"
+  destination: "generic/platform=iOS"
+  
+# Post-build actions
+post_build:
+  - name: "Upload to TestFlight"
+    action: "upload_to_testflight"
+    enabled: true
+
+# Environment variables
+environment:
+  NODE_VERSION: "18"
+  CAPACITOR_VERSION: "7.4.2"
+
+# Build triggers
+triggers:
+  - type: "manual"
+  - type: "git_push"
+    branch: "main" 

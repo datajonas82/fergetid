@@ -57,5 +57,11 @@
 	<string>Denne appen trenger tilgang til din posisjon for å vise nærliggende fergekaier.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Denne appen trenger tilgang til din posisjon for å vise nærliggende fergekaier.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>UIRequiresFullScreen</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
 </dict>
 </plist>

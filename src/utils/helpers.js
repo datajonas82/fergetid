@@ -48,16 +48,49 @@ export function bokmaalify(text) {
   return text.replace(/ferjekai/gi, 'fergekai');
 }
 
-// Get location name from reverse geocoding data
+// Get location name from reverse geocoding data (Google Maps API format)
 export function extractLocationName(data) {
-  return (
-    data.address?.city ||
-    data.address?.town ||
-    data.address?.village ||
-    data.address?.suburb ||
-    data.address?.hamlet ||
-    data.address?.municipality ||
-    data.address?.county ||
-    'Ukjent sted'
-  );
-} 
+  if (data.results && data.results.length > 0) {
+    const result = data.results[0];
+    const addressComponents = result.address_components;
+    
+    let streetName = '';
+    let localityName = '';
+    
+    // Extract street name and locality name
+    for (const component of addressComponents) {
+      if (component.types.includes('route')) {
+        streetName = component.long_name;
+      } else if (component.types.includes('locality') || 
+                 component.types.includes('sublocality') ||
+                 component.types.includes('administrative_area_level_2')) {
+        localityName = component.long_name;
+      }
+    }
+    
+    // Return street name and locality if both are available
+    if (streetName && localityName) {
+      return `${streetName}, ${localityName}`;
+    }
+    
+    // Return street name if available
+    if (streetName) {
+      return streetName;
+    }
+    
+    // Return locality name if available
+    if (localityName) {
+      return localityName;
+    }
+    
+    // Fallback to formatted address
+    if (result.formatted_address) {
+      const parts = result.formatted_address.split(', ');
+      return parts[0] || 'Ukjent sted';
+    }
+  }
+  
+  return 'Ukjent sted';
+}
+
+ 

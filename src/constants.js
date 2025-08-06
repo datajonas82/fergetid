@@ -5,9 +5,9 @@ export const ENTUR_ENDPOINT = 'https://api.entur.io/journey-planner/v3/graphql';
 
 // Geolocation settings
 export const GEOLOCATION_OPTIONS = {
-  enableHighAccuracy: false,
-  timeout: 5000,
-  maximumAge: 300000
+  enableHighAccuracy: false, // Less aggressive for simulator
+  timeout: 10000, // 10 seconds
+  maximumAge: 300000 // 5 minutes
 };
 
 // Search parameters

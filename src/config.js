@@ -15,7 +15,7 @@ export const config = {
             return import.meta.env.VITE_GOOGLE_MAPS_API_KEY_IOS;
           }
         } catch (error) {
-          console.log('⚠️ Error detecting platform, using iOS key:', error);
+  
           return import.meta.env.VITE_GOOGLE_MAPS_API_KEY_IOS;
         }
       }

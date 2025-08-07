@@ -244,8 +244,6 @@ function App() {
 
   // GPS functionality
   const handleGPSLocation = async () => {
-    console.log('🚀 GPS button clicked!');
-    
     // Check if geolocation is supported
     if (!navigator.geolocation) {
       setError('Geolokasjon støttes ikke av denne nettleseren.');
@@ -261,9 +259,6 @@ function App() {
     setHasInteracted(false);
     setSelectedStop(null);
     
-    console.log('📍 Starting geolocation...');
-    console.log('📍 Geolocation options:', GEOLOCATION_OPTIONS);
-    
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
@@ -272,7 +267,6 @@ function App() {
         // Get location name using Google Maps reverse geocoding
         try {
           if (!config.GOOGLE_MAPS_CONFIG.isConfigured()) {
-            console.warn('🌍 Google Maps API key not configured, using coordinates');
             throw new Error('API key not configured');
           }
           

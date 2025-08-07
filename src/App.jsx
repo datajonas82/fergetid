@@ -1,7 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
 import { GraphQLClient, gql } from 'graphql-request';
 import { SplashScreen } from '@capacitor/splash-screen';
+import { Capacitor } from '@capacitor/core';
 import LoadingSpinner from './components/LoadingSpinner';
+import DrivingTimeToggle from './components/DrivingTimeToggle';
+import inAppPurchaseService from './services/inAppPurchase';
+import drivingTimeService from './services/drivingTimeService';
 import { 
   ENTUR_ENDPOINT, 
   NEARBY_SEARCH_CONFIG, 
@@ -100,6 +104,11 @@ function App() {
   // Cache for all ferry stops (for autocomplete)
   const [allFerryStops, setAllFerryStops] = useState([]);
 
+  // Driving time calculation state
+  const [isDrivingTimeEnabled, setIsDrivingTimeEnabled] = useState(false);
+  const [drivingTimeCalculations, setDrivingTimeCalculations] = useState({});
+  const [isIOS] = useState(Capacitor.isNativePlatform());
+
   // Initialize app
   useEffect(() => {
     const loadAllFerryStops = async () => {
@@ -141,6 +150,16 @@ function App() {
       
       // Last fergekaier
       await loadAllFerryStops();
+      
+      // Initialize services
+      if (isIOS) {
+        try {
+          await inAppPurchaseService.initialize();
+          await drivingTimeService.initialize();
+        } catch (error) {
+          console.error('Error initializing services:', error);
+        }
+      }
       
       // Skjul splash screen etter 2 sekunder
       setTimeout(async () => {
@@ -241,6 +260,15 @@ function App() {
       setError(null);
     }
   }, [mode, error, query]);
+
+  // Calculate driving times when feature is enabled
+  useEffect(() => {
+    if (isDrivingTimeEnabled && mode === 'gps' && location && ferryStops.length > 0) {
+      ferryStops.forEach(stop => {
+        calculateDrivingTimeForStop(stop);
+      });
+    }
+  }, [isDrivingTimeEnabled, location, ferryStops, mode]);
 
   // GPS functionality
   const handleGPSLocation = async () => {
@@ -366,6 +394,13 @@ function App() {
           // Automatisk utvid det første kortet hvis vi har resultater
           if (places.length > 0) {
             setSelectedStop(places[0].id);
+            
+            // Calculate driving times if feature is enabled
+            if (isDrivingTimeEnabled) {
+              places.forEach(stop => {
+                calculateDrivingTimeForStop(stop);
+              });
+            }
             
             // Hent alle avganger for det første kortet automatisk
             const firstStop = places[0];
@@ -506,6 +541,46 @@ function App() {
     } finally {
       setCardLoading(prev => ({ ...prev, [stop.id]: false }));
     }
+  };
+
+  // Calculate driving time for a ferry stop
+  const calculateDrivingTimeForStop = async (stop) => {
+    if (!isDrivingTimeEnabled || !location || !isIOS) return;
+
+    try {
+      const drivingTime = await drivingTimeService.calculateDrivingTime(
+        location.latitude,
+        location.longitude,
+        stop.latitude,
+        stop.longitude
+      );
+
+      setDrivingTimeCalculations(prev => ({
+        ...prev,
+        [stop.id]: drivingTime
+      }));
+    } catch (error) {
+      console.error('Error calculating driving time for stop:', stop.id, error);
+    }
+  };
+
+  // Get departure status with driving time calculation
+  const getDepartureStatus = (departure, stopId) => {
+    if (!isDrivingTimeEnabled || !drivingTimeCalculations[stopId]) {
+      return null;
+    }
+
+    const drivingTime = drivingTimeCalculations[stopId];
+    const calculation = drivingTimeService.calculateCanMakeIt(
+      drivingTime.duration,
+      departure.aimedDepartureTime
+    );
+
+    return {
+      ...calculation,
+      statusText: drivingTimeService.getStatusText(calculation),
+      statusColor: drivingTimeService.getStatusColor(calculation)
+    };
   };
 
   // Funksjon for å beregne optimal font-størrelse basert på tekstlengde
@@ -680,6 +755,17 @@ function App() {
           </div>
         )}
 
+        {/* Driving Time Toggle Button */}
+        {isIOS && mode === 'gps' && location && (
+          <div className="mb-4">
+            <DrivingTimeToggle
+              isEnabled={isDrivingTimeEnabled}
+              onToggle={setIsDrivingTimeEnabled}
+              isIOS={isIOS}
+            />
+          </div>
+        )}
+
         {/* Loading and Error States */}
         <div 
           style={{ 
@@ -792,7 +878,11 @@ function App() {
                         <div className="text-gray-700 flex flex-row flex-wrap items-center gap-2">
                           <span>Neste avgang:</span>
                         </div>
-                        <div className="flex items-center py-0.5">
+                        <div className={`flex items-center py-0.5 rounded-lg p-2 ${
+                          isDrivingTimeEnabled && getDepartureStatus(nextDeparture, stopData.id) ? 
+                          (getDepartureStatus(nextDeparture, stopData.id).statusColor === 'green' ? 'bg-green-100' : 'bg-red-100') : 
+                          ''
+                        }`}>
                           <span className="font-bold w-16 text-left">
                             {nextDeparture.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
@@ -810,6 +900,15 @@ function App() {
                             {cleanDestinationText(nextDeparture.destinationDisplay?.frontText)}
                           </span>
                         </div>
+                        
+                        {/* Driving time status text */}
+                        {isDrivingTimeEnabled && getDepartureStatus(nextDeparture, stopData.id) && (
+                          <div className={`mt-2 text-sm font-medium ${
+                            getDepartureStatus(nextDeparture, stopData.id).statusColor === 'green' ? 'text-green-700' : 'text-red-700'
+                          }`}>
+                            {getDepartureStatus(nextDeparture, stopData.id).statusText}
+                          </div>
+                        )}
                       </div>
                       
                       {/* Vis kun "Senere avganger" hvis vi har data eller kortet er utvidet */}

@@ -1,6 +1,6 @@
 {
   "name": "fergetid-app",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "scripts": {
     "dev": "vite",
@@ -15,6 +15,7 @@
     "@capacitor/splash-screen": "^7.0.2",
     "@vercel/analytics": "^1.5.0",
     "@vercel/speed-insights": "^1.2.0",
+    "capacitor-plugin-purchase": "^0.1.0",
     "graphql": "^16.8.1",
     "graphql-request": "^6.1.0",
     "react": "^18.3.1",

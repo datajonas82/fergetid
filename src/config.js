@@ -47,6 +47,21 @@ export const config = {
     // Check if API key is configured
     isConfigured: () => {
       return !!config.GOOGLE_MAPS_CONFIG.getApiKey();
+    },
+    
+    DIRECTIONS_BASE_URL: 'https://maps.googleapis.com/maps/api/directions/json',
+    
+    // Get directions URL for driving time calculation
+    getDirectionsUrl: (fromLat, fromLng, toLat, toLng) => {
+      const apiKey = config.GOOGLE_MAPS_CONFIG.getApiKey();
+      if (!apiKey) {
+        throw new Error('Google Maps API key not found. Please set VITE_GOOGLE_MAPS_API_KEY_IOS and VITE_GOOGLE_MAPS_API_KEY_WEB in your .env file');
+      }
+      
+      const origin = `${fromLat},${fromLng}`;
+      const destination = `${toLat},${toLng}`;
+      
+      return `${config.GOOGLE_MAPS_CONFIG.DIRECTIONS_BASE_URL}?origin=${origin}&destination=${destination}&mode=driving&key=${apiKey}&language=no`;
     }
   }
 }; 

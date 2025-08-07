@@ -50,7 +50,7 @@ const DrivingTimeToggle = ({ isEnabled, onToggle, isIOS }) => {
     }
     
     if (!purchaseStatus?.isPurchased) {
-      return 'Kjøp kjøretidberegning';
+      return 'Kjøp kjøretidberegning (29 kr)';
     }
     
     return isEnabled ? 'Skru av kjøretidberegning' : 'Beregn kjøretid';
@@ -78,6 +78,11 @@ const DrivingTimeToggle = ({ isEnabled, onToggle, isIOS }) => {
       >
         {getButtonText()}
       </button>
+
+      {/* Debug Info - Remove in production */}
+      <div className="mt-1 text-xs text-white bg-black/20 p-1 rounded">
+        <div>Purchase Status: {purchaseStatus ? JSON.stringify(purchaseStatus) : 'Loading...'}</div>
+      </div>
 
       <InAppPurchaseModal
         isOpen={showPurchaseModal}

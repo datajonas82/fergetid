@@ -3,9 +3,8 @@ import { GraphQLClient, gql } from 'graphql-request';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { Capacitor } from '@capacitor/core';
 import LoadingSpinner from './components/LoadingSpinner';
-import DrivingTimeToggle from './components/DrivingTimeToggle';
 import inAppPurchaseService from './services/inAppPurchase';
-import drivingTimeService from './services/drivingTimeService';
+import { calculateDrivingTime, getLocationName, formatDrivingTime, generateTravelDescription } from './utils/googleMapsService';
 import { 
   ENTUR_ENDPOINT, 
   NEARBY_SEARCH_CONFIG, 
@@ -105,8 +104,9 @@ function App() {
   const [allFerryStops, setAllFerryStops] = useState([]);
 
   // Driving time calculation state
-  const [isDrivingTimeEnabled, setIsDrivingTimeEnabled] = useState(false);
-  const [drivingTimeCalculations, setDrivingTimeCalculations] = useState({});
+  const [showDrivingTimes, setShowDrivingTimes] = useState(false);
+  const [drivingTimes, setDrivingTimes] = useState({});
+  const [drivingTimesLoading, setDrivingTimesLoading] = useState({});
   const [isIOS] = useState(Capacitor.isNativePlatform());
 
   // Initialize app
@@ -155,7 +155,6 @@ function App() {
       if (isIOS) {
         try {
           await inAppPurchaseService.initialize();
-          await drivingTimeService.initialize();
         } catch (error) {
           console.error('Error initializing services:', error);
         }
@@ -263,12 +262,10 @@ function App() {
 
   // Calculate driving times when feature is enabled
   useEffect(() => {
-    if (isDrivingTimeEnabled && mode === 'gps' && location && ferryStops.length > 0) {
-      ferryStops.forEach(stop => {
-        calculateDrivingTimeForStop(stop);
-      });
+    if (showDrivingTimes && mode === 'gps' && location && ferryStops.length > 0) {
+      calculateDrivingTimesForExistingStops();
     }
-  }, [isDrivingTimeEnabled, location, ferryStops, mode]);
+  }, [showDrivingTimes, location, ferryStops, mode]);
 
   // GPS functionality
   const handleGPSLocation = async () => {
@@ -396,10 +393,8 @@ function App() {
             setSelectedStop(places[0].id);
             
             // Calculate driving times if feature is enabled
-            if (isDrivingTimeEnabled) {
-              places.forEach(stop => {
-                calculateDrivingTimeForStop(stop);
-              });
+            if (showDrivingTimes) {
+              await calculateDrivingTimesForExistingStops();
             }
             
             // Hent alle avganger for det første kortet automatisk
@@ -543,44 +538,70 @@ function App() {
     }
   };
 
-  // Calculate driving time for a ferry stop
-  const calculateDrivingTimeForStop = async (stop) => {
-    if (!isDrivingTimeEnabled || !location || !isIOS) return;
-
-    try {
-      const drivingTime = await drivingTimeService.calculateDrivingTime(
-        location.latitude,
-        location.longitude,
-        stop.latitude,
-        stop.longitude
-      );
-
-      setDrivingTimeCalculations(prev => ({
-        ...prev,
-        [stop.id]: drivingTime
-      }));
-    } catch (error) {
-      console.error('Error calculating driving time for stop:', stop.id, error);
+  // Funksjon for å beregne kjøretider for eksisterende fergekaier
+  const calculateDrivingTimesForExistingStops = async () => {
+    if (!location || !ferryStops.length) {
+      return;
+    }
+    
+    const startCoords = { lat: location.latitude, lng: location.longitude };
+    
+    for (const stop of ferryStops) {
+      const stopId = stop.id;
+      setDrivingTimesLoading(prev => ({ ...prev, [stopId]: true }));
+      
+      const endCoords = { lat: stop.latitude, lng: stop.longitude };
+      
+      try {
+        // Bruk Google Maps API for mer nøyaktige kjøretider
+        const drivingTime = await calculateDrivingTime(startCoords, endCoords);
+        
+        setDrivingTimes(prev => ({
+          ...prev,
+          [stopId]: drivingTime
+        }));
+      } catch (error) {
+        // Fallback til estimert tid med mer realistiske hastigheter
+        const distance = Math.sqrt(
+          Math.pow((endCoords.lat - startCoords.lat) * 111000, 2) + 
+          Math.pow((endCoords.lng - startCoords.lng) * 111000 * Math.cos(startCoords.lat * Math.PI / 180), 2)
+        );
+        
+        // Mer realistiske hastigheter basert på avstand og terreng
+        let averageSpeedKmh;
+        if (distance < 1000) {
+          averageSpeedKmh = 30; // Bykjøring for korte avstander (trafikk, lyskryss)
+        } else if (distance < 5000) {
+          averageSpeedKmh = 40; // Forstadsområde (fartsgrense 50-60)
+        } else if (distance < 20000) {
+          averageSpeedKmh = 50; // Landevei (fartsgrense 60-80)
+        } else {
+          averageSpeedKmh = 60; // Hovedvei (fartsgrense 80-90)
+        }
+        
+        const estimatedTime = Math.max(1, Math.round((distance / 1000) / averageSpeedKmh * 60));
+        
+        setDrivingTimes(prev => ({
+          ...prev,
+          [stopId]: estimatedTime
+        }));
+      } finally {
+        setDrivingTimesLoading(prev => ({ ...prev, [stopId]: false }));
+      }
     }
   };
 
-  // Get departure status with driving time calculation
-  const getDepartureStatus = (departure, stopId) => {
-    if (!isDrivingTimeEnabled || !drivingTimeCalculations[stopId]) {
-      return null;
-    }
-
-    const drivingTime = drivingTimeCalculations[stopId];
-    const calculation = drivingTimeService.calculateCanMakeIt(
-      drivingTime.duration,
-      departure.aimedDepartureTime
-    );
-
-    return {
-      ...calculation,
-      statusText: drivingTimeService.getStatusText(calculation),
-      statusColor: drivingTimeService.getStatusColor(calculation)
-    };
+  const getDepartureTimeColor = (departureTime, drivingTime) => {
+    if (!showDrivingTimes || !drivingTime || mode !== 'gps') return 'text-green-600'; // Default green when disabled
+    
+    const timeToDeparture = calculateTimeDiff(departureTime);
+    const canMakeIt = timeToDeparture > drivingTime;
+    const margin = timeToDeparture - drivingTime;
+    
+    if (!canMakeIt) return 'text-red-600';
+    if (margin < 5) return 'text-red-500'; // Rød for små marginer
+    if (margin < 15) return 'text-yellow-600'; // Gul for moderate marginer
+    return 'text-green-600'; // Grønn for gode marginer
   };
 
   // Funksjon for å beregne optimal font-størrelse basert på tekstlengde
@@ -627,6 +648,9 @@ function App() {
         setFerryStops([]);
         setHasInteracted(false);
         setSelectedStop(null);
+        setDrivingTimes({});
+        setDrivingTimesLoading({});
+        setShowDrivingTimes(false); // Deaktiver kjøretidsberegning
         break;
       case 'Enter':
         // Lukk tastaturet på mobil ved å fjerne fokus fra input-feltet
@@ -673,6 +697,7 @@ function App() {
                       // Sett mode til search så snart brukeren skriver noe
                       if (e.target.value.trim()) {
                         setMode('search');
+                        setShowDrivingTimes(false); // Deaktiver kjøretidsberegning i søk-modus
                       }
                     }}
                     onKeyDown={handleKeyDown}
@@ -755,14 +780,46 @@ function App() {
           </div>
         )}
 
-        {/* Driving Time Toggle Button */}
-        {isIOS && mode === 'gps' && location && (
-          <div className="mb-4">
-            <DrivingTimeToggle
-              isEnabled={isDrivingTimeEnabled}
-              onToggle={setIsDrivingTimeEnabled}
-              isIOS={isIOS}
-            />
+        {/* Toggle for kjøretidsberegning - kun synlig i GPS-modus når fergekaier er lastet */}
+        {mode === 'gps' && hasInteracted && ferryStops.length > 0 && (
+          <div className="w-full max-w-[350px] sm:max-w-md mb-4 px-3 sm:px-4 flex justify-center items-center gap-3">
+            <span className="text-white text-sm font-medium">Beregn kjøretid</span>
+            <button
+              onClick={async () => {
+                // Sjekk om brukeren har kjøpt funksjonen
+                const purchaseStatus = inAppPurchaseService.getPurchaseStatus();
+                
+                if (!purchaseStatus?.isPurchased) {
+                  // Vis purchase modal
+                  // For nå, simulerer vi en kjøp for testing
+                  try {
+                    await inAppPurchaseService.purchase();
+                    setShowDrivingTimes(true);
+                    await calculateDrivingTimesForExistingStops();
+                  } catch (error) {
+                    console.error('Purchase failed:', error);
+                  }
+                } else {
+                  // Brukeren har allerede kjøpt funksjonen
+                  const newState = !showDrivingTimes;
+                  setShowDrivingTimes(newState);
+                  if (newState && mode === 'gps') {
+                    await calculateDrivingTimesForExistingStops();
+                  }
+                }
+              }}
+              className={`relative inline-flex items-center h-6 rounded-full transition-all duration-300 ease-in-out w-12 border ${
+                showDrivingTimes 
+                  ? 'border-white bg-transparent' 
+                  : 'border-gray-300 bg-transparent'
+              }`}
+            >
+              <span className={`absolute w-5 h-5 rounded-full shadow-sm transition-all duration-300 ease-in-out ${
+                showDrivingTimes 
+                  ? 'bg-white right-0.5' 
+                  : 'bg-gray-300 left-0.5'
+              }`}></span>
+            </button>
           </div>
         )}
 
@@ -871,6 +928,20 @@ function App() {
                     >
                       {cleanDestinationText(stopData.name || '')}
                     </h2>
+                    
+                    {/* Kjøretidsbeskrivelse rett etter fergekainavn */}
+                    {showDrivingTimes && mode === 'gps' && drivingTimes[stopData.id] && (
+                      <div className="mt-2 text-sm text-gray-600 leading-relaxed">
+                        <div dangerouslySetInnerHTML={{
+                          __html: generateTravelDescription(
+                            distance,
+                            drivingTimes[stopData.id],
+                            nextDeparture ? calculateTimeDiff(nextDeparture.aimedDepartureTime || nextDeparture.aimed) : 0,
+                            departures
+                          )
+                        }} />
+                      </div>
+                    )}
                   
                   {nextDeparture ? (
                     <>
@@ -878,16 +949,12 @@ function App() {
                         <div className="text-gray-700 flex flex-row flex-wrap items-center gap-2">
                           <span>Neste avgang:</span>
                         </div>
-                        <div className={`flex items-center py-0.5 rounded-lg p-2 ${
-                          isDrivingTimeEnabled && getDepartureStatus(nextDeparture, stopData.id) ? 
-                          (getDepartureStatus(nextDeparture, stopData.id).statusColor === 'green' ? 'bg-green-100' : 'bg-red-100') : 
-                          ''
-                        }`}>
+                        <div className="flex items-center py-0.5">
                           <span className="font-bold w-16 text-left">
                             {nextDeparture.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                           <span className="flex-1 flex justify-center items-center gap-1">
-                            <span className="text-sm font-bold align-middle whitespace-nowrap text-blue-500">
+                            <span className={`text-sm font-bold align-middle whitespace-nowrap ${getDepartureTimeColor(nextDeparture.aimedDepartureTime || nextDeparture.aimed, drivingTimes[stopData.id])}`}>
                               {formatMinutes(calculateTimeDiff(nextDeparture.aimedDepartureTime || nextDeparture.aimed))}
                             </span>
                           </span>
@@ -900,19 +967,12 @@ function App() {
                             {cleanDestinationText(nextDeparture.destinationDisplay?.frontText)}
                           </span>
                         </div>
+                                              </div>
                         
-                        {/* Driving time status text */}
-                        {isDrivingTimeEnabled && getDepartureStatus(nextDeparture, stopData.id) && (
-                          <div className={`mt-2 text-sm font-medium ${
-                            getDepartureStatus(nextDeparture, stopData.id).statusColor === 'green' ? 'text-green-700' : 'text-red-700'
-                          }`}>
-                            {getDepartureStatus(nextDeparture, stopData.id).statusText}
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Vis kun "Senere avganger" hvis vi har data eller kortet er utvidet */}
-                      {(laterDepartures.length > 0 || isExpanded) && (
+                        
+                        
+                        {/* Vis kun "Senere avganger" hvis vi har data eller kortet er utvidet */}
+                        {(laterDepartures.length > 0 || isExpanded) && (
                         <div className="mt-4 departures-list">
                           <div className="text-base sm:text-lg text-gray-700 font-normal mb-0.5">Senere avganger:</div>
                           <ul>
@@ -924,11 +984,11 @@ function App() {
                                     <span className="font-bold w-16 text-left">
                                       {dep.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </span>
-                                    <span className="flex-1 flex justify-center items-center gap-1">
-                                      <span className="text-sm font-bold align-middle whitespace-nowrap text-blue-500">
-                                        {formatMinutes(mins)}
-                                      </span>
-                                    </span>
+                                                                         <span className="flex-1 flex justify-center items-center gap-1">
+                                       <span className={`text-sm font-bold align-middle whitespace-nowrap ${getDepartureTimeColor(dep.aimedDepartureTime || dep.aimed, drivingTimes[stopData.id])}`}>
+                                         {formatMinutes(mins)}
+                                       </span>
+                                     </span>
                                     <span 
                                       className="w-24 text-gray-700 text-right font-semibold"
                                       style={{ 

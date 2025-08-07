@@ -1,6 +1,6 @@
 {
   "appId": "com.fergetid.ferryapp",
-  "appName": "Fergetid - Fergeavganger",
+  "appName": "Fergetid",
   "webDir": "dist",
   "ios": {
     "buildOptions": {

@@ -1,6 +1,6 @@
 {
-  "name": "entur-ferge-app",
-  "version": "1.0.0",
+  "name": "fergetid-app",
+  "version": "1.0.2",
   "private": true,
   "scripts": {
     "dev": "vite",

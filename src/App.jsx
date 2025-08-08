@@ -345,15 +345,13 @@ function App() {
           const places = [];
           const seenIds = new Set();
           
+          console.log('GPS: nearest edges count =', data.nearest?.edges?.length || 0);
           for (const e of data.nearest.edges) {
             const { place, distance } = e.node;
             if (place && place.id && !seenIds.has(place.id)) {
-              // Ekskluder hurtigbåtkai og kystrutekai basert på navn og transportSubmode
+              // Ikke ekskluder på navn i GPS-modus – behold alle vann-knutepunkter for å sikre at relevante kaier ikke faller bort
               const name = (place.name || '').toLowerCase();
-              if (name.includes('hurtigbåt') || name.includes('express boat') || name.includes('kystrute') || 
-                  EXCLUDED_SUBMODES.includes(place.transportSubmode)) {
-                continue;
-              }
+              console.log('GPS candidate:', { id: place.id, name: place.name, distance, submode: place.transportSubmode });
               // Hent neste avgang for denne fergekaien
               let nextDeparture = null;
               try {
@@ -385,7 +383,61 @@ function App() {
             }
           }
           
-          setFerryStops(places);
+          // Sorter etter avstand stigende
+          places.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
+
+          // Generell fallback: suppler med fergekaier fra allFerryStops innen radius som mangler i nearest
+          if (Array.isArray(allFerryStops) && allFerryStops.length > 0) {
+            try {
+              const computed = allFerryStops
+                .map(s => {
+                  const dLat = (s.latitude - latitude) * 111000;
+                  const dLng = (s.longitude - longitude) * 111000 * Math.cos(latitude * Math.PI / 180);
+                  const approxDistance = Math.sqrt(dLat * dLat + dLng * dLng);
+                  return { stop: s, approxDistance };
+                })
+                .filter(({ stop, approxDistance }) => approxDistance <= NEARBY_SEARCH_CONFIG.maximumDistance && !seenIds.has(stop.id))
+                .sort((a, b) => a.approxDistance - b.approxDistance)
+                .slice(0, 50); // begrens fallbackmengde for ytelse
+
+              for (const { stop: cand, approxDistance } of computed) {
+                let nextDeparture = null;
+                try {
+                  const depData = await client.request(DEPARTURES_QUERY, { id: cand.id });
+                  const calls = depData.stopPlace?.estimatedCalls || [];
+                  const filteredCalls = calls
+                    .filter((call) => {
+                      const line = call.serviceJourney?.journeyPattern?.line;
+                      return line && line.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY;
+                    })
+                    .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime));
+                  if (filteredCalls.length > 0) {
+                    nextDeparture = filteredCalls[0];
+                  }
+                } catch {}
+
+                places.push({
+                  id: cand.id,
+                  name: cand.name,
+                  distance: approxDistance,
+                  latitude: cand.latitude,
+                  longitude: cand.longitude,
+                  nextDeparture
+                });
+                seenIds.add(cand.id);
+              }
+              console.log('GPS: added fallback candidates count =', computed.length);
+            } catch {}
+          }
+
+          // Prioriter kun steder med faktisk lokale bilferge-avganger
+          const withDepartures = places.filter(p => !!p.nextDeparture);
+          const finalPlaces = withDepartures.length > 0 ? withDepartures : places;
+
+          const hasKrokeide = finalPlaces.some(p => (p.name || '').toLowerCase().includes('krokeide'));
+          console.log('GPS: includes Krokeide after fallback?', hasKrokeide);
+
+          setFerryStops(finalPlaces);
           setHasInteracted(true);
           
           // Automatisk utvid det første kortet hvis vi har resultater

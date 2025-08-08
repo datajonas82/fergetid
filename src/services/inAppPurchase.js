@@ -27,6 +27,13 @@ class InAppPurchaseService {
         return false;
       }
 
+      // Warm up product cache (optional but helps StoreKit flow)
+      try {
+        await InAppPurchase.getProducts({ productIds: [PRODUCT_ID], productType: 'non-consumable' });
+      } catch (e) {
+        console.warn('getProducts during initialize failed:', e);
+      }
+
       // Check if user has already purchased the feature
       this.isPurchased = await this.checkPurchaseStatus();
       this.isInitialized = true;
@@ -110,6 +117,15 @@ class InAppPurchaseService {
 
     try {
       console.log('Starting purchase process for:', PRODUCT_ID);
+      // Ensure product is available in the store
+      const products = await InAppPurchase.getProducts({
+        productIds: [PRODUCT_ID],
+        productType: 'non-consumable'
+      });
+      const product = (products?.products || []).find(p => p.productId === PRODUCT_ID);
+      if (!product) {
+        throw new Error('Produktet er ikke tilgjengelig. Sjekk App Store Connect og produkt-ID.');
+      }
       const result = await InAppPurchase.purchaseProduct({
         productId: PRODUCT_ID,
         productType: 'non-consumable'

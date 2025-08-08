@@ -189,30 +189,43 @@ function App() {
 
     const performLiveSearch = async () => {
       const normQuery = normalizeText(query).toLowerCase();
+      const originalQuery = query.toLowerCase();
       
-      let stops = allFerryStops.filter(stop => 
-        normalizeText(stop.name).includes(normQuery)
-      );
+      let stops = allFerryStops.filter(stop => {
+        const normName = normalizeText(stop.name);
+        const originalName = stop.name.toLowerCase();
+        
+        // Sjekk både normalisert og original tekst
+        return normName.includes(normQuery) || originalName.includes(originalQuery);
+      });
       
       // Sorter slik at eksakte treff kommer først, deretter treff som starter med søkeordet
       stops = stops.sort((a, b) => {
-        const aName = normalizeText(a.name);
-        const bName = normalizeText(b.name);
+        const aNormName = normalizeText(a.name);
+        const bNormName = normalizeText(b.name);
+        const aOrigName = a.name.toLowerCase();
+        const bOrigName = b.name.toLowerCase();
         
-        // Eksakte treff får høyest prioritet (case-insensitive)
-        const aExact = aName === normQuery;
-        const bExact = bName === normQuery;
-        if (aExact && !bExact) return -1;
-        if (!aExact && bExact) return 1;
+        // Eksakte treff får høyest prioritet (både normalisert og original)
+        const aExactNorm = aNormName === normQuery;
+        const bExactNorm = bNormName === normQuery;
+        const aExactOrig = aOrigName === originalQuery;
+        const bExactOrig = bOrigName === originalQuery;
+        
+        if ((aExactNorm || aExactOrig) && !(bExactNorm || bExactOrig)) return -1;
+        if (!(aExactNorm || aExactOrig) && (bExactNorm || bExactOrig)) return 1;
         
         // Treff som starter med søkeordet får nest høyest prioritet
-        const aStartsWith = aName.startsWith(normQuery);
-        const bStartsWith = bName.startsWith(normQuery);
-        if (aStartsWith && !bStartsWith) return -1;
-        if (!aStartsWith && bStartsWith) return 1;
+        const aStartsWithNorm = aNormName.startsWith(normQuery);
+        const bStartsWithNorm = bNormName.startsWith(normQuery);
+        const aStartsWithOrig = aOrigName.startsWith(originalQuery);
+        const bStartsWithOrig = bOrigName.startsWith(originalQuery);
+        
+        if ((aStartsWithNorm || aStartsWithOrig) && !(bStartsWithNorm || bStartsWithOrig)) return -1;
+        if (!(aStartsWithNorm || aStartsWithOrig) && (bStartsWithNorm || bStartsWithOrig)) return 1;
         
         // Alfabetisk sortering som fallback
-        return aName.localeCompare(bName);
+        return aOrigName.localeCompare(bOrigName);
       });
 
       // Limit to 10 results for live search
@@ -360,9 +373,23 @@ function App() {
           
           if (destinationTexts.length > 0) {
             console.log('Auto-loading destination times for:', stop.name, '->', destinationTexts);
-            // Last returkort for alle destinasjoner
-            destinationTexts.forEach(destinationText => {
-              loadInlineDestinationDepartures(stop.id, destinationText);
+            // Last returkort for alle destinasjoner - unngå duplikater
+            const uniqueDestinationTexts = [...new Set(destinationTexts)];
+            const existingDestinations = inlineDestinations[stop.id] || [];
+            
+            uniqueDestinationTexts.forEach(destinationText => {
+              // Sjekk om denne destinasjonen allerede er lastet
+              const alreadyLoaded = existingDestinations.some(dest => {
+                const destName = normalizeText(cleanDestinationText(dest.name || '')).toLowerCase();
+                const targetName = normalizeText(cleanDestinationText(destinationText || '')).toLowerCase();
+                return destName === targetName;
+              });
+              
+              if (!alreadyLoaded) {
+                loadInlineDestinationDepartures(stop.id, destinationText);
+              } else {
+                console.log('Destination already loaded, skipping:', destinationText);
+              }
             });
           } else {
             console.log('No destination text found for:', stop.name, 'nextDeparture:', stop.nextDeparture, 'departures:', stop.departures);
@@ -370,7 +397,7 @@ function App() {
         }, index * 300); // 300ms delay mellom hver fergekai
       });
     }
-  }, [ferryStops, hasInteracted, loading]);
+  }, [ferryStops, hasInteracted, loading, departuresMap]);
 
   // GPS functionality
   const handleGPSLocation = async () => {
@@ -748,10 +775,11 @@ function App() {
       
       // Sjekk om denne spesifikke destinasjonen allerede er lastet
       const existingDestinations = inlineDestinations[parentStopId] || [];
-      const alreadyLoaded = existingDestinations.some(dest => 
-        normalizeText(cleanDestinationText(dest.name || '')).toLowerCase() === 
-        normalizeText(cleanDestinationText(destinationText || '')).toLowerCase()
-      );
+      const alreadyLoaded = existingDestinations.some(dest => {
+        const destName = normalizeText(cleanDestinationText(dest.name || '')).toLowerCase();
+        const targetName = normalizeText(cleanDestinationText(destinationText || '')).toLowerCase();
+        return destName === targetName;
+      });
       
       if (alreadyLoaded) {
         console.log('Destination times already loaded for:', parentStopId, '->', destinationText);
@@ -762,12 +790,14 @@ function App() {
       
       const norm = (s) => normalizeText(cleanDestinationText(s || '')).toLowerCase();
       const target = norm(destinationText);
+      const originalTarget = cleanDestinationText(destinationText || '').toLowerCase();
       
       console.log('Looking for destination:', destinationText, 'normalized:', target);
       
       // Forbedret matching-logikk med vanlige feil
       const candidates = allFerryStops.filter(s => {
-        const sName = norm(s.name);
+        const sNormName = norm(s.name);
+        const sOrigName = cleanDestinationText(s.name || '').toLowerCase();
         
         // Vanlige feil og varianter
         const commonErrors = {
@@ -787,12 +817,21 @@ function App() {
         
         // Fjern "kai" og "ferjekai" for bedre matching
         const cleanTarget = target.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
-        const cleanSName = sName.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
+        const cleanSNormName = sNormName.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
+        const cleanSOrigName = sOrigName.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
+        const cleanOrigTarget = originalTarget.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
         
-        // Mer presis matching - prioritere eksakte matches
-        const exactMatch = cleanSName === cleanTarget;
-        const startsWithMatch = cleanSName.startsWith(cleanTarget) || cleanTarget.startsWith(cleanSName);
-        const containsMatch = cleanSName.includes(cleanTarget) || cleanTarget.includes(cleanSName);
+        // Mer presis matching - prioritere eksakte matches (både normalisert og original)
+        const exactMatchNorm = cleanSNormName === cleanTarget;
+        const exactMatchOrig = cleanSOrigName === cleanOrigTarget;
+        const startsWithMatchNorm = cleanSNormName.startsWith(cleanTarget) || cleanTarget.startsWith(cleanSNormName);
+        const startsWithMatchOrig = cleanSOrigName.startsWith(cleanOrigTarget) || cleanOrigTarget.startsWith(cleanSOrigName);
+        const containsMatchNorm = cleanSNormName.includes(cleanTarget) || cleanTarget.includes(cleanSNormName);
+        const containsMatchOrig = cleanSOrigName.includes(cleanOrigTarget) || cleanOrigTarget.includes(cleanSOrigName);
+        
+        const exactMatch = exactMatchNorm || exactMatchOrig;
+        const startsWithMatch = startsWithMatchNorm || startsWithMatchOrig;
+        const containsMatch = containsMatchNorm || containsMatchOrig;
         
         // Logg alle potensielle matches for debugging
         if (exactMatch || startsWithMatch || containsMatch) {
@@ -804,15 +843,22 @@ function App() {
       
       // Velg den beste matchen med prioritet
       candidate = candidates.find(s => {
-        const sName = norm(s.name);
+        const sNormName = norm(s.name);
+        const sOrigName = cleanDestinationText(s.name || '').toLowerCase();
         const cleanTarget = target.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
-        const cleanSName = sName.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
-        return cleanSName === cleanTarget; // Eksakt match
+        const cleanOrigTarget = originalTarget.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
+        const cleanSNormName = sNormName.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
+        const cleanSOrigName = sOrigName.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
+        return cleanSNormName === cleanTarget || cleanSOrigName === cleanOrigTarget; // Eksakt match
       }) || candidates.find(s => {
-        const sName = norm(s.name);
+        const sNormName = norm(s.name);
+        const sOrigName = cleanDestinationText(s.name || '').toLowerCase();
         const cleanTarget = target.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
-        const cleanSName = sName.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
-        return cleanSName.startsWith(cleanTarget) || cleanTarget.startsWith(cleanSName); // StartsWith match
+        const cleanOrigTarget = originalTarget.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
+        const cleanSNormName = sNormName.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
+        const cleanSOrigName = sOrigName.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
+        return (cleanSNormName.startsWith(cleanTarget) || cleanTarget.startsWith(cleanSNormName)) ||
+               (cleanSOrigName.startsWith(cleanOrigTarget) || cleanOrigTarget.startsWith(cleanSOrigName)); // StartsWith match
       }) || candidates[0]; // Fallback til første match
       
       if (!candidate) {
@@ -866,6 +912,14 @@ function App() {
 
       setInlineDestinations(prev => {
         const existingDestinations = prev[parentStopId] || [];
+        
+        // Sjekk om denne stopId allerede eksisterer
+        const stopIdExists = existingDestinations.some(dest => dest.stopId === candidate.id);
+        if (stopIdExists) {
+          console.log('StopId already exists:', candidate.id, 'skipping duplicate');
+          return prev;
+        }
+        
         const newDestination = {
           stopId: candidate.id,
           name: candidate.name,

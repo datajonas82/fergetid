@@ -196,10 +196,10 @@ function App() {
       
       // Sorter slik at eksakte treff kommer først, deretter treff som starter med søkeordet
       stops = stops.sort((a, b) => {
-        const aName = normalizeText(a.name).toLowerCase();
-        const bName = normalizeText(b.name).toLowerCase();
+        const aName = normalizeText(a.name);
+        const bName = normalizeText(b.name);
         
-        // Eksakte treff får høyest prioritet
+        // Eksakte treff får høyest prioritet (case-insensitive)
         const aExact = aName === normQuery;
         const bExact = bName === normQuery;
         if (aExact && !bExact) return -1;
@@ -235,10 +235,20 @@ function App() {
           // Ignorer feil for individuelle fergekaier
         }
         
+        // Beregn avstand hvis GPS er aktiv (location er satt)
+        let distance = null;
+        if (location && stop.latitude && stop.longitude) {
+          const dLat = (stop.latitude - location.latitude) * 111000;
+          const dLng = (stop.longitude - location.longitude) * 111000 * Math.cos(location.latitude * Math.PI / 180);
+          distance = Math.sqrt(dLat * dLat + dLng * dLng);
+        }
+        
         stopsWithDepartures.push({
           id: stop.id,
           name: stop.name,
-          distance: null, // No distance for search results
+          latitude: stop.latitude,
+          longitude: stop.longitude,
+          distance: distance,
           departures: departures
         });
       }

@@ -192,6 +192,8 @@ function App() {
       const originalQuery = query.toLowerCase();
       
       let stops = allFerryStops.filter(stop => {
+        if (!stop || !stop.name) return false;
+        
         const normName = normalizeText(stop.name);
         const originalName = stop.name.toLowerCase();
         
@@ -220,6 +222,24 @@ function App() {
         const bStartsWithNorm = bNormName.startsWith(normQuery);
         const aStartsWithOrig = aOrigName.startsWith(originalQuery);
         const bStartsWithOrig = bOrigName.startsWith(originalQuery);
+        
+        // Hvis begge starter med søkeordet, prioriter den lengste matchen
+        if ((aStartsWithNorm || aStartsWithOrig) && (bStartsWithNorm || bStartsWithOrig)) {
+          // Beregn faktisk match-lengde for hver
+          const aMatchLength = Math.max(
+            aStartsWithNorm ? normQuery.length : 0,
+            aStartsWithOrig ? originalQuery.length : 0
+          );
+          const bMatchLength = Math.max(
+            bStartsWithNorm ? normQuery.length : 0,
+            bStartsWithOrig ? originalQuery.length : 0
+          );
+          
+          // Hvis match-lengdene er forskjellige, prioriter den lengste
+          if (aMatchLength !== bMatchLength) {
+            return bMatchLength - aMatchLength; // Lengre match først
+          }
+        }
         
         if ((aStartsWithNorm || aStartsWithOrig) && !(bStartsWithNorm || bStartsWithOrig)) return -1;
         if (!(aStartsWithNorm || aStartsWithOrig) && (bStartsWithNorm || bStartsWithOrig)) return 1;
@@ -764,6 +784,9 @@ function App() {
     
     return `${newSize}px`;
   };
+
+  // Hjelpefunksjon for å hente skipets navn
+
 
 
 

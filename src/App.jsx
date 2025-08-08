@@ -136,7 +136,12 @@ function App() {
             const name = (stop.name || '').toLowerCase();
             // Ekskluder hurtigbåtkai og kystrutekai basert på navn
             if (name.includes('hurtigbåt') || name.includes('express boat') || name.includes('kystrute')) return false;
-            return true; // Inkluder alle andre water transport stops
+            
+            // Prioriter localCarFerry, men inkluder også andre water transport stops som kan være relevante
+            if (stop.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY) return true;
+            
+            // Inkluder også andre water transport stops som ikke er ekskludert
+            return true;
           }
         );
         
@@ -764,8 +769,8 @@ function App() {
       }
       
       // Beregn redusert størrelse basert på tekstlengde
-      const reduction = Math.min((text.length - maxLength) * 0.8, 6); // Økt reduksjon fra 4 til 6px
-      const newSize = Math.max(baseSize - reduction, 8); // Redusert minimum fra 10 til 8px
+      const reduction = Math.min((text.length - maxLength) * 0.5, 4); // Redusert fra 0.8 til 0.5 per tegn
+      const newSize = Math.max(baseSize - reduction, 10); // Økt minimum fra 8 til 10px
       
       return `${newSize}px`;
     }
@@ -852,13 +857,16 @@ function App() {
         const containsMatchNorm = cleanSNormName.includes(cleanTarget) || cleanTarget.includes(cleanSNormName);
         const containsMatchOrig = cleanSOrigName.includes(cleanOrigTarget) || cleanOrigTarget.includes(cleanSOrigName);
         
+        // Sjekk også om navnet matcher uten normalisering
+        const directMatch = s.name.toLowerCase().includes(target) || target.includes(s.name.toLowerCase());
+        
         const exactMatch = exactMatchNorm || exactMatchOrig;
         const startsWithMatch = startsWithMatchNorm || startsWithMatchOrig;
         const containsMatch = containsMatchNorm || containsMatchOrig;
         
         // Logg alle potensielle matches for debugging
-        if (exactMatch || startsWithMatch || containsMatch) {
-          console.log('Found match:', s.name, 'for target:', target, 'exact:', exactMatch, 'startsWith:', startsWithMatch, 'contains:', containsMatch);
+        if (exactMatch || startsWithMatch || containsMatch || directMatch) {
+          console.log('Found match:', s.name, 'for target:', target, 'exact:', exactMatch, 'startsWith:', startsWithMatch, 'contains:', containsMatch, 'direct:', directMatch);
           return true;
         }
         return false;
@@ -1276,7 +1284,7 @@ function App() {
                           {(() => {
                             // Kombiner neste avgang og senere avganger til en liste
                             const allDepartures = [nextDeparture, ...laterDepartures].filter(Boolean);
-                            return allDepartures.slice(0, 6).map((dep, idx) => {
+                            return allDepartures.slice(0, 5).map((dep, idx) => {
                               const mins = Math.max(0, Math.round((dep.aimed - now) / 60000));
                               return (
                                 <li key={dep.aimedDepartureTime + '-' + idx} className="flex items-center py-0.5 leading-snug">
@@ -1323,7 +1331,7 @@ function App() {
                           <hr className="border-gray-300 my-2" />
                           <div className="mt-2 text-base sm:text-lg">
                             <ul className="space-y-0">
-                              {destination.departures.slice(0, 6).map((dep, idx) => {
+                              {destination.departures.slice(0, 5).map((dep, idx) => {
                                 const mins = Math.max(0, Math.round((dep.aimed - now) / 60000));
                                 return (
                                   <li key={`inline-${destination.stopId}-${dep.aimedDepartureTime}-${idx}`} className="flex items-center py-0.5 leading-snug">

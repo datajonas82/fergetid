@@ -136,7 +136,7 @@ function App() {
             const name = (stop.name || '').toLowerCase();
             // Ekskluder hurtigbåtkai og kystrutekai basert på navn
             if (name.includes('hurtigbåt') || name.includes('express boat') || name.includes('kystrute')) return false;
-            return (name.includes('fergekai') || name.includes('ferjekai'));
+            return true; // Inkluder alle andre water transport stops
           }
         );
         
@@ -757,15 +757,15 @@ function App() {
     // For destinasjonstekster (små felter)
     if (maxWidth === 96) {
       const baseSize = 14; // Standard størrelse for destinasjoner
-      const maxLength = 12; // Antall tegn før vi begynner å redusere størrelsen
+      const maxLength = 10; // Reduseret fra 12 til 10 tegn for destinasjoner
       
       if (text.length <= maxLength) {
         return '0.875rem'; // Behold standard størrelse (14px)
       }
       
       // Beregn redusert størrelse basert på tekstlengde
-      const reduction = Math.min((text.length - maxLength) * 0.6, 4); // Maks 4px reduksjon
-      const newSize = Math.max(baseSize - reduction, 10); // Minimum 10px
+      const reduction = Math.min((text.length - maxLength) * 0.8, 6); // Økt reduksjon fra 4 til 6px
+      const newSize = Math.max(baseSize - reduction, 8); // Redusert minimum fra 10 til 8px
       
       return `${newSize}px`;
     }
@@ -1225,6 +1225,11 @@ function App() {
                 }
               }
 
+              // Bare vis fergekortet hvis det er avganger
+              if (!nextDeparture) {
+                return null;
+              }
+
               return (
                 <div key={stopData.id + '-' + (distance || '')} className="flex flex-col">
                   {/* Km-avstand som egen boks over fergekortet */}
@@ -1347,9 +1352,7 @@ function App() {
                       ))}
 
                     </>
-                  ) : (
-                    <p className="mt-2 text-sm text-gray-500">Ingen avganger funnet</p>
-                  )}
+                  ) : null}
                   </div>
                 </div>
               );

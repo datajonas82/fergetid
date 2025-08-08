@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import { InAppPurchase } from 'capacitor-plugin-purchase';
 
 // In-app purchase product ID
 const PRODUCT_ID = 'kjoretidberegning';
@@ -18,6 +19,14 @@ class InAppPurchaseService {
     }
 
     try {
+      // Verify device can make purchases
+      const { allowed } = await InAppPurchase.canMakePurchases();
+      if (!allowed) {
+        console.warn('In-app purchases are disabled on this device');
+        this.isInitialized = true;
+        return false;
+      }
+
       // Check if user has already purchased the feature
       this.isPurchased = await this.checkPurchaseStatus();
       this.isInitialized = true;
@@ -34,12 +43,26 @@ class InAppPurchaseService {
     if (!this.isAvailable) return false;
 
     try {
-      // Check local storage for purchase status
+      // Ask StoreKit for active purchases
+      const result = await InAppPurchase.getActivePurchases();
+      const owned = (result?.purchases || []).some(p => p.productId === PRODUCT_ID);
+      if (owned) {
+        this.isPurchased = true;
+        localStorage.setItem('kjoretidberegning_purchased', 'true');
+        return true;
+      }
+      // Fallback to local storage for previously stored state
       const purchaseStatus = localStorage.getItem('kjoretidberegning_purchased');
       return purchaseStatus === 'true';
     } catch (error) {
       console.error('Error checking purchase status:', error);
-      return false;
+      // Fallback to local state if StoreKit query fails
+      try {
+        const purchaseStatus = localStorage.getItem('kjoretidberegning_purchased');
+        return purchaseStatus === 'true';
+      } catch (_) {
+        return false;
+      }
     }
   }
 
@@ -56,13 +79,17 @@ class InAppPurchaseService {
     }
 
     try {
-      // For now, return static product info
-      // In a real implementation, you would fetch this from StoreKit
+      const products = await InAppPurchase.getProducts({
+        productIds: [PRODUCT_ID],
+        productType: 'non-consumable'
+      });
+      const product = (products?.products || []).find(p => p.productId === PRODUCT_ID);
+      if (!product) return null;
       return {
-        id: PRODUCT_ID,
-        title: 'Kjøretidberegning',
-        description: 'Beregn kjøretid til fergekaier og få fargekodet avganger basert på om du rekker avgangen eller ikke',
-        price: '29 kr',
+        id: product.productId,
+        title: product.title || 'Kjøretidberegning',
+        description: product.description || 'Beregn kjøretid til fergekaier og få fargekodet avganger basert på om du rekker avgangen eller ikke',
+        price: product.price || '—',
         available: true
       };
     } catch (error) {
@@ -82,38 +109,25 @@ class InAppPurchaseService {
     }
 
     try {
-      // Simulate purchase process
-      // In a real implementation, you would integrate with StoreKit here
       console.log('Starting purchase process for:', PRODUCT_ID);
-      
-      // For demo purposes, we'll simulate a successful purchase
-      // In production, you would use the actual StoreKit API
-      await this.simulatePurchase();
-      
-      return true;
+      const result = await InAppPurchase.purchaseProduct({
+        productId: PRODUCT_ID,
+        productType: 'non-consumable'
+      });
+
+      if (result?.transactionId) {
+        this.isPurchased = true;
+        localStorage.setItem('kjoretidberegning_purchased', 'true');
+        return true;
+      }
+      throw new Error('Purchase did not return a transactionId');
     } catch (error) {
       console.error('Purchase failed:', error);
       throw error;
     }
   }
 
-  // Simulate purchase (for demo purposes)
-  async simulatePurchase() {
-    return new Promise((resolve, reject) => {
-      // Simulate network delay
-      setTimeout(() => {
-        try {
-          // Mark as purchased
-          this.isPurchased = true;
-          localStorage.setItem('kjoretidberegning_purchased', 'true');
-          console.log('Purchase completed successfully');
-          resolve(true);
-        } catch (error) {
-          reject(error);
-        }
-      }, 2000);
-    });
-  }
+  // Simulated purchase removed – real StoreKit used
 
   // Restore purchases
   async restorePurchases() {
@@ -123,17 +137,16 @@ class InAppPurchaseService {
 
     try {
       console.log('Restoring purchases...');
-      
-      // Check if user has purchased the feature
-      const wasPurchased = await this.checkPurchaseStatus();
-      if (wasPurchased) {
+      const result = await InAppPurchase.restorePurchases();
+      const restored = (result?.purchases || []).some(p => p.productId === PRODUCT_ID);
+      if (restored) {
         this.isPurchased = true;
+        localStorage.setItem('kjoretidberegning_purchased', 'true');
         console.log('Purchase restored successfully');
         return true;
-      } else {
-        console.log('No purchases to restore');
-        return false;
       }
+      console.log('No purchases to restore');
+      return false;
     } catch (error) {
       console.error('Error restoring purchases:', error);
       throw error;

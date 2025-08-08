@@ -832,8 +832,8 @@ function App() {
           </div>
         )}
 
-        {/* Toggle for kjøretidsberegning - kun synlig i GPS-modus når fergekaier er lastet */}
-        {mode === 'gps' && hasInteracted && ferryStops.length > 0 && (
+        {/* Toggle for kjøretidsberegning - kun synlig i GPS-modus når fergekaier er lastet (skjult i web) */}
+        {isIOS && mode === 'gps' && hasInteracted && ferryStops.length > 0 && (
           <div className="w-full max-w-[350px] sm:max-w-md mb-4 px-3 sm:px-4 flex justify-center items-center gap-3">
             <span className="text-white text-sm font-medium">Beregn kjøretid</span>
             <button

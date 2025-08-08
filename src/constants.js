@@ -12,7 +12,7 @@ export const GEOLOCATION_OPTIONS = {
 
 // Search parameters
 export const NEARBY_SEARCH_CONFIG = {
-  maximumDistance: 50000, // meters
+  maximumDistance: 60000, // meters (60km)
   maximumResults: 200,
   timeRange: 7200, // seconds (2 hours)
   numberOfDepartures: 6

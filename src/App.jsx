@@ -194,12 +194,24 @@ function App() {
         normalizeText(stop.name).includes(normQuery)
       );
       
-      // Sorter slik at treff som starter med søkeordet kommer øverst
+      // Sorter slik at eksakte treff kommer først, deretter treff som starter med søkeordet
       stops = stops.sort((a, b) => {
         const aName = normalizeText(a.name).toLowerCase();
         const bName = normalizeText(b.name).toLowerCase();
-        if (aName.startsWith(normQuery) && !bName.startsWith(normQuery)) return -1;
-        if (!aName.startsWith(normQuery) && bName.startsWith(normQuery)) return 1;
+        
+        // Eksakte treff får høyest prioritet
+        const aExact = aName === normQuery;
+        const bExact = bName === normQuery;
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+        
+        // Treff som starter med søkeordet får nest høyest prioritet
+        const aStartsWith = aName.startsWith(normQuery);
+        const bStartsWith = bName.startsWith(normQuery);
+        if (aStartsWith && !bStartsWith) return -1;
+        if (!aStartsWith && bStartsWith) return 1;
+        
+        // Alfabetisk sortering som fallback
         return aName.localeCompare(bName);
       });
 
@@ -238,17 +250,6 @@ function App() {
         setFerryStops(formattedStops);
         setHasInteracted(true);
         setSelectedStop(formattedStops[0].id);
-        // Auto-scroll til det første kortet med 4 sekunders delay
-        setTimeout(() => {
-          const cardElement = document.getElementById(`ferry-card-${formattedStops[0].id}`);
-          if (cardElement) {
-            cardElement.scrollIntoView({ 
-              behavior: 'smooth', 
-              block: 'center',
-              inline: 'nearest'
-            });
-          }
-        }, 4000);
       } else {
         setFerryStops([]);
         setHasInteracted(false);
@@ -527,17 +528,7 @@ function App() {
               console.error('Error fetching departures for first card:', err);
             }
             
-            // Auto-scroll til det første kortet
-            setTimeout(() => {
-              const cardElement = document.getElementById(`ferry-card-${limitedPlaces[0].id}`);
-              if (cardElement) {
-                cardElement.scrollIntoView({ 
-                  behavior: 'smooth', 
-                  block: 'center',
-                  inline: 'nearest'
-                });
-              }
-            }, 100);
+
           }
         } catch (err) {
           setError('Kunne ikke hente fergekaier');
@@ -1166,7 +1157,10 @@ function App() {
 
                       {console.log('Rendering ferry card for:', stopData.id, 'inlineDestinations:', inlineDestinations) || null}
                       {inlineDestinations[stopData.id] && (
-                          <div className="mt-5 p-4 sm:p-5 rounded-lg bg-gray-50/90 backdrop-blur-md shadow-lg ">
+                          <div className="mt-5 p-4 sm:p-5 rounded-lg bg-gray-50/90 backdrop-blur-md shadow-lg relative">
+                          <div className="bg-purple-100 text-purple-700 text-sm font-bold px-2 py-1 rounded-full shadow-lg absolute top-[-10px] left-0 z-20">
+                            Retur
+                          </div>
                           <div className="flex items-center justify-between">
                             <h3 className="text-lg font-bold text-gray-800">
                               {cleanDestinationText(inlineDestinations[stopData.id].name)}

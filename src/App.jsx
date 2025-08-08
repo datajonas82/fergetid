@@ -1229,7 +1229,7 @@ function App() {
 
                       {console.log('Rendering ferry card for:', stopData.id, 'inlineDestinations:', inlineDestinations) || null}
                       {inlineDestinations[stopData.id] && inlineDestinations[stopData.id].map((destination, destIndex) => (
-                          <div key={`${stopData.id}-${destination.stopId}`} className="mt-5 p-4 sm:p-5 rounded-lg bg-gray-50/90 backdrop-blur-md shadow-lg relative">
+                          <div key={`${stopData.id}-${destination.stopId}`} className="mt-5 p-4 sm:p-5 rounded-lg bg-gray-100/80 backdrop-blur-md shadow-lg relative">
                           <div className="bg-purple-100 text-purple-700 text-sm font-bold px-2 py-1 rounded-full shadow-lg absolute top-[-10px] left-0 z-20">
                             Retur
                           </div>

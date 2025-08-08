@@ -109,8 +109,6 @@ body {
 .card-expand {
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: visible;
-  width: 100%;
-  min-width: 100%;
 }
 
 /* Departures list animation */

@@ -109,8 +109,8 @@ function App() {
   const [drivingTimesLoading, setDrivingTimesLoading] = useState({});
   const [isIOS] = useState(Capacitor.isNativePlatform());
   
-  // Inline destinations state
-  const [inlineDestinations, setInlineDestinations] = useState({}); // { [parentStopId]: { stopId, name, departures: array } }
+  // Inline destinations state - now supports multiple destinations per stop
+  const [inlineDestinations, setInlineDestinations] = useState({}); // { [parentStopId]: [{ stopId, name, departures: array }] }
 
   // Initialize app
   useEffect(() => {
@@ -310,22 +310,60 @@ function App() {
             }
           }
           
-          // Last destinasjonstider - bruk destinasjonen fra avgangen
-          let destinationText = null;
+          // Last destinasjonstider - identifiser alle unike destinasjoner
+          let destinationTexts = [];
           
-          // For GPS-modus
+          // For GPS-modus - bruk departuresMap hvis tilgjengelig, ellers last avganger
           if (stop.nextDeparture?.destinationDisplay?.frontText) {
-            destinationText = stop.nextDeparture.destinationDisplay.frontText;
+            // Start med neste avgang
+            destinationTexts.push(stop.nextDeparture.destinationDisplay.frontText);
+            
+            // Bruk departuresMap hvis tilgjengelig, ellers last avganger
+            let filteredCalls = departuresMap[stop.id] || [];
+            
+            if (filteredCalls.length === 0) {
+              // Last alle avganger for å finne andre destinasjoner
+              try {
+                const data = await client.request(DEPARTURES_QUERY, { id: stop.id });
+                const calls = data.stopPlace?.estimatedCalls || [];
+                filteredCalls = calls
+                  .filter(call => call.serviceJourney?.journeyPattern?.line?.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY)
+                  .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime));
+              } catch (error) {
+                console.error('Error loading all departures for GPS mode:', error);
+              }
+            }
+            
+            // Finn alle unike destinasjoner
+            const uniqueDestinations = new Set();
+            filteredCalls.forEach(dep => {
+              if (dep.destinationDisplay?.frontText) {
+                uniqueDestinations.add(dep.destinationDisplay.frontText);
+              }
+            });
+            destinationTexts = Array.from(uniqueDestinations);
           }
-          // For søk-modus
-          else if (stop.departures && stop.departures.length > 0) {
-            destinationText = stop.departures[0]?.destinationDisplay?.frontText;
+          // For søk-modus - bruk departuresMap hvis tilgjengelig, ellers bruk stop.departures
+          else {
+            let departures = departuresMap[stop.id] || stop.departures || [];
+            
+            if (departures.length > 0) {
+              const uniqueDestinations = new Set();
+              departures.forEach(dep => {
+                if (dep.destinationDisplay?.frontText) {
+                  uniqueDestinations.add(dep.destinationDisplay.frontText);
+                }
+              });
+              destinationTexts = Array.from(uniqueDestinations);
+            }
           }
           
-          if (destinationText) {
-            console.log('Auto-loading destination times for:', stop.name, '->', destinationText);
-            // Send destinasjonen som returkortet skal vise
-            loadInlineDestinationDepartures(stop.id, destinationText);
+          if (destinationTexts.length > 0) {
+            console.log('Auto-loading destination times for:', stop.name, '->', destinationTexts);
+            // Last returkort for alle destinasjoner
+            destinationTexts.forEach(destinationText => {
+              loadInlineDestinationDepartures(stop.id, destinationText);
+            });
           } else {
             console.log('No destination text found for:', stop.name, 'nextDeparture:', stop.nextDeparture, 'departures:', stop.departures);
           }
@@ -419,8 +457,9 @@ function App() {
               // Ikke ekskluder på navn i GPS-modus – behold alle vann-knutepunkter for å sikre at relevante kaier ikke faller bort
               const name = (place.name || '').toLowerCase();
               console.log('GPS candidate:', { id: place.id, name: place.name, distance, submode: place.transportSubmode });
-              // Hent neste avgang for denne fergekaien
+              // Hent alle avganger for denne fergekaien
               let nextDeparture = null;
+              let allDepartures = [];
               try {
                 const depData = await client.request(DEPARTURES_QUERY, { id: place.id });
                 const calls = depData.stopPlace?.estimatedCalls || [];
@@ -431,9 +470,16 @@ function App() {
                   })
                   .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime));
                 
+                allDepartures = filteredCalls;
                 if (filteredCalls.length > 0) {
                   nextDeparture = filteredCalls[0]; // Kun neste avgang
                 }
+                
+                // Lagre alle avganger i departuresMap
+                setDeparturesMap(prev => ({
+                  ...prev,
+                  [place.id]: filteredCalls
+                }));
               } catch {
                 // Ignorer feil for individuelle fergekaier
               }
@@ -478,9 +524,16 @@ function App() {
                       return line && line.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY;
                     })
                     .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime));
+                  
                   if (filteredCalls.length > 0) {
                     nextDeparture = filteredCalls[0];
                   }
+                  
+                  // Lagre alle avganger i departuresMap
+                  setDeparturesMap(prev => ({
+                    ...prev,
+                    [cand.id]: filteredCalls
+                  }));
                 } catch {}
 
                 places.push({
@@ -693,9 +746,15 @@ function App() {
     try {
       console.log('loadInlineDestinationDepartures called with:', { parentStopId, destinationText });
       
-      // Hvis destinasjonstidene allerede er lastet, ikke last på nytt
-      if (inlineDestinations[parentStopId]) {
-        console.log('Destination times already loaded for:', parentStopId);
+      // Sjekk om denne spesifikke destinasjonen allerede er lastet
+      const existingDestinations = inlineDestinations[parentStopId] || [];
+      const alreadyLoaded = existingDestinations.some(dest => 
+        normalizeText(cleanDestinationText(dest.name || '')).toLowerCase() === 
+        normalizeText(cleanDestinationText(destinationText || '')).toLowerCase()
+      );
+      
+      if (alreadyLoaded) {
+        console.log('Destination times already loaded for:', parentStopId, '->', destinationText);
         return;
       }
 
@@ -806,13 +865,16 @@ function App() {
       }
 
       setInlineDestinations(prev => {
+        const existingDestinations = prev[parentStopId] || [];
+        const newDestination = {
+          stopId: candidate.id,
+          name: candidate.name,
+          departures: finalCalls
+        };
+        
         const newInlineDestinations = {
           ...prev,
-          [parentStopId]: {
-            stopId: candidate.id,
-            name: candidate.name,
-            departures: finalCalls
-          }
+          [parentStopId]: [...existingDestinations, newDestination]
         };
         console.log('Setting inline destinations:', newInlineDestinations);
         return newInlineDestinations;
@@ -1166,23 +1228,23 @@ function App() {
 
 
                       {console.log('Rendering ferry card for:', stopData.id, 'inlineDestinations:', inlineDestinations) || null}
-                      {inlineDestinations[stopData.id] && (
-                          <div className="mt-5 p-4 sm:p-5 rounded-lg bg-gray-50/90 backdrop-blur-md shadow-lg relative">
+                      {inlineDestinations[stopData.id] && inlineDestinations[stopData.id].map((destination, destIndex) => (
+                          <div key={`${stopData.id}-${destination.stopId}`} className="mt-5 p-4 sm:p-5 rounded-lg bg-gray-50/90 backdrop-blur-md shadow-lg relative">
                           <div className="bg-purple-100 text-purple-700 text-sm font-bold px-2 py-1 rounded-full shadow-lg absolute top-[-10px] left-0 z-20">
                             Retur
                           </div>
                           <div className="flex items-center justify-between">
                             <h3 className="text-lg font-bold text-gray-800">
-                              {cleanDestinationText(inlineDestinations[stopData.id].name)}
+                              {cleanDestinationText(destination.name)}
                             </h3>
                           </div>
                           <hr className="border-gray-300 my-2" />
                           <div className="mt-2 text-base sm:text-lg">
                             <ul className="space-y-0">
-                              {inlineDestinations[stopData.id].departures.slice(0, 6).map((dep, idx) => {
+                              {destination.departures.slice(0, 6).map((dep, idx) => {
                                 const mins = Math.max(0, Math.round((dep.aimed - now) / 60000));
                                 return (
-                                  <li key={'inline-' + dep.aimedDepartureTime + '-' + idx} className="flex items-center py-0.5 leading-snug">
+                                  <li key={`inline-${destination.stopId}-${dep.aimedDepartureTime}-${idx}`} className="flex items-center py-0.5 leading-snug">
                                     <span className="font-bold w-16 text-left text-sm">
                                       {dep.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </span>
@@ -1205,7 +1267,7 @@ function App() {
                             </ul>
                           </div>
                         </div>
-                      )}
+                      ))}
 
                     </>
                   ) : (

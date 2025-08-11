@@ -33,7 +33,7 @@ const DEPARTURES_QUERY = gql`
   query StopPlaceDepartures($id: String!) {
     stopPlace(id: $id) {
       name
-      estimatedCalls(timeRange: 86400, numberOfDepartures: 50) {
+      estimatedCalls(timeRange: 43200, numberOfDepartures: 20) {
         aimedDepartureTime
         destinationDisplay { frontText }
         serviceJourney {
@@ -51,7 +51,7 @@ const ENHANCED_DEPARTURES_WITH_PATTERNS_QUERY = gql`
   query EnhancedDeparturesWithPatterns($id: String!) {
     stopPlace(id: $id) {
       name
-      estimatedCalls(timeRange: 86400, numberOfDepartures: 50) {
+      estimatedCalls(timeRange: 43200, numberOfDepartures: 20) {
         aimedDepartureTime
         expectedDepartureTime
         destinationDisplay {
@@ -218,6 +218,141 @@ function App() {
         await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for stops to load
       }
 
+      // Helper to compute nearby stops and update UI based on coordinates
+      const computeNearbyAndUpdate = async (latitude, longitude) => {
+        setLocation({ latitude, longitude });
+
+        // Non-blocking location name fetch
+        (async () => {
+          try {
+            const geocodingUrl = config.GOOGLE_MAPS_CONFIG.getGeocodingUrl(latitude, longitude);
+            if (geocodingUrl) {
+              const response = await fetch(geocodingUrl);
+              const data = await response.json();
+              if (data.results && data.results.length > 0) {
+                setLocationName(extractLocationName(data));
+              }
+            }
+          } catch {
+            const latDeg = Math.abs(latitude);
+            const lonDeg = Math.abs(longitude);
+            const latDir = latitude >= 0 ? 'N' : 'S';
+            const lonDir = longitude >= 0 ? 'E' : 'W';
+            setLocationName(`${latDeg.toFixed(2)}°${latDir}, ${lonDeg.toFixed(2)}°${lonDir}`);
+          }
+        })();
+        
+        // Step 1: Calculate simple Haversine distance for ALL quays (fast, no network)
+        const placesWithDistance = allFerryQuays.map(stop => {
+          const dLat = (stop.latitude - latitude) * 111000;
+          const dLng = (stop.longitude - longitude) * 111000 * Math.cos(latitude * Math.PI / 180);
+          const distance = Math.sqrt(dLat * dLat + dLng * dLng);
+          return { ...stop, distance };
+        });
+
+        // Filter by distance and sort
+        const nearbyCandidates = placesWithDistance
+          .filter(p => p.distance <= 60000) // 60 km radius
+          .sort((a, b) => a.distance - b.distance);
+
+        // Step 2: Fetch departures for the closest candidates
+        const fetchDepartures = async (place) => {
+          const attempt = async () => {
+            const depData = await client.request(DEPARTURES_QUERY, { id: place.id });
+            const calls = depData.stopPlace?.estimatedCalls || [];
+            const departures = calls
+              .filter(call => {
+                const sub = call.serviceJourney?.journeyPattern?.line?.transportSubmode;
+                return sub && !EXCLUDED_SUBMODES.includes(sub);
+              })
+              .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime));
+            return { ...place, nextDeparture: departures[0] || null, departures };
+          };
+          try {
+            return await attempt();
+          } catch {
+            await new Promise(r => setTimeout(r, 250));
+            try {
+              return await attempt();
+            } catch {
+              return { ...place, nextDeparture: null, departures: [] };
+            }
+          }
+        };
+        
+        // Grow search window until we find enough results (handles many nearby water stops without departures)
+        const collectedWithDepartures = [];
+        const chunkSize = 30;
+        const maxCandidates = Math.min(nearbyCandidates.length, 200);
+        for (let i = 0; i < maxCandidates && collectedWithDepartures.length < 5; i += chunkSize) {
+          const chunk = nearbyCandidates.slice(i, i + chunkSize);
+          const results = await Promise.all(chunk.map(fetchDepartures));
+          for (const res of results) {
+            if (res.nextDeparture) collectedWithDepartures.push(res);
+          }
+        }
+
+        const finalPlaces = collectedWithDepartures.slice(0, 5);
+
+        // Step 3: Fetch return cards for the final list of stops
+        const returnCardPromises = finalPlaces.map(stop => loadReturnCardForStop(stop));
+        const resolvedReturnCards = await Promise.all(returnCardPromises);
+
+        // Step 4: Prepare all state updates
+        const newDeparturesMap = finalPlaces.reduce((acc, stop) => {
+          acc[stop.id] = stop.departures;
+          return acc;
+        }, {});
+
+        const newInlineDestinations = resolvedReturnCards.reduce((acc, card) => {
+          if (card) {
+            if (!acc[card.parentStopId]) {
+              acc[card.parentStopId] = [];
+            }
+            acc[card.parentStopId].push(card);
+          }
+          return acc;
+        }, {});
+
+        // Step 5: Perform a single, atomic state update
+        setFerryStops(finalPlaces);
+        setDeparturesMap(newDeparturesMap);
+        
+        // Preserve existing return cards if they're still relevant
+        setInlineDestinations(prev => {
+          const preserved = {};
+          // Keep existing return cards for stops that are still in the new results
+          Object.keys(prev).forEach(stopId => {
+            if (finalPlaces.some(stop => stop.id === stopId)) {
+              preserved[stopId] = prev[stopId];
+            }
+          });
+          // Add new return cards
+          Object.keys(newInlineDestinations).forEach(stopId => {
+            if (!preserved[stopId]) {
+              preserved[stopId] = newInlineDestinations[stopId];
+            }
+          });
+          return preserved;
+        });
+        
+        if (finalPlaces.length > 0) {
+          setHasInteracted(true);
+          setSelectedStop(finalPlaces[0].id);
+        }
+      };
+
+      // If we have a last known location, use it immediately for a fast result
+      try {
+        const cached = localStorage.getItem('lastLocation');
+        if (cached) {
+          const { latitude: clat, longitude: clng } = JSON.parse(cached) || {};
+          if (clat && clng) {
+            await computeNearbyAndUpdate(clat, clng);
+          }
+        }
+      } catch {}
+
       try {
         // Try a quick, low-accuracy fix first (uses cached location if available)
         let pos;
@@ -234,110 +369,10 @@ function App() {
 
         try {
           const { latitude, longitude } = pos.coords;
-          setLocation({ latitude, longitude });
+          await computeNearbyAndUpdate(latitude, longitude);
 
-          // Non-blocking location name fetch
-          (async () => {
-            try {
-              const geocodingUrl = config.GOOGLE_MAPS_CONFIG.getGeocodingUrl(latitude, longitude);
-              const response = await fetch(geocodingUrl);
-              const data = await response.json();
-              if (data.results && data.results.length > 0) {
-                setLocationName(extractLocationName(data));
-              }
-            } catch {
-              const latDeg = Math.abs(latitude);
-              const lonDeg = Math.abs(longitude);
-              const latDir = latitude >= 0 ? 'N' : 'S';
-              const lonDir = longitude >= 0 ? 'E' : 'W';
-              setLocationName(`${latDeg.toFixed(2)}°${latDir}, ${lonDeg.toFixed(2)}°${lonDir}`);
-            }
-          })();
-          
-          // Step 1: Calculate simple Haversine distance for ALL quays (fast, no network)
-          const placesWithDistance = allFerryQuays.map(stop => {
-            const dLat = (stop.latitude - latitude) * 111000;
-            const dLng = (stop.longitude - longitude) * 111000 * Math.cos(latitude * Math.PI / 180);
-            const distance = Math.sqrt(dLat * dLat + dLng * dLng);
-            return { ...stop, distance };
-          });
-
-          // Filter by distance and sort
-          const nearbyCandidates = placesWithDistance
-            .filter(p => p.distance <= 80000) // 80 km (include Moss/Svelvik from Oslo)
-            .sort((a, b) => a.distance - b.distance);
-
-          // Step 2: Fetch departures for the closest candidates
-          const fetchDepartures = async (place) => {
-            try {
-              const depData = await client.request(DEPARTURES_QUERY, { id: place.id });
-              const calls = depData.stopPlace?.estimatedCalls || [];
-              const departures = calls
-                .filter(call => call.serviceJourney?.journeyPattern?.line?.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY)
-                .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime));
-              
-              return {
-                ...place,
-                nextDeparture: departures[0] || null,
-                departures: departures,
-              };
-            } catch {
-              return { ...place, nextDeparture: null, departures: [] };
-            }
-          };
-          
-          const placesWithDepartures = await Promise.all(nearbyCandidates.slice(0, 20).map(fetchDepartures));
-          
-          const finalPlaces = placesWithDepartures
-            .filter(p => p.nextDeparture)
-            .slice(0, 5);
-
-          // Step 3: Fetch return cards for the final list of stops
-          const returnCardPromises = finalPlaces.map(stop => loadReturnCardForStop(stop));
-          const resolvedReturnCards = await Promise.all(returnCardPromises);
-
-          // Step 4: Prepare all state updates
-          const newDeparturesMap = finalPlaces.reduce((acc, stop) => {
-            acc[stop.id] = stop.departures;
-            return acc;
-          }, {});
-
-          const newInlineDestinations = resolvedReturnCards.reduce((acc, card) => {
-            if (card) {
-              if (!acc[card.parentStopId]) {
-                acc[card.parentStopId] = [];
-              }
-              acc[card.parentStopId].push(card);
-            }
-            return acc;
-          }, {});
-
-          // Step 5: Perform a single, atomic state update
-          setFerryStops(finalPlaces);
-          setDeparturesMap(newDeparturesMap);
-          
-          // Preserve existing return cards if they're still relevant
-          setInlineDestinations(prev => {
-            const preserved = {};
-            // Keep existing return cards for stops that are still in the new results
-            Object.keys(prev).forEach(stopId => {
-              if (finalPlaces.some(stop => stop.id === stopId)) {
-                preserved[stopId] = prev[stopId];
-              }
-            });
-            // Add new return cards
-            Object.keys(newInlineDestinations).forEach(stopId => {
-              if (!preserved[stopId]) {
-                preserved[stopId] = newInlineDestinations[stopId];
-              }
-            });
-            return preserved;
-          });
-          
-          if (finalPlaces.length > 0) {
-            setHasInteracted(true);
-            setSelectedStop(finalPlaces[0].id);
-          }
+          // Store last location for faster next startup
+          try { localStorage.setItem('lastLocation', JSON.stringify({ latitude, longitude, ts: Date.now() })); } catch {}
         } catch (err) {
           setError('Kunne ikke hente fergekaier');
         } finally {

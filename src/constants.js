@@ -3,20 +3,10 @@ import { config } from './config.js';
 // API Configuration
 export const ENTUR_ENDPOINT = 'https://api.entur.io/journey-planner/v3/graphql';
 
-// Geolocation settings
-export const GEOLOCATION_OPTIONS = {
-  enableHighAccuracy: false, // Less aggressive for simulator
-  timeout: 10000, // 10 seconds
-  maximumAge: 300000 // 5 minutes
-};
+// Geolocation settings - use config-based options
+export const GEOLOCATION_OPTIONS = config.GEOLOCATION_CONFIG.getOptions();
 
-// Search parameters
-export const NEARBY_SEARCH_CONFIG = {
-  maximumDistance: 60000, // meters (60km)
-  maximumResults: 200,
-  timeRange: 7200, // seconds (2 hours)
-  numberOfDepartures: 6
-};
+
 
 // Transport modes
 export const TRANSPORT_MODES = {

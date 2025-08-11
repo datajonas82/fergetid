@@ -3,14 +3,40 @@
 
 import { config } from '../config';
 
-// Calculate driving time using Google Maps Routes API (latest version)
+// In-memory cache and de-duplication for driving time calculations
+const drivingTimeCache = new Map(); // key -> { time, distance }
+const pendingDrivingTimePromises = new Map(); // key -> Promise<{ time, distance }>
+
+const getCacheKey = (startCoords, endCoords) => {
+  const s = `${startCoords.lat.toFixed(5)},${startCoords.lng.toFixed(5)}`;
+  const e = `${endCoords.lat.toFixed(5)},${endCoords.lng.toFixed(5)}`;
+  return `${s}|${e}`;
+};
+
+// Calculate driving time and distance using Google Maps Routes API (latest version)
 export const calculateDrivingTime = async (startCoords, endCoords) => {
-  const apiKey = config.GOOGLE_MAPS_CONFIG.getApiKey();
-  if (!apiKey) {
-    throw new Error('Google Maps API key not configured');
+  const cacheKey = getCacheKey(startCoords, endCoords);
+
+  // Serve from cache if available
+  if (drivingTimeCache.has(cacheKey)) {
+    return drivingTimeCache.get(cacheKey);
   }
 
-  try {
+  // Return the same in-flight promise if already fetching
+  if (pendingDrivingTimePromises.has(cacheKey)) {
+    return await pendingDrivingTimePromises.get(cacheKey);
+  }
+
+  const apiKey = config.GOOGLE_MAPS_CONFIG.getApiKey();
+  
+  if (!apiKey) {
+    const fallback = calculateSimpleDistance(startCoords, endCoords);
+    drivingTimeCache.set(cacheKey, fallback);
+    return fallback;
+  }
+
+  const promise = (async () => {
+    try {
     // Use Google Maps Routes API v2 (latest) with optimized settings
     const url = 'https://routes.googleapis.com/directions/v2:computeRoutes';
     
@@ -54,8 +80,7 @@ export const calculateDrivingTime = async (startCoords, endCoords) => {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Routes API failed: ${response.status} - ${errorText}`);
+      throw new Error(`Routes API failed: ${response.status}`);
     }
 
     const data = await response.json();
@@ -67,38 +92,45 @@ export const calculateDrivingTime = async (startCoords, endCoords) => {
     const route = data.routes[0];
     const durationSeconds = parseInt(route.duration.replace('s', ''));
     const durationMinutes = Math.round(durationSeconds / 60);
-    const distanceKm = (route.distanceMeters / 1000).toFixed(1);
-    const speedKmh = ((route.distanceMeters / 1000) / (durationSeconds / 3600)).toFixed(1);
-
-    // Check if Google Maps time seems unrealistic and try OpenRouteService
-    if (parseFloat(distanceKm) > 5 && parseFloat(speedKmh) < 35) {
-      try {
-        const openRouteTime = await calculateDrivingTimeWithOpenRoute(startCoords, endCoords);
-        
-        // Use the shorter time (more realistic)
-        const finalTime = Math.min(durationMinutes, openRouteTime);
-        return finalTime;
-      } catch (openRouteError) {
-        return durationMinutes;
-      }
-    }
-
-    return durationMinutes;
+    const distanceMeters = route.distanceMeters;
+    const result = { time: durationMinutes, distance: distanceMeters };
+    drivingTimeCache.set(cacheKey, result);
+    return result;
 
   } catch (error) {
-    // Try OpenRouteService as fallback
-    try {
-      const openRouteTime = await calculateDrivingTimeWithOpenRoute(startCoords, endCoords);
-      return openRouteTime;
-    } catch (openRouteError) {
-      throw new Error('Failed to calculate driving time with both Google Maps and OpenRouteService APIs');
+    // In browsers, OpenRouteService is commonly blocked by CORS and rate limits.
+    const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
+    if (isBrowser) {
+      const fallback = calculateSimpleDistance(startCoords, endCoords);
+      drivingTimeCache.set(cacheKey, fallback);
+      return fallback;
     }
+
+    // Non-browser (native/server) can try OpenRouteService as fallback
+    try {
+      const openRouteResult = await calculateDrivingTimeWithOpenRoute(startCoords, endCoords);
+      drivingTimeCache.set(cacheKey, openRouteResult);
+      return openRouteResult;
+    } catch (_) {
+      const fallback = calculateSimpleDistance(startCoords, endCoords);
+      drivingTimeCache.set(cacheKey, fallback);
+      return fallback;
+    }
+  }
+  })();
+
+  pendingDrivingTimePromises.set(cacheKey, promise);
+  try {
+    return await promise;
+  } finally {
+    pendingDrivingTimePromises.delete(cacheKey);
   }
 };
 
-// Calculate driving time using OpenRouteService as fallback
+// Calculate driving time and distance using OpenRouteService as fallback
 const calculateDrivingTimeWithOpenRoute = async (startCoords, endCoords) => {
   try {
+    
     const url = 'https://api.openrouteservice.org/v2/directions/driving-car';
     
     const requestBody = {
@@ -120,8 +152,7 @@ const calculateDrivingTimeWithOpenRoute = async (startCoords, endCoords) => {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenRouteService API failed: ${response.status} - ${errorText}`);
+      throw new Error(`OpenRouteService API failed: ${response.status}`);
     }
 
     const data = await response.json();
@@ -133,69 +164,34 @@ const calculateDrivingTimeWithOpenRoute = async (startCoords, endCoords) => {
     const route = data.routes[0];
     const durationSeconds = route.summary.duration;
     const durationMinutes = Math.round(durationSeconds / 60);
-    const distanceKm = (route.summary.distance / 1000).toFixed(1);
-    const speedKmh = ((route.summary.distance / 1000) / (durationSeconds / 3600)).toFixed(1);
+    const distanceMeters = route.summary.distance;
 
-    return durationMinutes;
+    return { time: durationMinutes, distance: distanceMeters };
 
   } catch (error) {
     throw new Error('Failed to calculate driving time with OpenRouteService API');
   }
 };
 
-// Get location name from coordinates using Google Geocoding API
-export const getLocationName = async (coords) => {
-  const apiKey = config.GOOGLE_MAPS_CONFIG.getApiKey();
-  if (!apiKey) {
-    return null;
-  }
-
-  try {
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coords.lat},${coords.lng}&key=${apiKey}&language=nb&region=no`;
-
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    if (data.status === 'OK' && data.results && data.results.length > 0) {
-      const result = data.results[0];
-      const locationName = result.formatted_address;
-
-      // Clean up the location name - be more careful with Norwegian characters
-      let cleanedName = locationName.trim();
-
-      // Remove any weird characters but preserve Norwegian letters
-      cleanedName = cleanedName
-        .replace(/[^\w\sæøåÆØÅ,.-]/g, '') // Remove all non-alphanumeric except Norwegian letters, spaces, commas, dots, hyphens
-        .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-        .trim();
-
-      // If the name is too short or empty, use a fallback
-      if (cleanedName.length < 3) {
-        cleanedName = `Posisjon (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)})`;
-      }
-
-      return cleanedName;
-    } else {
-      return null;
-    }
-  } catch (error) {
-    return null;
-  }
-};
-
-// Format driving time for display
-export const formatDrivingTime = (minutes) => {
-  if (minutes < 60) {
-    return `${minutes} min`;
-  } else {
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    if (remainingMinutes === 0) {
-      return `${hours} t`;
-    } else {
-      return `${hours} t ${remainingMinutes} min`;
-    }
-  }
+// Simple distance calculation as final fallback
+const calculateSimpleDistance = (startCoords, endCoords) => {
+  
+  // Calculate distance using Haversine formula
+  const R = 6371000; // Earth's radius in meters
+  const dLat = (endCoords.lat - startCoords.lat) * Math.PI / 180;
+  const dLng = (endCoords.lng - startCoords.lng) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(startCoords.lat * Math.PI / 180) * Math.cos(endCoords.lat * Math.PI / 180) *
+            Math.sin(dLng/2) * Math.sin(dLng/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const distanceMeters = R * c;
+  
+  // Estimate driving time (assuming average speed of 50 km/h in urban areas)
+  const estimatedSpeedKmh = 50;
+  const distanceKm = distanceMeters / 1000;
+  const estimatedTimeMinutes = Math.round((distanceKm / estimatedSpeedKmh) * 60);
+  
+  return { time: estimatedTimeMinutes, distance: distanceMeters };
 };
 
 // Generate natural language description
@@ -245,5 +241,31 @@ const formatDistance = (distance) => {
     return `${Math.round(distance)} m`;
   } else {
     return `${(distance / 1000).toFixed(1)} km`;
+  }
+};
+
+// Helper function to format driving time
+const formatDrivingTime = (minutes) => {
+  if (minutes < 60) {
+    return `${minutes} min`;
+  } else {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    if (remainingMinutes === 0) {
+      return `${hours} t`;
+    } else {
+      return `${hours} t ${remainingMinutes} min`;
+    }
+  }
+};
+
+// Calculate driving distance using Google Maps Routes API
+export const calculateDrivingDistance = async (startCoords, endCoords) => {
+  try {
+    const result = await calculateDrivingTime(startCoords, endCoords);
+    return result.distance;
+  } catch (error) {
+    // Fallback to simple distance calculation if API fails
+    return calculateSimpleDistance(startCoords, endCoords).distance;
   }
 };

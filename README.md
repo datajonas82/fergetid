@@ -98,6 +98,32 @@ npx cap open android
 ### Google Maps API
 - **Geocoding API**: For reverse geocoding location names
 - **Separate keys**: iOS and web platforms require different API keys
+
+## 🔧 Troubleshooting
+
+### Geolocation Issues
+
+If you're experiencing geolocation timeout errors:
+
+1. **Development Environment**: The app uses extended timeouts (45 seconds) in development mode
+2. **Retry Logic**: The app automatically retries failed geolocation requests
+3. **Fallback Location**: If geolocation fails completely, the app will use Oslo as a fallback location
+4. **Browser Permissions**: Ensure your browser has location permissions enabled
+5. **Simulator Issues**: iOS/Android simulators may have limited geolocation support
+
+### Common Error Messages
+
+- **"Timeout ved henting av posisjon"**: Geolocation is taking too long, the app will retry automatically
+- **"Tilgang til posisjon ble avvist"**: Location permissions are denied, check browser settings
+- **"Posisjon kunne ikke bestemmes"**: Network or GPS issues, the app will retry
+
+### Debug Mode
+
+In development mode, the app logs detailed geolocation information to the console:
+- Geolocation options being used
+- Attempt counts and retry logic
+- Success/failure details
+- Location accuracy information
 - **Billing**: Google Maps API has usage-based billing
 
 ## 🏗️ Project Structure

@@ -1,12 +1,14 @@
 {
   "name": "fergetid-app",
-  "version": "2.0.0",
+  "version": "2.2.0",
   "private": true,
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint:css": "stylelint src/**/*.css"
+    "lint:css": "stylelint src/**/*.css",
+    "routes:generate": "node scripts/generateRouteMap.mjs",
+    "build:with-routes": "npm run routes:generate && vite build"
   },
   "dependencies": {
     "@capacitor/cli": "^7.4.2",

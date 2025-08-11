@@ -18,10 +18,7 @@ export function formatDistance(meters) {
   return `${Math.round(meters / 1000)} ${DISTANCE_UNITS.KILOMETERS}`;
 }
 
-// Get current time formatted
-export function getCurrentTime() {
-  return new Date().toLocaleTimeString([], TIME_FORMAT_OPTIONS);
-}
+
 
 // Calculate time difference in minutes
 export function calculateTimeDiff(targetTime) {
@@ -42,11 +39,7 @@ export function normalizeText(str) {
   return (str || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
 }
 
-// Convert Norwegian text to Bokmål
-export function bokmaalify(text) {
-  if (!text) return text;
-  return text.replace(/ferjekai/gi, 'fergekai');
-}
+
 
 // Get location name from reverse geocoding data (Google Maps API format)
 export function extractLocationName(data) {

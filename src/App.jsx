@@ -4,10 +4,9 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { Capacitor } from '@capacitor/core';
 import LoadingSpinner from './components/LoadingSpinner';
 import inAppPurchaseService from './services/inAppPurchase';
-import { calculateDrivingTime, getLocationName, formatDrivingTime, generateTravelDescription } from './utils/googleMapsService';
+import { calculateDrivingTime, calculateDrivingDistance, generateTravelDescription } from './utils/googleMapsService';
 import { 
   ENTUR_ENDPOINT, 
-  NEARBY_SEARCH_CONFIG, 
   TRANSPORT_MODES, 
   APP_NAME,
   GEOLOCATION_OPTIONS,
@@ -17,45 +16,18 @@ import { config } from './config';
 import { 
   formatMinutes, 
   formatDistance, 
-  getCurrentTime, 
   calculateTimeDiff,
   cleanDestinationText,
   extractLocationName,
-  normalizeText,
-  bokmaalify
+  normalizeText
 } from './utils/helpers';
+// Removed legacy routeMap import; using only Entur hierarchy-based matching
 
 const client = new GraphQLClient(ENTUR_ENDPOINT, {
   headers: { 'ET-Client-Name': config.ENTUR_CLIENT_NAME }
 });
 
-const NEARBY_QUERY = gql`
-  query NearestStops($latitude: Float!, $longitude: Float!) {
-    nearest(
-      latitude: $latitude,
-      longitude: $longitude,
-      maximumDistance: ${NEARBY_SEARCH_CONFIG.maximumDistance},
-      maximumResults: ${NEARBY_SEARCH_CONFIG.maximumResults},
-      filterByModes: [${TRANSPORT_MODES.WATER}]
-    ) {
-      edges {
-        node {
-          distance
-          place {
-            ... on StopPlace {
-              id
-              name
-              latitude
-              longitude
-              transportMode
-              transportSubmode
-            }
-          }
-        }
-      }
-    }
-  }
-`;
+
 
 const DEPARTURES_QUERY = gql`
   query StopPlaceDepartures($id: String!) {
@@ -72,6 +44,120 @@ const DEPARTURES_QUERY = gql`
   }
 `;
 
+
+
+// Enhanced departures query with journeyPattern data for better matching
+const ENHANCED_DEPARTURES_WITH_PATTERNS_QUERY = gql`
+  query EnhancedDeparturesWithPatterns($id: String!) {
+    stopPlace(id: $id) {
+      name
+      estimatedCalls(timeRange: 86400, numberOfDepartures: 50) {
+        aimedDepartureTime
+        expectedDepartureTime
+        destinationDisplay {
+          frontText
+          via
+        }
+        serviceJourney {
+          id
+          journeyPattern {
+            id
+            directionType
+            line {
+              id
+              name
+              publicCode
+              transportMode
+              transportSubmode
+              operator {
+                id
+                name
+              }
+              quays {
+                id
+                name
+                publicCode
+                latitude
+                longitude
+                stopPlace {
+                  id
+                  name
+                }
+              }
+            }
+          }
+          wheelchairAccessible
+          notices {
+            id
+            text
+          }
+        }
+        cancellation
+        predictionInaccurate
+        situations {
+          id
+          reportType
+        }
+      }
+    }
+  }
+`;
+
+// Enhanced query to get line details with quays
+const LINE_WITH_QUAYS_QUERY = gql`
+  query LineWithQuays($id: ID!) {
+    line(id: $id) {
+      id
+      name
+      publicCode
+      transportMode
+      transportSubmode
+      quays {
+        id
+        name
+        publicCode
+        latitude
+        longitude
+        stopPlace {
+          id
+          name
+        }
+      }
+      journeyPatterns {
+        id
+        directionType
+        stopPoints {
+          id
+          name
+          latitude
+          longitude
+          quays {
+            id
+            name
+            publicCode
+            latitude
+            longitude
+          }
+        }
+      }
+    }
+  }
+`;
+
+// Query for loading all ferry stops (we'll use quay info from Line.quays for matching)
+const ALL_FERRY_STOPS_QUERY = gql`
+  query AllFerryStops {
+    stopPlaces {
+      id
+      name
+      latitude
+      longitude
+      transportMode
+      transportSubmode
+    }
+  }
+`;
+
 function App() {
   // Search state
   const [query, setQuery] = useState('');
@@ -80,6 +166,7 @@ function App() {
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const searchInputRef = useRef(null);
   const gpsButtonRef = useRef(null);
+  const processedStopsRef = useRef(new Set());
 
   const [showSearchInput, setShowSearchInput] = useState(!/iPad|iPhone|iPod/.test(navigator.userAgent));
 
@@ -100,8 +187,10 @@ function App() {
   const [mode, setMode] = useState('search'); // 'search' or 'gps'
   const [ferryStopsLoaded, setFerryStopsLoaded] = useState(false);
 
-  // Cache for all ferry stops (for autocomplete)
-  const [allFerryStops, setAllFerryStops] = useState([]);
+
+
+  // Cache for all ferry quays (for autocomplete)
+  const [allFerryQuays, setAllFerryQuays] = useState([]);
 
   // Driving time calculation state
   const [showDrivingTimes, setShowDrivingTimes] = useState(false);
@@ -111,204 +200,399 @@ function App() {
   
   // Inline destinations state - now supports multiple destinations per stop
   const [inlineDestinations, setInlineDestinations] = useState({}); // { [parentStopId]: [{ stopId, name, departures: array }] }
+  
+    // GPS search function - moved outside useEffect for direct calling
+  const executeGpsSearch = async () => {
+      setMode('gps');
+      setLoading(true);
+      setError(null);
+      setQuery('');
+      setFerryStops([]);
+      setDeparturesMap({});
+      setHasInteracted(false);
+      setSelectedStop(null);
+      // Don't clear inlineDestinations - keep existing return cards
+
+      // Wait for all ferry quays to be loaded before proceeding
+      if (!ferryStopsLoaded) {
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for stops to load
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          try {
+            const { latitude, longitude } = pos.coords;
+            setLocation({ latitude, longitude });
+
+            // Non-blocking location name fetch
+            (async () => {
+              try {
+                const geocodingUrl = config.GOOGLE_MAPS_CONFIG.getGeocodingUrl(latitude, longitude);
+                const response = await fetch(geocodingUrl);
+                const data = await response.json();
+                if (data.results && data.results.length > 0) {
+                  setLocationName(extractLocationName(data));
+                }
+              } catch {
+                const latDeg = Math.abs(latitude);
+                const lonDeg = Math.abs(longitude);
+                const latDir = latitude >= 0 ? 'N' : 'S';
+                const lonDir = longitude >= 0 ? 'E' : 'W';
+                setLocationName(`${latDeg.toFixed(2)}°${latDir}, ${lonDeg.toFixed(2)}°${lonDir}`);
+              }
+            })();
+            
+            // Step 1: Calculate simple Haversine distance for ALL quays (fast, no network)
+            const placesWithDistance = allFerryQuays.map(stop => {
+              const dLat = (stop.latitude - latitude) * 111000;
+              const dLng = (stop.longitude - longitude) * 111000 * Math.cos(latitude * Math.PI / 180);
+              const distance = Math.sqrt(dLat * dLat + dLng * dLng);
+              return { ...stop, distance };
+            });
+
+            // Filter by distance and sort
+            const nearbyCandidates = placesWithDistance
+              .filter(p => p.distance <= 60000) // 60 km
+              .sort((a, b) => a.distance - b.distance);
+
+            // Step 2: Fetch departures for the closest candidates
+            const fetchDepartures = async (place) => {
+              try {
+                const depData = await client.request(DEPARTURES_QUERY, { id: place.id });
+                const calls = depData.stopPlace?.estimatedCalls || [];
+                const departures = calls
+                  .filter(call => call.serviceJourney?.journeyPattern?.line?.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY)
+                  .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime));
+                
+                return {
+                  ...place,
+                  nextDeparture: departures[0] || null,
+                  departures: departures,
+                };
+              } catch {
+                return { ...place, nextDeparture: null, departures: [] };
+              }
+            };
+            
+            const placesWithDepartures = await Promise.all(nearbyCandidates.slice(0, 20).map(fetchDepartures));
+            
+            const finalPlaces = placesWithDepartures
+              .filter(p => p.nextDeparture)
+              .slice(0, 5);
+
+            // Step 3: Fetch return cards for the final list of stops
+            const returnCardPromises = finalPlaces.map(stop => loadReturnCardForStop(stop));
+            const resolvedReturnCards = await Promise.all(returnCardPromises);
+
+            // Step 4: Prepare all state updates
+            const newDeparturesMap = finalPlaces.reduce((acc, stop) => {
+              acc[stop.id] = stop.departures;
+              return acc;
+            }, {});
+
+            const newInlineDestinations = resolvedReturnCards.reduce((acc, card) => {
+              if (card) {
+                if (!acc[card.parentStopId]) {
+                  acc[card.parentStopId] = [];
+                }
+                acc[card.parentStopId].push(card);
+              }
+              return acc;
+            }, {});
+
+            // Step 5: Perform a single, atomic state update
+            setFerryStops(finalPlaces);
+            setDeparturesMap(newDeparturesMap);
+            
+            // Preserve existing return cards if they're still relevant
+            setInlineDestinations(prev => {
+              const preserved = {};
+              // Keep existing return cards for stops that are still in the new results
+              Object.keys(prev).forEach(stopId => {
+                if (finalPlaces.some(stop => stop.id === stopId)) {
+                  preserved[stopId] = prev[stopId];
+                }
+              });
+              // Add new return cards
+              Object.keys(newInlineDestinations).forEach(stopId => {
+                if (!preserved[stopId]) {
+                  preserved[stopId] = newInlineDestinations[stopId];
+                }
+              });
+              return preserved;
+            });
+            
+            if (finalPlaces.length > 0) {
+              setHasInteracted(true);
+              setSelectedStop(finalPlaces[0].id);
+            }
+
+          } catch (err) {
+            setError('Kunne ikke hente fergekaier');
+          } finally {
+            setLoading(false);
+          }
+        },
+        (err) => {
+          setError('Kunne ikke hente posisjon.');
+          setLoading(false);
+        },
+        GEOLOCATION_OPTIONS
+      );
+    };
+
+
+
+  // Load all ferry stops function (we'll use quay info from Line.quays for matching)
+  const loadAllFerryStops = async () => {
+    try {      const data = await client.request(ALL_FERRY_STOPS_QUERY);
+      
+      
+      
+      const stops = (data.stopPlaces || []).filter(
+        (stop) => {
+          if (!Array.isArray(stop.transportMode) || !stop.transportMode.includes('water')) return false;
+          if (EXCLUDED_SUBMODES.includes(stop.transportSubmode)) {
+            return false;
+          }
+          const name = (stop.name || '').toLowerCase();
+          // Ekskluder hurtigbåtkai og kystrutekai basert på navn
+          if (name.includes('hurtigbåt') || name.includes('express boat') || name.includes('kystrute')) {
+            return false;
+          }
+          
+          // Prioriter localCarFerry, men inkluder også andre water transport stops som kan være relevante
+          if (stop.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY) return true;
+          
+          // Inkluder også andre water transport stops som ikke er ekskludert
+          return true;
+        }
+      );
+      
+      
+      setAllFerryQuays(stops); // Keep the same state variable name for compatibility
+      setFerryStopsLoaded(true);
+    } catch (error) {
+      console.error('❌ Error loading ferry stops:', error);
+      setFerryStopsLoaded(true); // Sett til true selv ved feil for å unngå evig lasting
+    }
+  };
+
+  // Initialize app function
+  const initializeApp = async () => {
+    // Vis splash screen
+    await SplashScreen.show();
+    
+    // Initialize services
+    if (isIOS) {
+      try {
+        await inAppPurchaseService.initialize();
+      } catch (error) {
+        console.error('Error initializing services:', error);
+      }
+    }
+    
+    // Skjul splash screen etter 2 sekunder
+    setTimeout(async () => {
+      await SplashScreen.hide();
+    }, 2000);
+  };
 
   // Initialize app
   useEffect(() => {
-    const loadAllFerryStops = async () => {
-      try {
-        const data = await client.request(gql`
-          query AllFerryStops {
-            stopPlaces {
-              id
-              name
-              latitude
-              longitude
-              transportMode
-              transportSubmode
-            }
-          }
-        `);
-        
-        const stops = (data.stopPlaces || []).filter(
-          (stop) => {
-            if (!Array.isArray(stop.transportMode) || !stop.transportMode.includes('water')) return false;
-            if (EXCLUDED_SUBMODES.includes(stop.transportSubmode)) return false;
-            const name = (stop.name || '').toLowerCase();
-            // Ekskluder hurtigbåtkai og kystrutekai basert på navn
-            if (name.includes('hurtigbåt') || name.includes('express boat') || name.includes('kystrute')) return false;
-            
-            // Prioriter localCarFerry, men inkluder også andre water transport stops som kan være relevante
-            if (stop.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY) return true;
-            
-            // Inkluder også andre water transport stops som ikke er ekskludert
-            return true;
-          }
+    initializeApp();
+    loadAllFerryStops(); // Load all ferry stops on initial app load
+  }, []);
+
+  // Live search function - show ferry cards as user types
+  const performLiveSearch = async () => {
+    processedStopsRef.current.clear(); // Clear processed stops for new search
+    setInlineDestinations({}); // Clear previous return cards
+    
+    
+    // Load ferry quays on-demand if not already loaded
+    if (!ferryStopsLoaded || allFerryQuays.length === 0) {
+      await loadAllFerryStops();
+    }
+    
+    const normQuery = normalizeText(query).toLowerCase();
+    const originalQuery = query.toLowerCase();
+    
+    
+    
+    let stops = allFerryQuays.filter(stop => {
+      if (!stop || !stop.name) return false;
+      
+      const normName = normalizeText(stop.name);
+      const originalName = stop.name.toLowerCase();
+      
+      const matches = normName.includes(normQuery) || originalName.includes(originalQuery);
+      
+      
+      // Sjekk både normalisert og original tekst
+      return matches;
+    });
+    
+    
+    
+    // Sorter slik at eksakte treff kommer først, deretter treff som starter med søkeordet
+    stops = stops.sort((a, b) => {
+      const aNormName = normalizeText(a.name);
+      const bNormName = normalizeText(b.name);
+      const aOrigName = a.name.toLowerCase();
+      const bOrigName = b.name.toLowerCase();
+      
+      // Eksakte treff får høyest prioritet (både normalisert og original)
+      const aExactNorm = aNormName === normQuery;
+      const bExactNorm = bNormName === normQuery;
+      const aExactOrig = aOrigName === originalQuery;
+      const bExactOrig = bOrigName.includes(originalQuery);
+      
+      if ((aExactNorm || aExactOrig) && !(bExactNorm || bExactOrig)) return -1;
+      if (!(aExactNorm || aExactOrig) && (bExactNorm || bExactOrig)) return 1;
+      
+      // Treff som starter med søkeordet får nest høyest prioritet
+      const aStartsWithNorm = aNormName.startsWith(normQuery);
+      const bStartsWithNorm = bNormName.startsWith(normQuery);
+      const aStartsWithOrig = aOrigName.startsWith(originalQuery);
+      const bStartsWithOrig = bOrigName.startsWith(originalQuery);
+      
+      // Hvis begge starter med søkeordet, prioriter den lengste matchen
+      if ((aStartsWithNorm || aStartsWithOrig) && (bStartsWithNorm || bStartsWithOrig)) {
+        // Beregn faktisk match-lengde for hver
+        const aMatchLength = Math.max(
+          aStartsWithNorm ? normQuery.length : 0,
+          aStartsWithOrig ? originalQuery.length : 0
+        );
+        const bMatchLength = Math.max(
+          bStartsWithNorm ? normQuery.length : 0,
+          bStartsWithOrig ? originalQuery.length : 0
         );
         
-        console.log('All ferry stops from Entur:', stops.map(s => ({ 
-          name: s.name, 
-          id: s.id 
-        })));
-        setAllFerryStops(stops);
-        setFerryStopsLoaded(true);
-      } catch (error) {
-        console.error('Error loading ferry stops:', error);
-        setFerryStopsLoaded(true); // Sett til true selv ved feil for å unngå evig lasting
-      }
-    };
-
-    const initializeApp = async () => {
-      // Vis splash screen
-      await SplashScreen.show();
-      
-      // Last fergekaier
-      await loadAllFerryStops();
-      
-      // Initialize services
-      if (isIOS) {
-        try {
-          await inAppPurchaseService.initialize();
-        } catch (error) {
-          console.error('Error initializing services:', error);
+        // Hvis match-lengdene er forskjellige, prioriter den lengste
+        if (aMatchLength !== bMatchLength) {
+          return bMatchLength - aMatchLength; // Lengre match først
         }
       }
       
-      // Skjul splash screen etter 2 sekunder
-      setTimeout(async () => {
-        await SplashScreen.hide();
-      }, 2000);
-    };
+      if ((aStartsWithNorm || aStartsWithOrig) && !(bStartsWithNorm || bStartsWithOrig)) return -1;
+      if (!(aStartsWithNorm || aStartsWithOrig) && (bStartsWithNorm || bStartsWithOrig)) return 1;
+      
+      // Alfabetisk sortering som fallback
+      return aOrigName.localeCompare(bOrigName);
+    });
 
-    initializeApp();
-  }, []);
+    // Limit to 10 results for live search
+    const limitedStops = stops.slice(0, 10);
+    
+    // Hent avganger for hver fergekai
+    const stopsWithDepartures = [];
+    for (const stop of limitedStops) {
+      let departures = [];
+      try {
+        const data = await client.request(DEPARTURES_QUERY, { id: stop.id });
+        const calls = data.stopPlace?.estimatedCalls || [];
+        departures = calls
+          .filter((call) => {
+            const line = call.serviceJourney?.journeyPattern?.line;
+            return line && line.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY;
+          })
+          .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime));
+      } catch {
+        // Ignorer feil for individuelle fergekaier
+      }
+      
+      // Beregn kjøreavstand hvis GPS er aktiv (location er satt)
+      let distance = null;
+      if (location && stop.latitude && stop.longitude) {
+        try {
+          distance = await calculateDrivingDistance(
+            { lat: location.latitude, lng: location.longitude },
+            { lat: stop.latitude, lng: stop.longitude }
+          );
+        } catch (error) {
+          // Fallback to simple distance calculation if API fails
+          const dLat = (stop.latitude - location.latitude) * 111000;
+          const dLng = (stop.longitude - location.longitude) * 111000 * Math.cos(location.latitude * Math.PI / 180);
+          distance = Math.sqrt(dLat * dLat + dLng * dLng);
+        }
+      }
+      
+      stopsWithDepartures.push({
+        id: stop.id,
+        name: stop.name,
+        latitude: stop.latitude,
+        longitude: stop.longitude,
+        distance: distance,
+        departures: departures
+      });
+    }
+    
+    const formattedStops = stopsWithDepartures.filter(stop => stop.id);
+    
+    // Asynchronously load return cards for the search results
+    const returnCardPromises = formattedStops.map(async (stop) => {
+      const departures = stop.departures || [];
+      if (departures.length > 0) {
+        const destinationCounts = departures.reduce((acc, dep) => {
+          const dest = dep.destinationDisplay?.frontText;
+          if (dest) {
+            acc[dest] = (acc[dest] || 0) + 1;
+          }
+          return acc;
+        }, {});
+
+        const mostFrequentDestination = Object.keys(destinationCounts).reduce((a, b) =>
+          destinationCounts[a] > destinationCounts[b] ? a : b,
+          null
+        );
+
+        if (mostFrequentDestination) {
+          return await loadInlineDestinationDepartures(stop.id, mostFrequentDestination);
+        }
+      }
+      return null;
+    });
+
+    const resolvedReturnCards = await Promise.all(returnCardPromises);
+    const newInlineDestinations = resolvedReturnCards.reduce((acc, card) => {
+      if (card) {
+        if (!acc[card.parentStopId]) {
+          acc[card.parentStopId] = [];
+        }
+        acc[card.parentStopId].push(card);
+      }
+      return acc;
+    }, {});
+
+    setInlineDestinations(newInlineDestinations);
+
+    // Kun sett hasInteracted til true hvis vi faktisk har resultater
+    if (formattedStops.length > 0) {
+      setFerryStops(formattedStops);
+      setHasInteracted(true);
+      setSelectedStop(formattedStops[0].id);
+    } else {
+      setFerryStops([]);
+      setHasInteracted(false);
+      setSelectedStop(null);
+    }
+  };
 
   // Live search effect - show ferry cards as user types
   useEffect(() => {
-    // Kun kjøre live search hvis brukeren faktisk har skrevet noe OG vi har data
-    if (!query.trim() || !ferryStopsLoaded || allFerryStops.length === 0) {
+    // Kun kjøre live search hvis brukeren faktisk har skrevet noe
+    if (!query.trim()) {
       setFerryStops([]);
       setHasInteracted(false);
       setSelectedStop(null);
       return;
     }
 
-    const performLiveSearch = async () => {
-      const normQuery = normalizeText(query).toLowerCase();
-      const originalQuery = query.toLowerCase();
-      
-      let stops = allFerryStops.filter(stop => {
-        if (!stop || !stop.name) return false;
-        
-        const normName = normalizeText(stop.name);
-        const originalName = stop.name.toLowerCase();
-        
-        // Sjekk både normalisert og original tekst
-        return normName.includes(normQuery) || originalName.includes(originalQuery);
-      });
-      
-      // Sorter slik at eksakte treff kommer først, deretter treff som starter med søkeordet
-      stops = stops.sort((a, b) => {
-        const aNormName = normalizeText(a.name);
-        const bNormName = normalizeText(b.name);
-        const aOrigName = a.name.toLowerCase();
-        const bOrigName = b.name.toLowerCase();
-        
-        // Eksakte treff får høyest prioritet (både normalisert og original)
-        const aExactNorm = aNormName === normQuery;
-        const bExactNorm = bNormName === normQuery;
-        const aExactOrig = aOrigName === originalQuery;
-        const bExactOrig = bOrigName === originalQuery;
-        
-        if ((aExactNorm || aExactOrig) && !(bExactNorm || bExactOrig)) return -1;
-        if (!(aExactNorm || aExactOrig) && (bExactNorm || bExactOrig)) return 1;
-        
-        // Treff som starter med søkeordet får nest høyest prioritet
-        const aStartsWithNorm = aNormName.startsWith(normQuery);
-        const bStartsWithNorm = bNormName.startsWith(normQuery);
-        const aStartsWithOrig = aOrigName.startsWith(originalQuery);
-        const bStartsWithOrig = bOrigName.startsWith(originalQuery);
-        
-        // Hvis begge starter med søkeordet, prioriter den lengste matchen
-        if ((aStartsWithNorm || aStartsWithOrig) && (bStartsWithNorm || bStartsWithOrig)) {
-          // Beregn faktisk match-lengde for hver
-          const aMatchLength = Math.max(
-            aStartsWithNorm ? normQuery.length : 0,
-            aStartsWithOrig ? originalQuery.length : 0
-          );
-          const bMatchLength = Math.max(
-            bStartsWithNorm ? normQuery.length : 0,
-            bStartsWithOrig ? originalQuery.length : 0
-          );
-          
-          // Hvis match-lengdene er forskjellige, prioriter den lengste
-          if (aMatchLength !== bMatchLength) {
-            return bMatchLength - aMatchLength; // Lengre match først
-          }
-        }
-        
-        if ((aStartsWithNorm || aStartsWithOrig) && !(bStartsWithNorm || bStartsWithOrig)) return -1;
-        if (!(aStartsWithNorm || aStartsWithOrig) && (bStartsWithNorm || bStartsWithOrig)) return 1;
-        
-        // Alfabetisk sortering som fallback
-        return aOrigName.localeCompare(bOrigName);
-      });
-
-      // Limit to 10 results for live search
-      const limitedStops = stops.slice(0, 10);
-      
-      // Hent avganger for hver fergekai
-      const stopsWithDepartures = [];
-      for (const stop of limitedStops) {
-        let departures = [];
-        try {
-          const data = await client.request(DEPARTURES_QUERY, { id: stop.id });
-          const calls = data.stopPlace?.estimatedCalls || [];
-          departures = calls
-            .filter((call) => {
-              const line = call.serviceJourney?.journeyPattern?.line;
-              return line && line.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY;
-            })
-            .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime));
-        } catch {
-          // Ignorer feil for individuelle fergekaier
-        }
-        
-        // Beregn avstand hvis GPS er aktiv (location er satt)
-        let distance = null;
-        if (location && stop.latitude && stop.longitude) {
-          const dLat = (stop.latitude - location.latitude) * 111000;
-          const dLng = (stop.longitude - location.longitude) * 111000 * Math.cos(location.latitude * Math.PI / 180);
-          distance = Math.sqrt(dLat * dLat + dLng * dLng);
-        }
-        
-        stopsWithDepartures.push({
-          id: stop.id,
-          name: stop.name,
-          latitude: stop.latitude,
-          longitude: stop.longitude,
-          distance: distance,
-          departures: departures
-        });
-      }
-      
-      const formattedStops = stopsWithDepartures.filter(stop => stop.id);
-      
-      // Kun sett hasInteracted til true hvis vi faktisk har resultater
-      if (formattedStops.length > 0) {
-        setFerryStops(formattedStops);
-        setHasInteracted(true);
-        setSelectedStop(formattedStops[0].id);
-      } else {
-        setFerryStops([]);
-        setHasInteracted(false);
-        setSelectedStop(null);
-      }
-    };
-
-    // Debounce the live search
+    // Debounce search to avoid too many API calls
     const timeoutId = setTimeout(performLiveSearch, 300);
     return () => clearTimeout(timeoutId);
-  }, [query, allFerryStops, ferryStopsLoaded]);
+  }, [query, location, allFerryQuays, ferryStopsLoaded]);
 
   // Fjern feilmeldinger når mode endres til search eller query endres
   useEffect(() => {
@@ -318,375 +602,37 @@ function App() {
   }, [mode, error, query]);
 
   // Calculate driving times when feature is enabled
+  // Throttle driving time calculations to avoid spamming APIs on rapid updates
+  const drivingTimesThrottleRef = useRef(null);
   useEffect(() => {
-    if (showDrivingTimes && mode === 'gps' && location && ferryStops.length > 0) {
-      calculateDrivingTimesForExistingStops();
+    if (!(showDrivingTimes && mode === 'gps' && location && ferryStops.length > 0)) {
+      return;
     }
+    if (drivingTimesThrottleRef.current) {
+      clearTimeout(drivingTimesThrottleRef.current);
+    }
+    drivingTimesThrottleRef.current = setTimeout(() => {
+      calculateDrivingTimesForExistingStops();
+    }, 400); // debounce/throttle 400ms
+    return () => {
+      if (drivingTimesThrottleRef.current) {
+        clearTimeout(drivingTimesThrottleRef.current);
+      }
+    };
   }, [showDrivingTimes, location, ferryStops, mode]);
 
-  // Automatisk last alle avganger og destinasjonstider når fergekaier vises
-  useEffect(() => {
-    if (ferryStops.length > 0 && hasInteracted && !loading) {
-      ferryStops.forEach((stop, index) => {
-        // Vent litt før vi laster avganger og destinasjonstider for hver fergekai
-        setTimeout(async () => {
-          // Last alle avganger for denne fergekaien
-          if (!departuresMap[stop.id]) {
-            try {
-              const data = await client.request(DEPARTURES_QUERY, { id: stop.id });
-              const calls = data.stopPlace?.estimatedCalls || [];
-              const filteredCalls = calls
-                .filter(call => call.serviceJourney?.journeyPattern?.line?.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY)
-                .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime));
-              
-              setDeparturesMap(prev => ({
-                ...prev,
-                [stop.id]: filteredCalls
-              }));
-            } catch (error) {
-              console.error('Error loading departures for:', stop.name, error);
-            }
-          }
-          
-          // Last destinasjonstider - identifiser alle unike destinasjoner
-          let destinationTexts = [];
-          
-          // For GPS-modus - bruk departuresMap hvis tilgjengelig, ellers last avganger
-          if (stop.nextDeparture?.destinationDisplay?.frontText) {
-            // Start med neste avgang
-            destinationTexts.push(stop.nextDeparture.destinationDisplay.frontText);
-            
-            // Bruk departuresMap hvis tilgjengelig, ellers last avganger
-            let filteredCalls = departuresMap[stop.id] || [];
-            
-            if (filteredCalls.length === 0) {
-              // Last alle avganger for å finne andre destinasjoner
-              try {
-                const data = await client.request(DEPARTURES_QUERY, { id: stop.id });
-                const calls = data.stopPlace?.estimatedCalls || [];
-                filteredCalls = calls
-                  .filter(call => call.serviceJourney?.journeyPattern?.line?.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY)
-                  .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime));
-              } catch (error) {
-                console.error('Error loading all departures for GPS mode:', error);
-              }
-            }
-            
-            // Finn alle unike destinasjoner
-            const uniqueDestinations = new Set();
-            filteredCalls.forEach(dep => {
-              if (dep.destinationDisplay?.frontText) {
-                uniqueDestinations.add(dep.destinationDisplay.frontText);
-              }
-            });
-            destinationTexts = Array.from(uniqueDestinations);
-          }
-          // For søk-modus - bruk departuresMap hvis tilgjengelig, ellers bruk stop.departures
-          else {
-            let departures = departuresMap[stop.id] || stop.departures || [];
-            
-            if (departures.length > 0) {
-              const uniqueDestinations = new Set();
-              departures.forEach(dep => {
-                if (dep.destinationDisplay?.frontText) {
-                  uniqueDestinations.add(dep.destinationDisplay.frontText);
-                }
-              });
-              destinationTexts = Array.from(uniqueDestinations);
-            }
-          }
-          
-          if (destinationTexts.length > 0) {
-            console.log('Auto-loading destination times for:', stop.name, '->', destinationTexts);
-            // Last returkort for alle destinasjoner - unngå duplikater
-            const uniqueDestinationTexts = [...new Set(destinationTexts)];
-            const existingDestinations = inlineDestinations[stop.id] || [];
-            
-            uniqueDestinationTexts.forEach(destinationText => {
-              // Sjekk om denne destinasjonen allerede er lastet
-              const alreadyLoaded = existingDestinations.some(dest => {
-                const destName = normalizeText(cleanDestinationText(dest.name || '')).toLowerCase();
-                const targetName = normalizeText(cleanDestinationText(destinationText || '')).toLowerCase();
-                return destName === targetName;
-              });
-              
-              if (!alreadyLoaded) {
-                loadInlineDestinationDepartures(stop.id, destinationText);
-              } else {
-                console.log('Destination already loaded, skipping:', destinationText);
-              }
-            });
-          } else {
-            console.log('No destination text found for:', stop.name, 'nextDeparture:', stop.nextDeparture, 'departures:', stop.departures);
-          }
-        }, index * 300); // 300ms delay mellom hver fergekai
-      });
-    }
-  }, [ferryStops, hasInteracted, loading, departuresMap]);
+
 
   // GPS functionality
   const handleGPSLocation = async () => {
-    // Check if geolocation is supported
-    if (!navigator.geolocation) {
-      setError('Geolokasjon støttes ikke av denne nettleseren.');
-      setLoading(false);
+    // Prevent multiple simultaneous GPS searches
+    if (loading) {
       return;
     }
     
-    setMode('gps');
-    setLoading(true);
-    setError(null);
-    setQuery('');
-    setFerryStops([]);
-    setHasInteracted(false);
-    setSelectedStop(null);
-    
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setLocation({ latitude, longitude });
-        
-        // Get location name using Google Maps reverse geocoding
-        try {
-          if (!config.GOOGLE_MAPS_CONFIG.isConfigured()) {
-            throw new Error('API key not configured');
-          }
-          
-          const geocodingUrl = config.GOOGLE_MAPS_CONFIG.getGeocodingUrl(latitude, longitude);
-          
-          console.log('🌍 Fetching location name from Google Maps API');
-          
-          const response = await fetch(geocodingUrl, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json'
-            },
-            signal: AbortSignal.timeout(10000) // 10 second timeout
-          });
-          
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          console.log('🌍 Google Maps geocoding response:', data);
-          
-          if (data.status !== 'OK') {
-            console.error('🌍 Google Maps API error:', data.status, data.error_message);
-            throw new Error(`Google Maps API error: ${data.status}`);
-          }
-          
-          if (data.results && data.results.length > 0) {
-            const locationName = extractLocationName(data);
-            console.log('🌍 Extracted location name:', locationName);
-            setLocationName(locationName);
-          } else {
-            console.log('🌍 No results in response, using fallback');
-            setLocationName('Ukjent plassering');
-          }
-        } catch (error) {
-          console.error('🌍 Failed to get location name:', error);
-          
-          // Fallback to user-friendly coordinates
-          const latDeg = Math.abs(latitude);
-          const lonDeg = Math.abs(longitude);
-          const latDir = latitude >= 0 ? 'N' : 'S';
-          const lonDir = longitude >= 0 ? 'E' : 'W';
-          
-          setLocationName(`${latDeg.toFixed(2)}°${latDir}, ${lonDeg.toFixed(2)}°${lonDir}`);
-        }
-        
-        // Hent fergekaier med neste avgang
-        try {
-          const data = await client.request(NEARBY_QUERY, { latitude, longitude });
-          const places = [];
-          const seenIds = new Set();
-          
-          console.log('GPS: nearest edges count =', data.nearest?.edges?.length || 0);
-          for (const e of data.nearest.edges) {
-            const { place, distance } = e.node;
-            if (place && place.id && !seenIds.has(place.id)) {
-              // Ikke ekskluder på navn i GPS-modus – behold alle vann-knutepunkter for å sikre at relevante kaier ikke faller bort
-              const name = (place.name || '').toLowerCase();
-              console.log('GPS candidate:', { id: place.id, name: place.name, distance, submode: place.transportSubmode });
-              // Hent alle avganger for denne fergekaien
-              let nextDeparture = null;
-              let allDepartures = [];
-              try {
-                const depData = await client.request(DEPARTURES_QUERY, { id: place.id });
-                const calls = depData.stopPlace?.estimatedCalls || [];
-                const filteredCalls = calls
-                  .filter((call) => {
-                    const line = call.serviceJourney?.journeyPattern?.line;
-                    return line && line.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY;
-                  })
-                  .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime));
-                
-                allDepartures = filteredCalls;
-                if (filteredCalls.length > 0) {
-                  nextDeparture = filteredCalls[0]; // Kun neste avgang
-                }
-                
-                // Lagre alle avganger i departuresMap
-                setDeparturesMap(prev => ({
-                  ...prev,
-                  [place.id]: filteredCalls
-                }));
-              } catch {
-                // Ignorer feil for individuelle fergekaier
-              }
-              
-              places.push({
-                id: place.id,
-                name: place.name,
-                distance: distance,
-                latitude: place.latitude,
-                longitude: place.longitude,
-                nextDeparture: nextDeparture
-              });
-              seenIds.add(place.id);
-            }
-          }
-          
-          // Sorter etter avstand stigende
-          places.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
-
-          // Generell fallback: suppler med fergekaier fra allFerryStops innen radius som mangler i nearest
-          if (Array.isArray(allFerryStops) && allFerryStops.length > 0) {
-            try {
-              const computed = allFerryStops
-                .map(s => {
-                  const dLat = (s.latitude - latitude) * 111000;
-                  const dLng = (s.longitude - longitude) * 111000 * Math.cos(latitude * Math.PI / 180);
-                  const approxDistance = Math.sqrt(dLat * dLat + dLng * dLng);
-                  return { stop: s, approxDistance };
-                })
-                .filter(({ stop, approxDistance }) => approxDistance <= NEARBY_SEARCH_CONFIG.maximumDistance && !seenIds.has(stop.id))
-                .sort((a, b) => a.approxDistance - b.approxDistance)
-                .slice(0, 50); // begrens fallbackmengde for ytelse
-
-              for (const { stop: cand, approxDistance } of computed) {
-                let nextDeparture = null;
-                try {
-                  const depData = await client.request(DEPARTURES_QUERY, { id: cand.id });
-                  const calls = depData.stopPlace?.estimatedCalls || [];
-                  const filteredCalls = calls
-                    .filter((call) => {
-                      const line = call.serviceJourney?.journeyPattern?.line;
-                      return line && line.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY;
-                    })
-                    .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime));
-                  
-                  if (filteredCalls.length > 0) {
-                    nextDeparture = filteredCalls[0];
-                  }
-                  
-                  // Lagre alle avganger i departuresMap
-                  setDeparturesMap(prev => ({
-                    ...prev,
-                    [cand.id]: filteredCalls
-                  }));
-                } catch {}
-
-                places.push({
-                  id: cand.id,
-                  name: cand.name,
-                  distance: approxDistance,
-                  latitude: cand.latitude,
-                  longitude: cand.longitude,
-                  nextDeparture
-                });
-                seenIds.add(cand.id);
-              }
-              console.log('GPS: added fallback candidates count =', computed.length);
-            } catch {}
-          }
-
-          // Prioriter kun steder med faktisk lokale bilferge-avganger
-          const withDepartures = places.filter(p => !!p.nextDeparture);
-          const finalPlaces = withDepartures.length > 0 ? withDepartures : places;
-          
-          // Begrens antall resultater i GPS-visning til maksimalt 5 fergekaier
-          const limitedPlaces = finalPlaces.slice(0, 5);
-
-          const hasKrokeide = limitedPlaces.some(p => (p.name || '').toLowerCase().includes('krokeide'));
-          console.log('GPS: includes Krokeide after fallback?', hasKrokeide);
-
-          setFerryStops(limitedPlaces);
-          setHasInteracted(true);
-          
-          // Automatisk utvid det første kortet hvis vi har resultater
-          if (limitedPlaces.length > 0) {
-            setSelectedStop(limitedPlaces[0].id);
-            
-            // Calculate driving times if feature is enabled
-            if (showDrivingTimes) {
-              await calculateDrivingTimesForExistingStops();
-            }
-            
-            // Hent alle avganger for det første kortet automatisk
-            const firstStop = limitedPlaces[0];
-            try {
-              const data = await client.request(DEPARTURES_QUERY, { id: firstStop.id });
-              const calls = data.stopPlace.estimatedCalls || [];
-              
-              // Filter and sort departures
-              const filteredCalls = calls
-                .filter(call => call.serviceJourney?.journeyPattern?.line?.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY)
-                .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime));
-
-              setDeparturesMap(prev => ({
-                ...prev,
-                [firstStop.id]: filteredCalls
-              }));
-            } catch (err) {
-              console.error('Error fetching departures for first card:', err);
-            }
-            
-
-          }
-        } catch (err) {
-          setError('Kunne ikke hente fergekaier');
-          console.error('Error fetching ferry stops:', err);
-        } finally {
-          setLoading(false);
-        }
-      },
-      (err) => {
-        console.error('❌ Geolocation error details:', err);
-        
-        let errorMessage = 'Kunne ikke hente posisjon.';
-        
-        if (err.code) {
-          switch (err.code) {
-            case 1:
-              errorMessage = 'Tilgang til posisjon ble avvist. Vennligst tillat posisjon i innstillingene.';
-              break;
-            case 2:
-              errorMessage = 'Posisjon kunne ikke bestemmes. Sjekk internettforbindelsen.';
-              break;
-            case 3:
-              errorMessage = 'Timeout ved henting av posisjon. Prøv igjen.';
-              break;
-            default:
-              errorMessage = `Posisjonsfeil (kode ${err.code}): ${err.message || 'Ukjent feil'}`;
-          }
-        } else if (err.message) {
-          errorMessage = `Posisjonsfeil: ${err.message}`;
-        }
-        
-        console.error('❌ Geolocation error message:', errorMessage);
-        
-        // Ikke vis GPS-feilmelding hvis brukeren allerede har startet å søke
-        if (mode !== 'search' && !query.trim()) {
-          setError(errorMessage);
-        }
-        setLoading(false);
-      },
-      GEOLOCATION_OPTIONS
-    );
+    // Call executeGpsSearch directly - no blocking mechanism
+    await executeGpsSearch();
   };
-
 
 
   // Funksjon for å beregne kjøretider for eksisterende fergekaier
@@ -697,7 +643,9 @@ function App() {
     
     const startCoords = { lat: location.latitude, lng: location.longitude };
     
-    for (const stop of ferryStops) {
+    // Limit max concurrent calculations to reduce bursts
+    const stopsToProcess = ferryStops.slice(0, 12); // cap to 12 visible/nearby
+    for (const stop of stopsToProcess) {
       const stopId = stop.id;
       setDrivingTimesLoading(prev => ({ ...prev, [stopId]: true }));
       
@@ -705,32 +653,21 @@ function App() {
       
       try {
         // Bruk Google Maps API for mer nøyaktige kjøretider
-        const drivingTime = await calculateDrivingTime(startCoords, endCoords);
+        // This function now has its own fallback chain built-in
+        const result = await calculateDrivingTime(startCoords, endCoords);
         
         setDrivingTimes(prev => ({
           ...prev,
-          [stopId]: drivingTime
+          [stopId]: result.time
         }));
       } catch (error) {
-        // Fallback til estimert tid med mer realistiske hastigheter
+        // If even the simple distance calculation fails, use a basic estimate
         const distance = Math.sqrt(
           Math.pow((endCoords.lat - startCoords.lat) * 111000, 2) + 
           Math.pow((endCoords.lng - startCoords.lng) * 111000 * Math.cos(startCoords.lat * Math.PI / 180), 2)
         );
         
-        // Mer realistiske hastigheter basert på avstand og terreng
-        let averageSpeedKmh;
-        if (distance < 1000) {
-          averageSpeedKmh = 30; // Bykjøring for korte avstander (trafikk, lyskryss)
-        } else if (distance < 5000) {
-          averageSpeedKmh = 40; // Forstadsområde (fartsgrense 50-60)
-        } else if (distance < 20000) {
-          averageSpeedKmh = 50; // Landevei (fartsgrense 60-80)
-        } else {
-          averageSpeedKmh = 60; // Hovedvei (fartsgrense 80-90)
-        }
-        
-        const estimatedTime = Math.max(1, Math.round((distance / 1000) / averageSpeedKmh * 60));
+        const estimatedTime = Math.max(1, Math.round((distance / 1000) / 50 * 60)); // 50 km/h default
         
         setDrivingTimes(prev => ({
           ...prev,
@@ -740,6 +677,35 @@ function App() {
         setDrivingTimesLoading(prev => ({ ...prev, [stopId]: false }));
       }
     }
+  };
+
+  // Helper function to load a return card for a single stop
+  const loadReturnCardForStop = async (stop) => {
+    try {
+      // Check if return cards are already being loaded for this stop
+      const existingDestinations = inlineDestinations[stop.id] || [];
+      if (existingDestinations.length > 0) {
+        return null; // Already have return cards for this stop
+      }
+      
+      // Load return cards using line-based destination finding
+      const dataLine = await client.request(ENHANCED_DEPARTURES_WITH_PATTERNS_QUERY, { id: stop.id });
+      const callsLine = dataLine.stopPlace?.estimatedCalls || [];
+      const anyFerry = callsLine.find(call => call.serviceJourney?.journeyPattern?.line?.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY);
+      const line = anyFerry?.serviceJourney?.journeyPattern?.line;
+
+      if (line && Array.isArray(line.quays) && line.quays.length >= 2) {
+        const other = line.quays.find(q => q.stopPlace?.id !== stop.id) || line.quays.find(q => q.id !== stop.id);
+        const destName = other?.stopPlace?.name || other?.name;
+        if (destName) {
+          // This function is now pure and returns data instead of setting state
+          return await loadInlineDestinationDepartures(stop.id, destName);
+        }
+      }
+    } catch (e) {
+      //
+    }
+    return null; // Return null if anything fails
   };
 
   const getDepartureTimeColor = (departureTime, drivingTime) => {
@@ -772,7 +738,7 @@ function App() {
       const reduction = Math.min((text.length - maxLength) * 0.5, 4); // Redusert fra 0.8 til 0.5 per tegn
       const newSize = Math.max(baseSize - reduction, 10); // Økt minimum fra 8 til 10px
       
-      return `${newSize}px`;
+      return newSize + 'px';
     }
     
     // For fergekaikort-navn (store felter)
@@ -787,7 +753,7 @@ function App() {
     const reduction = Math.min((text.length - maxLength) * 0.8, 8); // Maks 8px reduksjon
     const newSize = Math.max(baseSize - reduction, 16); // Minimum 16px (1rem)
     
-    return `${newSize}px`;
+    return newSize + 'px';
   };
 
   // Hjelpefunksjon for å hente skipets navn
@@ -795,13 +761,14 @@ function App() {
 
 
 
-    // New function to load inline destination departures
+    // Enhanced function to load inline destination departures using journeyPattern
   const loadInlineDestinationDepartures = async (parentStopId, destinationText) => {
     let candidate = null;
+    
     try {
-      console.log('loadInlineDestinationDepartures called with:', { parentStopId, destinationText });
+      // Loading inline destination departures
       
-      // Sjekk om denne spesifikke destinasjonen allerede er lastet
+      // Check if this specific destination is already loaded
       const existingDestinations = inlineDestinations[parentStopId] || [];
       const alreadyLoaded = existingDestinations.some(dest => {
         const destName = normalizeText(cleanDestinationText(dest.name || '')).toLowerCase();
@@ -810,166 +777,277 @@ function App() {
       });
       
       if (alreadyLoaded) {
-        console.log('Destination times already loaded for:', parentStopId, '->', destinationText);
-        return;
+        return null; // Return null instead of undefined to prevent further processing
       }
 
-      if (!destinationText || !Array.isArray(allFerryStops) || allFerryStops.length === 0) return;
+      if (!destinationText) return null;
+       
+      // Load ferry quays on-demand if not already loaded
+      if (!ferryStopsLoaded || allFerryQuays.length === 0) {
+        await loadAllFerryStops();
+      }
       
-      const norm = (s) => normalizeText(cleanDestinationText(s || '')).toLowerCase();
-      const target = norm(destinationText);
-      const originalTarget = cleanDestinationText(destinationText || '').toLowerCase();
+      // Step 1: Try enhanced journeyPattern-based matching first (using destination text)
+      candidate = await findDestinationUsingJourneyPattern(parentStopId, destinationText);
       
-      console.log('Looking for destination:', destinationText, 'normalized:', target);
-      
-      // Forbedret matching-logikk med vanlige feil
-      const candidates = allFerryStops.filter(s => {
-        const sNormName = norm(s.name);
-        const sOrigName = cleanDestinationText(s.name || '').toLowerCase();
-        
-        // Vanlige feil og varianter
-        const commonErrors = {
-          'oppdal': 'oppedal',
-          'oppedal': 'oppdal',
-          'lavik': 'lavik',
-          'magerholm': 'magerholm',
-          'sykkylven': 'sykkylven',
-          'standal': 'standal',
-          'sæbø': 'sæbø',
-          'trandal': 'trandal',
-          'solavågen': 'solavågen',
-          'solavagen': 'solavågen'
-        };
-        
-        const correctedTarget = commonErrors[target] || target;
-        
-        // Fjern "kai" og "ferjekai" for bedre matching
-        const cleanTarget = target.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
-        const cleanSNormName = sNormName.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
-        const cleanSOrigName = sOrigName.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
-        const cleanOrigTarget = originalTarget.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
-        
-        // Mer presis matching - prioritere eksakte matches (både normalisert og original)
-        const exactMatchNorm = cleanSNormName === cleanTarget;
-        const exactMatchOrig = cleanSOrigName === cleanOrigTarget;
-        const startsWithMatchNorm = cleanSNormName.startsWith(cleanTarget) || cleanTarget.startsWith(cleanSNormName);
-        const startsWithMatchOrig = cleanSOrigName.startsWith(cleanOrigTarget) || cleanOrigTarget.startsWith(cleanSOrigName);
-        const containsMatchNorm = cleanSNormName.includes(cleanTarget) || cleanTarget.includes(cleanSNormName);
-        const containsMatchOrig = cleanSOrigName.includes(cleanOrigTarget) || cleanOrigTarget.includes(cleanSOrigName);
-        
-        // Sjekk også om navnet matcher uten normalisering
-        const directMatch = s.name.toLowerCase().includes(target) || target.includes(s.name.toLowerCase());
-        
-        const exactMatch = exactMatchNorm || exactMatchOrig;
-        const startsWithMatch = startsWithMatchNorm || startsWithMatchOrig;
-        const containsMatch = containsMatchNorm || containsMatchOrig;
-        
-        // Logg alle potensielle matches for debugging
-        if (exactMatch || startsWithMatch || containsMatch || directMatch) {
-          console.log('Found match:', s.name, 'for target:', target, 'exact:', exactMatch, 'startsWith:', startsWithMatch, 'contains:', containsMatch, 'direct:', directMatch);
-          return true;
-        }
-        return false;
-      });
-      
-      // Velg den beste matchen med prioritet
-      candidate = candidates.find(s => {
-        const sNormName = norm(s.name);
-        const sOrigName = cleanDestinationText(s.name || '').toLowerCase();
-        const cleanTarget = target.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
-        const cleanOrigTarget = originalTarget.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
-        const cleanSNormName = sNormName.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
-        const cleanSOrigName = sOrigName.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
-        return cleanSNormName === cleanTarget || cleanSOrigName === cleanOrigTarget; // Eksakt match
-      }) || candidates.find(s => {
-        const sNormName = norm(s.name);
-        const sOrigName = cleanDestinationText(s.name || '').toLowerCase();
-        const cleanTarget = target.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
-        const cleanOrigTarget = originalTarget.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
-        const cleanSNormName = sNormName.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
-        const cleanSOrigName = sOrigName.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
-        return (cleanSNormName.startsWith(cleanTarget) || cleanTarget.startsWith(cleanSNormName)) ||
-               (cleanSOrigName.startsWith(cleanOrigTarget) || cleanOrigTarget.startsWith(cleanSOrigName)); // StartsWith match
-      }) || candidates[0]; // Fallback til første match
-      
+      // Step 1b: If not found, try line-only pairing (choose the other quay on the line)
       if (!candidate) {
-        console.log('No match found for:', target);
-        console.log('Available stops:', allFerryStops.map(s => norm(s.name)).slice(0, 10));
-        return;
+        const lineOnlyCandidate = await findDestinationByLineOtherQuay(parentStopId);
+        if (lineOnlyCandidate) {
+          candidate = lineOnlyCandidate;
+        }
       }
       
-      console.log('Selected candidate:', candidate.name, 'from', candidates.length, 'candidates');
-      console.log('All candidates:', candidates.map(c => c.name));
+      // Removed legacy fallbacks (routeMap and traditional name-based matching). We now rely solely on journeyPattern-based matching.
+      
+      if (!candidate) return null;
+      
+      // Step 4: Use enhanced journeyPattern-based return departure finding
+      const lineId = candidate.lineId;
+      let returnDepartures = await findReturnDeparturesUsingJourneyPattern(parentStopId, candidate.id, lineId);
 
-      setCardLoading(prev => ({ ...prev, [`${parentStopId}-${candidate.id}`]: true }));
-      const data = await client.request(DEPARTURES_QUERY, { id: candidate.id });
+      // Fallback: if no return departures for candidate, try line-only pairing as destination
+      if (returnDepartures.length === 0) {
+        const lineOnlyCandidate = await findDestinationByLineOtherQuay(parentStopId);
+        if (lineOnlyCandidate && lineOnlyCandidate.id !== candidate.id) {
+          candidate = lineOnlyCandidate;
+          returnDepartures = await findReturnDeparturesUsingJourneyPattern(parentStopId, candidate.id, candidate.lineId);
+        }
+      }
+      
+      // Use only journeyPattern-based return departures. If none, leave empty.
+      const finalCalls = returnDepartures;
+      
+      // Return departures result determined
+
+      if (finalCalls.length === 0) {
+        return null; // Return null instead of setting state
+      }
+        
+      const newDestination = {
+        parentStopId: parentStopId,
+        stopId: candidate.id,
+        name: candidate.name,
+        departures: finalCalls,
+        quayId: candidate.quayId,
+        quayName: candidate.quayName,
+        lineId: candidate.lineId,
+        lineName: candidate.lineName
+      };
+        
+      return newDestination; // Return the new destination object
+
+    } catch (error) {
+      return null; // Return null on error
+    }
+  };
+
+  // Find destination using only line hierarchy: pick the other quay on the line for the parent stop
+  const findDestinationByLineOtherQuay = async (parentStopId) => {
+    try {
+      const data = await client.request(ENHANCED_DEPARTURES_WITH_PATTERNS_QUERY, { id: parentStopId });
+      const calls = data.stopPlace?.estimatedCalls || [];
+      const anyFerryCall = calls.find(call => call.serviceJourney?.journeyPattern?.line?.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY);
+      const line = anyFerryCall?.serviceJourney?.journeyPattern?.line;
+      if (!line || !Array.isArray(line.quays) || line.quays.length < 2) return null;
+
+      const parentQuay = allFerryQuays.find(q => q.id === parentStopId);
+      // Prefer quay whose stopPlace differs from parent; fallback to first different quay by id
+      const destinationQuay = line.quays.find(q => q?.stopPlace?.id && q.stopPlace.id !== parentStopId) ||
+                              line.quays.find(q => q?.id && q.id !== parentStopId) || null;
+      if (!destinationQuay) return null;
+
+      if (destinationQuay.stopPlace) {
+        return {
+          id: destinationQuay.stopPlace.id,
+          name: destinationQuay.stopPlace.name,
+          quayId: destinationQuay.id,
+          quayName: destinationQuay.name,
+          lineId: line.id,
+          lineName: line.name
+        };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  // Enhanced matching function using journeyPattern data
+  const findDestinationUsingJourneyPattern = async (parentStopId, destinationText) => {
+    try {
+      
+      
+      // Get parent quay details
+      const parentQuay = allFerryQuays.find(q => q.id === parentStopId);
+      if (!parentQuay) {
+        
+        return null;
+      }
+
+      // Get departures from parent stop with journeyPattern data including quays
+      const data = await client.request(ENHANCED_DEPARTURES_WITH_PATTERNS_QUERY, { id: parentStopId });
       const calls = data.stopPlace?.estimatedCalls || [];
       
-      // Hent navnet på hovedfergekaien for sammenligning
-      const parentStopName = allFerryStops.find(s => s.id === parentStopId)?.name || '';
-      
-      // Finn avganger som går tilbake til hovedfergekaien
-      console.log('Total departures from', candidate.name, ':', calls.length);
-      console.log('Parent stop name:', parentStopName);
-      
-      const filteredCalls = calls
-        .filter(call => {
-          // Sjekk at det er en lokal bilferge
-          const isLocalCarFerry = call.serviceJourney?.journeyPattern?.line?.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY;
-          
-          // Sjekk at destinasjonen matcher hovedfergekaien
-          const destinationText = call.destinationDisplay?.frontText;
-          const normDestination = normalizeText(cleanDestinationText(destinationText || '')).toLowerCase();
-          const normParentStop = normalizeText(cleanDestinationText(parentStopName || '')).toLowerCase();
-          
-          console.log('Checking departure:', destinationText, 'normalized:', normDestination, 'against parent stop:', parentStopName, 'normalized:', normParentStop, 'ferry:', isLocalCarFerry, 'match:', normDestination === normParentStop);
-          
-          return isLocalCarFerry && normDestination === normParentStop;
-        })
-        .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime))
-        .map(dep => ({ ...dep, aimed: new Date(dep.aimedDepartureTime) }));
-      
-      console.log('Filtered departures:', filteredCalls.length);
+      // Find departures that match the destination text
+      const matchingDepartures = calls.filter(call => {
+        const destText = call.destinationDisplay?.frontText;
+        const normDest = normalizeText(cleanDestinationText(destText || '')).toLowerCase();
+        const normTarget = normalizeText(cleanDestinationText(destinationText || '')).toLowerCase();
+        
+        // Clean names for comparison
+        const cleanDest = normDest.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
+        const cleanTarget = normTarget.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
+        
+        return cleanDest === cleanTarget || 
+               cleanDest.includes(cleanTarget) || 
+               cleanTarget.includes(cleanDest);
+      });
 
-      // Fallback: hvis ingen avganger matcher, vis alle avganger for debugging
-      const finalCalls = filteredCalls.length > 0 ? filteredCalls : calls
-        .filter(call => call.serviceJourney?.journeyPattern?.line?.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY)
-        .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime))
-        .map(dep => ({ ...dep, aimed: new Date(dep.aimedDepartureTime) }));
-
-      if (filteredCalls.length === 0) {
-        console.log('No matching departures found, showing all departures as fallback');
+      // Get the line and its quays: prefer a matching departure; fallback to any local car ferry call
+      let line = matchingDepartures[0]?.serviceJourney?.journeyPattern?.line;
+      if (!line) {
+        const anyFerryCall = calls.find(call => call.serviceJourney?.journeyPattern?.line?.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY);
+        if (anyFerryCall) {
+          line = anyFerryCall.serviceJourney?.journeyPattern?.line;
+        }
+      }
+      if (!line || !line.quays) {
+        
+        return null;
       }
 
-      setInlineDestinations(prev => {
-        const existingDestinations = prev[parentStopId] || [];
+
+      // Find the destination quay by matching the destination text
+      let destinationQuay = line.quays.find(quay => {
+        const quayName = normalizeText(cleanDestinationText(quay.name || '')).toLowerCase();
+        const stopPlaceName = normalizeText(cleanDestinationText(quay.stopPlace?.name || '')).toLowerCase();
+        const targetName = normalizeText(cleanDestinationText(destinationText || '')).toLowerCase();
         
-        // Sjekk om denne stopId allerede eksisterer
-        const stopIdExists = existingDestinations.some(dest => dest.stopId === candidate.id);
-        if (stopIdExists) {
-          console.log('StopId already exists:', candidate.id, 'skipping duplicate');
-          return prev;
+        const cleanQuayName = quayName.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
+        const cleanStopPlaceName = stopPlaceName.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
+        const cleanTargetName = targetName.replace(/\s*(kai|ferjekai|fergekai)\s*/gi, '').trim();
+        
+        return cleanQuayName === cleanTargetName || 
+               cleanStopPlaceName === cleanTargetName ||
+               cleanQuayName.includes(cleanTargetName) || 
+               cleanTargetName.includes(cleanQuayName) ||
+               cleanStopPlaceName.includes(cleanTargetName) ||
+               cleanTargetName.includes(cleanStopPlaceName);
+      });
+
+      // Robust fallback: hvis ingen tekst-match og linjen har to quays, velg den som ikke er parent
+      if (!destinationQuay && Array.isArray(line.quays) && line.quays.length === 2) {
+        const parentQuay = allFerryQuays.find(q => q.id === parentStopId);
+        if (parentQuay) {
+          destinationQuay = line.quays.find(q => q.stopPlace?.id !== parentQuay.id) || null;
+        }
+      }
+
+      if (destinationQuay) {
+        
+        // Return the stop place associated with the quay, plus quay and line info
+        if (destinationQuay.stopPlace) {
+          return {
+            id: destinationQuay.stopPlace.id,
+            name: destinationQuay.stopPlace.name,
+            quayId: destinationQuay.id,
+            quayName: destinationQuay.name,
+            lineId: line.id,
+            lineName: line.name
+          };
+        }
+      }
+
+      // No name-based fallback. If quay cannot be found via journeyPattern hierarchy, we return null.
+      
+      return null;
+    } catch (error) {
+      
+      return null;
+    }
+  };
+
+  // Enhanced function to find return departures using Quay-based journeyPattern matching
+  const findReturnDeparturesUsingJourneyPattern = async (parentStopId, destinationStopId, lineId = null) => {
+    try {
+      // Finding return departures using journey pattern matching
+      
+      // Get parent quay details - check both quay.id and quay.stopPlace.id
+      const parentQuay = allFerryQuays.find(q => 
+        q.id === parentStopId || q.stopPlace?.id === parentStopId
+      );
+      
+      // Get destination quay details - check both quay.id and quay.stopPlace.id  
+      const destinationQuay = allFerryQuays.find(q => 
+        q.id === destinationStopId || q.stopPlace?.id === destinationStopId
+      );
+      
+      if (!parentQuay || !destinationQuay) {
+        // Missing quays, using direct API-based approach
+        // Fall back to direct API-based matching without relying on allFerryQuays
+      }
+
+      // Get departures from destination stop with journeyPattern data including quays
+      const data = await client.request(ENHANCED_DEPARTURES_WITH_PATTERNS_QUERY, { id: destinationStopId });
+      const calls = data.stopPlace?.estimatedCalls || [];
+      
+      // Limit the number of calls to process to prevent infinite loops
+      const limitedCalls = calls.slice(0, 50); // Only process first 50 calls
+      
+      // Find return departures using QUAY-ONLY logic
+      let returnDepartures = limitedCalls.filter(call => {
+        const journeyPattern = call.serviceJourney?.journeyPattern;
+        if (!journeyPattern) return false;
+        
+        // Check if this is a relevant water ferry (broaden beyond only localCarFerry)
+        const submode = journeyPattern.line?.transportSubmode;
+        const mode = journeyPattern.line?.transportMode;
+        const isRelevantFerry = mode === TRANSPORT_MODES.WATER && !EXCLUDED_SUBMODES.includes(submode);
+        if (!isRelevantFerry) return false;
+        
+        // QUAY-ONLY: Check if the line has quays that match the parent stop
+        const line = journeyPattern.line;
+        // Sjekk både StopPlace-ID og Quay-ID (noen API-responser kan bruke ulike nivå)
+        const hasMatchingQuay = !!(line && Array.isArray(line.quays) && line.quays.some(quay => (
+          quay?.stopPlace?.id === parentStopId || quay?.id === parentStopId
+        )));
+        
+        // If no direct match but we have a lineId, try line-based matching
+        if (!hasMatchingQuay && lineId && line?.id === lineId) {
+          return true;
         }
         
-        const newDestination = {
-          stopId: candidate.id,
-          name: candidate.name,
-          departures: finalCalls
-        };
-        
-        const newInlineDestinations = {
-          ...prev,
-          [parentStopId]: [...existingDestinations, newDestination]
-        };
-        console.log('Setting inline destinations:', newInlineDestinations);
-        return newInlineDestinations;
+        // QUAY-ONLY: Only return true if we have a matching quay
+        return hasMatchingQuay;
       });
-    } catch (error) {
-      console.error('Error loading inline destination departures:', error);
-    } finally {
-      if (candidate) {
-        setCardLoading(prev => ({ ...prev, [`${parentStopId}-${candidate.id}`]: false }));
+
+      // If none matched by quay but we know the lineId, use same-line departures as a fallback
+      if (returnDepartures.length === 0 && lineId) {
+        returnDepartures = limitedCalls.filter(call => call.serviceJourney?.journeyPattern?.line?.id === lineId);
       }
+      
+      // If we have a lineId, prioritize departures from the same line
+      let prioritizedDepartures = returnDepartures;
+      if (lineId) {
+        const sameLineDepartures = returnDepartures.filter(call => 
+          call.serviceJourney?.journeyPattern?.line?.id === lineId
+        );
+        if (sameLineDepartures.length > 0) {
+          prioritizedDepartures = sameLineDepartures;
+        }
+      }
+      
+      // Limit the number of return departures to prevent performance issues
+      const limitedReturnDepartures = prioritizedDepartures.slice(0, 20);
+      
+      // Return departures found and prioritized
+      return limitedReturnDepartures
+        .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime))
+        .map(dep => ({ ...dep, aimed: new Date(dep.aimedDepartureTime) }));
+        
+    } catch (error) {
+      return [];
     }
   };
 
@@ -1140,17 +1218,17 @@ function App() {
                   }
                 }
               }}
-              className={`relative inline-flex items-center h-6 rounded-full transition-all duration-300 ease-in-out w-12 border ${
+              className={'relative inline-flex items-center h-6 rounded-full transition-all duration-300 ease-in-out w-12 border ' + (
                 showDrivingTimes 
                   ? 'border-white bg-transparent' 
                   : 'border-gray-300 bg-transparent'
-              }`}
+              )}
             >
-              <span className={`absolute w-5 h-5 rounded-full shadow-sm transition-all duration-300 ease-in-out ${
+              <span className={'absolute w-5 h-5 rounded-full shadow-sm transition-all duration-300 ease-in-out ' + (
                 showDrivingTimes 
                   ? 'bg-white right-0.5' 
                   : 'bg-gray-300 left-0.5'
-              }`}></span>
+              )}></span>
             </button>
           </div>
         )}
@@ -1158,7 +1236,7 @@ function App() {
         {/* Loading and Error States */}
         <div 
           style={{ 
-            minHeight: (loading || !ferryStopsLoaded) ? '150px' : '0px',
+            minHeight: loading ? '150px' : '0px',
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center',
@@ -1166,9 +1244,9 @@ function App() {
             overflow: 'hidden'
           }}
         >
-          {(loading || !ferryStopsLoaded) && (
+          {loading && (
             <LoadingSpinner 
-              message={!ferryStopsLoaded ? "Laster fergekaier..." : "Laster posisjon og fergekaier..."} 
+              message="Laster posisjon og fergekaier..." 
             />
           )}
         </div>
@@ -1248,8 +1326,8 @@ function App() {
                   )}
                   
                   <div
-                    id={`ferry-card-${stopData.id}`}
-                    className={`relative ${distance ? 'rounded-tr-2xl rounded-br-2xl rounded-bl-2xl' : 'rounded-2xl'} p-4 sm:p-5 card-expand w-full max-w-[350px] sm:max-w-md bg-white shadow-lg border border-gray-200`}
+                                          id={'ferry-card-' + stopData.id}
+                                          className={'relative ' + (distance ? 'rounded-tr-2xl rounded-br-2xl rounded-bl-2xl' : 'rounded-2xl') + ' p-4 sm:p-5 card-expand w-full max-w-[350px] sm:max-w-md bg-white shadow-lg border border-gray-200'}
                     style={{ minWidth: '280px' }}
                   >
                     <h2 
@@ -1292,7 +1370,7 @@ function App() {
                                     {dep.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                   </span>
                                   <span className="flex-1 flex justify-start items-center gap-1">
-                                    <span className={`text-sm font-bold align-middle whitespace-nowrap pl-4 ${getDepartureTimeColor(dep.aimedDepartureTime || dep.aimed, drivingTimes[stopData.id])}`}>
+                                                                          <span className={'text-sm font-bold align-middle whitespace-nowrap pl-4 ' + getDepartureTimeColor(dep.aimedDepartureTime || dep.aimed, drivingTimes[stopData.id])}>
                                       {formatMinutes(mins)}
                                     </span>
                                   </span>
@@ -1309,17 +1387,11 @@ function App() {
                             });
                           })()}
                         </ul>
-                                              </div>
-                        
-                        
-                        
-                        
-                      
+                      </div>
 
-
-                      {console.log('Rendering ferry card for:', stopData.id, 'inlineDestinations:', inlineDestinations) || null}
+                      {/* debug removed */}
                       {inlineDestinations[stopData.id] && inlineDestinations[stopData.id].map((destination, destIndex) => (
-                          <div key={`${stopData.id}-${destination.stopId}`} className="mt-5 p-4 sm:p-5 rounded-lg bg-gray-100/80 backdrop-blur-md shadow-lg relative">
+                                                      <div key={stopData.id + '-' + destination.stopId} className="mt-5 p-4 sm:p-5 rounded-lg bg-gray-100/80 backdrop-blur-md shadow-lg relative">
                           <div className="bg-purple-100 text-purple-700 text-sm font-bold px-2 py-1 rounded-full shadow-lg absolute top-[-10px] left-0 z-20">
                             Retur
                           </div>
@@ -1334,7 +1406,7 @@ function App() {
                               {destination.departures.slice(0, 5).map((dep, idx) => {
                                 const mins = Math.max(0, Math.round((dep.aimed - now) / 60000));
                                 return (
-                                  <li key={`inline-${destination.stopId}-${dep.aimedDepartureTime}-${idx}`} className="flex items-center py-0.5 leading-snug">
+                                                                      <li key={'inline-' + destination.stopId + '-' + dep.aimedDepartureTime + '-' + idx} className="flex items-center py-0.5 leading-snug">
                                     <span className="font-bold w-16 text-left text-sm">
                                       {dep.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </span>
@@ -1383,4 +1455,3 @@ function App() {
 }
 
 export default App;
-

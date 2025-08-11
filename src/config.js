@@ -3,6 +3,32 @@ export const config = {
   // Entur API Client Name
   ENTUR_CLIENT_NAME: import.meta.env.VITE_ENTUR_CLIENT_NAME || 'fergetid-app',
   
+  // Development settings
+  isDevelopment: import.meta.env.DEV,
+  
+  // Geolocation settings for development
+  GEOLOCATION_CONFIG: {
+    // Use more lenient settings in development
+    getOptions: () => {
+      const baseOptions = {
+        enableHighAccuracy: false,
+        timeout: 30000,
+        maximumAge: 600000
+      };
+      
+      // In development, use even more lenient settings
+      if (import.meta.env.DEV) {
+        return {
+          ...baseOptions,
+          timeout: 45000, // 45 seconds in development
+          enableHighAccuracy: false
+        };
+      }
+      
+      return baseOptions;
+    }
+  },
+  
   // Google Maps API Configuration
   GOOGLE_MAPS_CONFIG: {
     // Get the appropriate API key based on platform
@@ -15,7 +41,6 @@ export const config = {
             return import.meta.env.VITE_GOOGLE_MAPS_API_KEY_IOS;
           }
         } catch (error) {
-  
           return import.meta.env.VITE_GOOGLE_MAPS_API_KEY_IOS;
         }
       }
@@ -38,7 +63,7 @@ export const config = {
     getGeocodingUrl: (lat, lon) => {
       const apiKey = config.GOOGLE_MAPS_CONFIG.getApiKey();
       if (!apiKey) {
-        throw new Error('Google Maps API key not found. Please set VITE_GOOGLE_MAPS_API_KEY_IOS and VITE_GOOGLE_MAPS_API_KEY_WEB in your .env file');
+        return null;
       }
       
       return `${config.GOOGLE_MAPS_CONFIG.GEOCODING_BASE_URL}?latlng=${lat},${lon}&key=${apiKey}&language=no`;
@@ -46,7 +71,8 @@ export const config = {
     
     // Check if API key is configured
     isConfigured: () => {
-      return !!config.GOOGLE_MAPS_CONFIG.getApiKey();
+      const apiKey = config.GOOGLE_MAPS_CONFIG.getApiKey();
+      return !!apiKey;
     },
     
     DIRECTIONS_BASE_URL: 'https://maps.googleapis.com/maps/api/directions/json',
@@ -55,7 +81,7 @@ export const config = {
     getDirectionsUrl: (fromLat, fromLng, toLat, toLng) => {
       const apiKey = config.GOOGLE_MAPS_CONFIG.getApiKey();
       if (!apiKey) {
-        throw new Error('Google Maps API key not found. Please set VITE_GOOGLE_MAPS_API_KEY_IOS and VITE_GOOGLE_MAPS_API_KEY_WEB in your .env file');
+        return null;
       }
       
       const origin = `${fromLat},${fromLng}`;

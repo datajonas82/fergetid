@@ -229,10 +229,17 @@ function App() {
             if (geocodingUrl) {
               const response = await fetch(geocodingUrl);
               const data = await response.json();
-              if (data.results && data.results.length > 0) {
+              if (data?.results?.length > 0) {
                 setLocationName(extractLocationName(data));
+                return;
               }
             }
+            // Fallback when URL is missing or no results returned
+            const latDeg = Math.abs(latitude);
+            const lonDeg = Math.abs(longitude);
+            const latDir = latitude >= 0 ? 'N' : 'S';
+            const lonDir = longitude >= 0 ? 'E' : 'W';
+            setLocationName(`${latDeg.toFixed(2)}°${latDir}, ${lonDeg.toFixed(2)}°${lonDir}`);
           } catch {
             const latDeg = Math.abs(latitude);
             const lonDeg = Math.abs(longitude);

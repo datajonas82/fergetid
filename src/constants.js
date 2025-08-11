@@ -15,15 +15,13 @@ export const TRANSPORT_MODES = {
 };
 
 // Excluded transport submodes
+// Exclude only passenger/sightseeing submodes. Always include car ferries (local/national/vehicle).
 export const EXCLUDED_SUBMODES = [
-  'nationalCarFerry',
-  'regionalPassengerFerry', 
+  'regionalPassengerFerry',
   'localPassengerFerry',
   'nationalPassengerFerry',
   'sightSeeingService',
-  'highSpeedPassengerService',
-  'highSpeedVehicleService',
-  'highSpeedCarFerry'
+  'highSpeedPassengerService'
 ];
 
 // UI Constants

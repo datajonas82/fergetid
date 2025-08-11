@@ -264,7 +264,7 @@ function App() {
 
           // Filter by distance and sort
           const nearbyCandidates = placesWithDistance
-            .filter(p => p.distance <= 60000) // 60 km
+            .filter(p => p.distance <= 80000) // 80 km (include Moss/Svelvik from Oslo)
             .sort((a, b) => a.distance - b.distance);
 
           // Step 2: Fetch departures for the closest candidates

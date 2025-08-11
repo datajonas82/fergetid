@@ -98,23 +98,30 @@ export const calculateDrivingTime = async (startCoords, endCoords) => {
     return result;
 
   } catch (error) {
-    // In browsers, OpenRouteService is commonly blocked by CORS and rate limits.
-    const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
-    if (isBrowser) {
-      const fallback = calculateSimpleDistance(startCoords, endCoords);
-      drivingTimeCache.set(cacheKey, fallback);
-      return fallback;
-    }
-
-    // Non-browser (native/server) can try OpenRouteService as fallback
+    // First fallback: Google Directions API v1 (GET)
     try {
-      const openRouteResult = await calculateDrivingTimeWithOpenRoute(startCoords, endCoords);
-      drivingTimeCache.set(cacheKey, openRouteResult);
-      return openRouteResult;
-    } catch (_) {
-      const fallback = calculateSimpleDistance(startCoords, endCoords);
-      drivingTimeCache.set(cacheKey, fallback);
-      return fallback;
+      const v1Result = await calculateDrivingTimeWithDirectionsV1(startCoords, endCoords);
+      drivingTimeCache.set(cacheKey, v1Result);
+      return v1Result;
+    } catch (_v1err) {
+      // In browsers, OpenRouteService is commonly blocked by CORS and rate limits → skip to simple
+      const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
+      if (isBrowser) {
+        const fallback = calculateSimpleDistance(startCoords, endCoords);
+        drivingTimeCache.set(cacheKey, fallback);
+        return fallback;
+      }
+
+      // Non-browser (native/server) can try OpenRouteService as fallback
+      try {
+        const openRouteResult = await calculateDrivingTimeWithOpenRoute(startCoords, endCoords);
+        drivingTimeCache.set(cacheKey, openRouteResult);
+        return openRouteResult;
+      } catch (_) {
+        const fallback = calculateSimpleDistance(startCoords, endCoords);
+        drivingTimeCache.set(cacheKey, fallback);
+        return fallback;
+      }
     }
   }
   })();
@@ -125,6 +132,28 @@ export const calculateDrivingTime = async (startCoords, endCoords) => {
   } finally {
     pendingDrivingTimePromises.delete(cacheKey);
   }
+};
+
+// Google Directions API v1 fallback (GET)
+const calculateDrivingTimeWithDirectionsV1 = async (startCoords, endCoords) => {
+  const url = config.GOOGLE_MAPS_CONFIG.getDirectionsUrl(
+    startCoords.lat,
+    startCoords.lng,
+    endCoords.lat,
+    endCoords.lng
+  );
+  if (!url) throw new Error('Directions V1 URL missing (no API key)');
+
+  const response = await fetch(url, { method: 'GET' });
+  if (!response.ok) throw new Error(`Directions V1 failed: ${response.status}`);
+  const data = await response.json();
+  if (!data.routes || data.routes.length === 0) throw new Error('No routes in Directions V1 response');
+  const leg = data.routes[0]?.legs?.[0];
+  if (!leg || !leg.duration || !leg.distance) throw new Error('Missing leg info in Directions V1');
+  const durationSeconds = leg.duration.value;
+  const durationMinutes = Math.round(durationSeconds / 60);
+  const distanceMeters = leg.distance.value;
+  return { time: durationMinutes, distance: distanceMeters };
 };
 
 // Calculate driving time and distance using OpenRouteService as fallback

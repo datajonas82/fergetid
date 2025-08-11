@@ -33,27 +33,18 @@ export const config = {
   GOOGLE_MAPS_CONFIG: {
     // Get the appropriate API key based on platform
     getApiKey: () => {
-      // Check if we're in a Capacitor environment
+      // Use the iOS key ONLY for native (Capacitor) builds
       if (typeof window !== 'undefined' && window.Capacitor) {
         try {
           const platform = window.Capacitor.getPlatform();
           if (platform === 'ios') {
             return import.meta.env.VITE_GOOGLE_MAPS_API_KEY_IOS;
           }
-        } catch (error) {
+        } catch (_) {
           return import.meta.env.VITE_GOOGLE_MAPS_API_KEY_IOS;
         }
       }
-      
-      // Check for iOS using user agent as fallback
-      const userAgent = navigator.userAgent || '';
-      const isIOS = /iPad|iPhone|iPod/.test(userAgent);
-      
-      if (isIOS) {
-        return import.meta.env.VITE_GOOGLE_MAPS_API_KEY_IOS;
-      }
-      
-      // Default to web key
+      // Always use the WEB key in browsers (including iOS Safari)
       return import.meta.env.VITE_GOOGLE_MAPS_API_KEY_WEB;
     },
     

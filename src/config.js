@@ -69,7 +69,7 @@ export const config = {
     DIRECTIONS_BASE_URL: 'https://maps.googleapis.com/maps/api/directions/json',
     
     // Get directions URL for driving time calculation
-    getDirectionsUrl: (fromLat, fromLng, toLat, toLng) => {
+    getDirectionsUrl: (fromLat, fromLng, toLat, toLng, options = {}) => {
       const apiKey = config.GOOGLE_MAPS_CONFIG.getApiKey();
       if (!apiKey) {
         return null;
@@ -77,8 +77,10 @@ export const config = {
       
       const origin = `${fromLat},${fromLng}`;
       const destination = `${toLat},${toLng}`;
+      const avoid = options.roadOnly ? '&avoid=ferries' : '';
       
-      return `${config.GOOGLE_MAPS_CONFIG.DIRECTIONS_BASE_URL}?origin=${origin}&destination=${destination}&mode=driving&key=${apiKey}&language=no`;
+      // Use live traffic like Google Maps by setting departure_time=now and traffic_model=best_guess
+      return `${config.GOOGLE_MAPS_CONFIG.DIRECTIONS_BASE_URL}?origin=${origin}&destination=${destination}&mode=driving${avoid}&departure_time=now&traffic_model=best_guess&key=${apiKey}&language=no`;
     }
   }
 }; 

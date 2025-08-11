@@ -4,18 +4,30 @@
 import { config } from '../config';
 
 // In-memory cache and de-duplication for driving time calculations
-const drivingTimeCache = new Map(); // key -> { time, distance }
-const pendingDrivingTimePromises = new Map(); // key -> Promise<{ time, distance }>
+const drivingTimeCache = new Map(); // key -> { time, distance, source }
+const pendingDrivingTimePromises = new Map(); // key -> Promise<{ time, distance, source }>
 
-const getCacheKey = (startCoords, endCoords) => {
+const fetchWithTimeout = async (url, options = {}, timeoutMs = 10000) => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return response;
+  } finally {
+    clearTimeout(id);
+  }
+};
+
+const getCacheKey = (startCoords, endCoords, options) => {
   const s = `${startCoords.lat.toFixed(5)},${startCoords.lng.toFixed(5)}`;
   const e = `${endCoords.lat.toFixed(5)},${endCoords.lng.toFixed(5)}`;
-  return `${s}|${e}`;
+  const flags = options?.roadOnly ? 'road' : 'any';
+  return `${s}|${e}|${flags}`;
 };
 
 // Calculate driving time and distance using Google Maps Routes API (latest version)
-export const calculateDrivingTime = async (startCoords, endCoords) => {
-  const cacheKey = getCacheKey(startCoords, endCoords);
+export const calculateDrivingTime = async (startCoords, endCoords, options = {}) => {
+  const cacheKey = getCacheKey(startCoords, endCoords, options);
 
   // Serve from cache if available
   if (drivingTimeCache.has(cacheKey)) {
@@ -30,54 +42,54 @@ export const calculateDrivingTime = async (startCoords, endCoords) => {
   const apiKey = config.GOOGLE_MAPS_CONFIG.getApiKey();
   
   if (!apiKey) {
-    const fallback = calculateSimpleDistance(startCoords, endCoords);
+    const fallback = { time: 0, distance: 0, source: 'no_api_key' };
     drivingTimeCache.set(cacheKey, fallback);
     return fallback;
   }
 
   const promise = (async () => {
     try {
-    // Use Google Maps Routes API v2 (latest) with optimized settings
-    const url = 'https://routes.googleapis.com/directions/v2:computeRoutes';
-    
-    const requestBody = {
-      origin: {
-        location: {
-          latLng: {
-            latitude: startCoords.lat,
-            longitude: startCoords.lng
+      // Use Google Maps Routes API v2 (Compute Routes) with live traffic
+      const url = 'https://routes.googleapis.com/directions/v2:computeRoutes';
+      
+      const requestBody = {
+        origin: {
+          location: {
+            latLng: {
+              latitude: startCoords.lat,
+              longitude: startCoords.lng
+            }
           }
-        }
-      },
-      destination: {
-        location: {
-          latLng: {
-            latitude: endCoords.lat,
-            longitude: endCoords.lng
+        },
+        destination: {
+          location: {
+            latLng: {
+              latitude: endCoords.lat,
+              longitude: endCoords.lng
+            }
           }
-        }
-      },
-      travelMode: "DRIVE",
-      routingPreference: "TRAFFIC_UNAWARE", // Use traffic-unaware for more realistic times
-      computeAlternativeRoutes: false,
-      routeModifiers: {
-        avoidTolls: false,
-        avoidHighways: false,
-        avoidFerries: false
-      },
-      languageCode: "no-NO",
-      units: "METRIC"
-    };
+        },
+        travelMode: 'DRIVE',
+        routingPreference: 'TRAFFIC_AWARE_OPTIMAL',
+        computeAlternativeRoutes: false,
+        routeModifiers: {
+          avoidTolls: false,
+          avoidHighways: false,
+          avoidFerries: options.roadOnly === true, // road-only access leg
+        },
+        languageCode: 'no-NO',
+        units: 'METRIC'
+      };
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters'
-      },
-      body: JSON.stringify(requestBody)
-    });
+      const response = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters'
+        },
+        body: JSON.stringify(requestBody)
+      }, 10000);
 
     if (!response.ok) {
       throw new Error(`Routes API failed: ${response.status}`);
@@ -90,39 +102,27 @@ export const calculateDrivingTime = async (startCoords, endCoords) => {
     }
 
     const route = data.routes[0];
-    const durationSeconds = parseInt(route.duration.replace('s', ''));
-    const durationMinutes = Math.round(durationSeconds / 60);
+    const durationSeconds = typeof route.duration === 'string'
+      ? parseFloat(route.duration.replace('s', ''))
+      : (route.duration?.seconds ?? 0);
+    const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
     const distanceMeters = route.distanceMeters;
-    const result = { time: durationMinutes, distance: distanceMeters };
+    const result = { time: durationMinutes, distance: distanceMeters, source: 'routes_v2' };
     drivingTimeCache.set(cacheKey, result);
     return result;
 
   } catch (error) {
-    // First fallback: Google Directions API v1 (GET)
-    try {
-      const v1Result = await calculateDrivingTimeWithDirectionsV1(startCoords, endCoords);
-      drivingTimeCache.set(cacheKey, v1Result);
-      return v1Result;
-    } catch (_v1err) {
-      // In browsers, OpenRouteService is commonly blocked by CORS and rate limits → skip to simple
-      const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
-      if (isBrowser) {
-        const fallback = calculateSimpleDistance(startCoords, endCoords);
-        drivingTimeCache.set(cacheKey, fallback);
-        return fallback;
-      }
-
-      // Non-browser (native/server) can try OpenRouteService as fallback
+      // First fallback: Google Directions API v1 (GET)
       try {
-        const openRouteResult = await calculateDrivingTimeWithOpenRoute(startCoords, endCoords);
-        drivingTimeCache.set(cacheKey, openRouteResult);
-        return openRouteResult;
-      } catch (_) {
-        const fallback = calculateSimpleDistance(startCoords, endCoords);
+        const v1Result = await calculateDrivingTimeWithDirectionsV1(startCoords, endCoords, options);
+        drivingTimeCache.set(cacheKey, v1Result);
+        return v1Result;
+      } catch (_v1err) {
+        // Final fallback: simple haversine estimate
+        const fallback = calculateHaversineDistance(startCoords, endCoords);
         drivingTimeCache.set(cacheKey, fallback);
         return fallback;
       }
-    }
   }
   })();
 
@@ -135,12 +135,13 @@ export const calculateDrivingTime = async (startCoords, endCoords) => {
 };
 
 // Google Directions API v1 fallback (GET)
-const calculateDrivingTimeWithDirectionsV1 = async (startCoords, endCoords) => {
+const calculateDrivingTimeWithDirectionsV1 = async (startCoords, endCoords, options = {}) => {
   const url = config.GOOGLE_MAPS_CONFIG.getDirectionsUrl(
     startCoords.lat,
     startCoords.lng,
     endCoords.lat,
-    endCoords.lng
+    endCoords.lng,
+    options
   );
   if (!url) throw new Error('Directions V1 URL missing (no API key)');
 
@@ -153,74 +154,21 @@ const calculateDrivingTimeWithDirectionsV1 = async (startCoords, endCoords) => {
   const durationSeconds = leg.duration.value;
   const durationMinutes = Math.round(durationSeconds / 60);
   const distanceMeters = leg.distance.value;
-  return { time: durationMinutes, distance: distanceMeters };
+  return { time: durationMinutes, distance: distanceMeters, source: 'directions_v1' };
 };
 
-// Calculate driving time and distance using OpenRouteService as fallback
-const calculateDrivingTimeWithOpenRoute = async (startCoords, endCoords) => {
-  try {
-    
-    const url = 'https://api.openrouteservice.org/v2/directions/driving-car';
-    
-    const requestBody = {
-      coordinates: [
-        [startCoords.lng, startCoords.lat],
-        [endCoords.lng, endCoords.lat]
-      ],
-      instructions: false,
-      geometry: false
-    };
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6Ijk1ZDZiMWRjNjE1ZTQ4YWRhYjVkYTEwN2E2OTc4ODlkIiwiaCI6Im11cm11cjY0In0='
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-      throw new Error(`OpenRouteService API failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (!data.routes || data.routes.length === 0) {
-      throw new Error('No routes found in OpenRouteService response');
-    }
-
-    const route = data.routes[0];
-    const durationSeconds = route.summary.duration;
-    const durationMinutes = Math.round(durationSeconds / 60);
-    const distanceMeters = route.summary.distance;
-
-    return { time: durationMinutes, distance: distanceMeters };
-
-  } catch (error) {
-    throw new Error('Failed to calculate driving time with OpenRouteService API');
-  }
-};
-
-// Simple distance calculation as final fallback
-const calculateSimpleDistance = (startCoords, endCoords) => {
-  
-  // Calculate distance using Haversine formula
+// Simple haversine distance calculation as fallback
+const calculateHaversineDistance = (startCoords, endCoords) => {
   const R = 6371000; // Earth's radius in meters
   const dLat = (endCoords.lat - startCoords.lat) * Math.PI / 180;
-  const dLng = (endCoords.lng - startCoords.lng) * Math.PI / 180;
+  const dLon = (endCoords.lng - startCoords.lng) * Math.PI / 180;
   const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
             Math.cos(startCoords.lat * Math.PI / 180) * Math.cos(endCoords.lat * Math.PI / 180) *
-            Math.sin(dLng/2) * Math.sin(dLng/2);
+            Math.sin(dLon/2) * Math.sin(dLon/2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  const distanceMeters = R * c;
-  
-  // Estimate driving time (assuming average speed of 50 km/h in urban areas)
-  const estimatedSpeedKmh = 50;
-  const distanceKm = distanceMeters / 1000;
-  const estimatedTimeMinutes = Math.round((distanceKm / estimatedSpeedKmh) * 60);
-  
-  return { time: estimatedTimeMinutes, distance: distanceMeters };
+  const distance = R * c;
+  const time = Math.max(1, Math.round((distance / 1000) / 50 * 60)); // 50 km/h default
+  return { time, distance, source: 'haversine' };
 };
 
 // Generate natural language description
@@ -288,13 +236,4 @@ const formatDrivingTime = (minutes) => {
   }
 };
 
-// Calculate driving distance using Google Maps Routes API
-export const calculateDrivingDistance = async (startCoords, endCoords) => {
-  try {
-    const result = await calculateDrivingTime(startCoords, endCoords);
-    return result.distance;
-  } catch (error) {
-    // Fallback to simple distance calculation if API fails
-    return calculateSimpleDistance(startCoords, endCoords).distance;
-  }
-};
+

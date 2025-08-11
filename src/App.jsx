@@ -4,7 +4,7 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { Capacitor } from '@capacitor/core';
 import LoadingSpinner from './components/LoadingSpinner';
 import inAppPurchaseService from './services/inAppPurchase';
-import { calculateDrivingTime, calculateDrivingDistance, generateTravelDescription } from './utils/googleMapsService';
+import { calculateDrivingTime, generateTravelDescription } from './utils/googleMapsService';
 import { 
   ENTUR_ENDPOINT, 
   TRANSPORT_MODES, 
@@ -158,6 +158,19 @@ const ALL_FERRY_STOPS_QUERY = gql`
   }
 `;
 
+// Manual coordinate overrides for specific StopPlaces
+const STOP_COORDINATE_OVERRIDES = {
+  'NSR:StopPlace:58755': { // Sulesund ferjekai
+    latitude: 62.395646,
+    longitude: 6.167937,
+  },
+};
+
+// Name-based overrides as fallback (normalized to lowercase)
+const STOP_COORDINATE_NAME_OVERRIDES = {
+  'sulesund ferjekai': { latitude: 62.395646, longitude: 6.167937 },
+};
+
 function App() {
   // Search state
   const [query, setQuery] = useState('');
@@ -192,11 +205,13 @@ function App() {
   // Cache for all ferry quays (for autocomplete)
   const [allFerryQuays, setAllFerryQuays] = useState([]);
 
-  // Driving time calculation state
-  const [showDrivingTimes, setShowDrivingTimes] = useState(false);
-  const [drivingTimes, setDrivingTimes] = useState({});
-  const [drivingTimesLoading, setDrivingTimesLoading] = useState({});
-  const [isIOS] = useState(Capacitor.isNativePlatform());
+      // Driving time calculation state
+    const [showDrivingTimes, setShowDrivingTimes] = useState(!Capacitor.isNativePlatform());
+    const [drivingTimes, setDrivingTimes] = useState({});
+    const [drivingDistances, setDrivingDistances] = useState({});
+    const [drivingTimesLoading, setDrivingTimesLoading] = useState({});
+    const [drivingTimeSources, setDrivingTimeSources] = useState({});
+    const [isIOS] = useState(Capacitor.isNativePlatform());
   
   // Inline destinations state - now supports multiple destinations per stop
   const [inlineDestinations, setInlineDestinations] = useState({}); // { [parentStopId]: [{ stopId, name, departures: array }] }
@@ -299,7 +314,31 @@ function App() {
           }
         }
 
-        const finalPlaces = collectedWithDepartures.slice(0, 5);
+                 // Choose up to 5 stops that are drivable by road (avoid ferries in routing) and compute their driving times/distances
+         const origin = { lat: latitude, lng: longitude };
+         const drivableStops = [];
+         for (const stop of collectedWithDepartures) {
+           if (drivableStops.length >= 5) break;
+           try {
+             const result = await calculateDrivingTime(origin, { lat: stop.latitude, lng: stop.longitude }, { roadOnly: true });
+             // Accept only real Google results; skip if we fell back to simple estimate
+             if (
+               result &&
+               result.source &&
+               result.source.startsWith('routes_v2') &&
+               typeof result.distance === 'number' &&
+               result.distance <= 60000 // must be within radius by road, not luftlinje
+             ) {
+               setDrivingTimes(prev => ({ ...prev, [stop.id]: result.time }));
+               setDrivingDistances(prev => ({ ...prev, [stop.id]: result.distance }));
+               setDrivingTimeSources(prev => ({ ...prev, [stop.id]: result.source }));
+               drivableStops.push(stop);
+             }
+           } catch (_) {
+             // skip stops that aren't reachable by road-only route
+           }
+         }
+         const finalPlaces = drivableStops;
 
         // Step 3: Fetch return cards for the final list of stops
         const returnCardPromises = finalPlaces.map(stop => loadReturnCardForStop(stop));
@@ -349,16 +388,7 @@ function App() {
         }
       };
 
-      // If we have a last known location, use it immediately for a fast result
-      try {
-        const cached = localStorage.getItem('lastLocation');
-        if (cached) {
-          const { latitude: clat, longitude: clng } = JSON.parse(cached) || {};
-          if (clat && clng) {
-            await computeNearbyAndUpdate(clat, clng);
-          }
-        }
-      } catch {}
+
 
       try {
         // Try a quick, low-accuracy fix first (uses cached location if available)
@@ -419,8 +449,21 @@ function App() {
         }
       );
       
+      // Apply manual coordinate overrides
+      const stopsWithOverrides = stops.map((stop) => {
+        const idOverride = STOP_COORDINATE_OVERRIDES[stop.id];
+        const normName = (stop.name || '').toLowerCase();
+        const nameOverride = STOP_COORDINATE_NAME_OVERRIDES[normName];
+        if (idOverride || nameOverride) {
+          const override = idOverride || nameOverride;
+          const updated = { ...stop, latitude: override.latitude, longitude: override.longitude };
+          console.log('[Override] Applied coordinate override for', stop.name, stop.id, '->', override.latitude, override.longitude);
+          return updated;
+        }
+        return stop;
+      });
       
-      setAllFerryQuays(stops); // Keep the same state variable name for compatibility
+      setAllFerryQuays(stopsWithOverrides); // Keep the same state variable name for compatibility
       setFerryStopsLoaded(true);
     } catch (error) {
       console.error('❌ Error loading ferry stops:', error);
@@ -556,10 +599,11 @@ function App() {
       let distance = null;
       if (location && stop.latitude && stop.longitude) {
         try {
-          distance = await calculateDrivingDistance(
+          const result = await calculateDrivingTime(
             { lat: location.latitude, lng: location.longitude },
             { lat: stop.latitude, lng: stop.longitude }
           );
+          distance = result.distance;
         } catch (error) {
           // Fallback to simple distance calculation if API fails
           const dLat = (stop.latitude - location.latitude) * 111000;
@@ -706,10 +750,9 @@ function App() {
         // This function now has its own fallback chain built-in
         const result = await calculateDrivingTime(startCoords, endCoords);
         
-        setDrivingTimes(prev => ({
-          ...prev,
-          [stopId]: result.time
-        }));
+                 setDrivingTimes(prev => ({ ...prev, [stopId]: result.time }));
+         setDrivingDistances(prev => ({ ...prev, [stopId]: result.distance }));
+         setDrivingTimeSources(prev => ({ ...prev, [stopId]: result.source || 'unknown' }));
       } catch (error) {
         // If even the simple distance calculation fails, use a basic estimate
         const distance = Math.sqrt(
@@ -719,10 +762,9 @@ function App() {
         
         const estimatedTime = Math.max(1, Math.round((distance / 1000) / 50 * 60)); // 50 km/h default
         
-        setDrivingTimes(prev => ({
-          ...prev,
-          [stopId]: estimatedTime
-        }));
+                 setDrivingTimes(prev => ({ ...prev, [stopId]: estimatedTime }));
+         setDrivingDistances(prev => ({ ...prev, [stopId]: distance }));
+         setDrivingTimeSources(prev => ({ ...prev, [stopId]: 'simple' }));
       } finally {
         setDrivingTimesLoading(prev => ({ ...prev, [stopId]: false }));
       }
@@ -1370,9 +1412,9 @@ function App() {
                 <div key={stopData.id + '-' + (distance || '')} className="flex flex-col">
                   {/* Km-avstand som egen boks over fergekortet */}
                   {distance && (
-                    <div className="bg-blue-500 text-white text-base font-bold px-2 py-1.5 rounded-full shadow-lg mb-[-10px] self-start relative z-20 -ml-2">
-                      {formatDistance(distance)}
-                    </div>
+                                         <div className="bg-blue-500 text-white text-base font-bold px-2 py-1.5 rounded-full shadow-lg mb-[-10px] self-start relative z-20 -ml-2">
+                       {formatDistance(drivingDistances[stopData.id] ?? distance)}
+                     </div>
                   )}
                   
                   <div
@@ -1396,7 +1438,7 @@ function App() {
                       <div className="mt-2 text-sm text-gray-600 leading-relaxed">
                         <div dangerouslySetInnerHTML={{
                           __html: generateTravelDescription(
-                            distance,
+                            (drivingDistances[stopData.id] ?? distance),
                             drivingTimes[stopData.id],
                             nextDeparture ? calculateTimeDiff(nextDeparture.aimedDepartureTime || nextDeparture.aimed) : 0,
                             departures

@@ -341,17 +341,22 @@ export const generateTravelDescription = (distance, drivingTime, timeToDeparture
     }
   } else {
     const missedBy = drivingTime - timeToDeparture;
+    
+    // Calculate wait time for next ferry (after arriving at terminal)
+    const waitTimeForNextFerry = calculateWaitTimeForNextFerry(allDepartures, timeToDeparture, drivingTime);
+    const waitTimeText = formatWaitTime(waitTimeForNextFerry);
+    
     if (missedBy < 60) {
       const minuteText = missedBy === 1 ? 'minutt' : 'minutter';
-      return `Du er <span style="color: #2563eb; font-weight: bold;">${distanceText}</span> unna og det tar ca <span style="color: #2563eb; font-weight: bold;">${drivingTimeText}</span> å kjøre. <span style="color: #dc2626; font-weight: bold;">Du kommer ${missedBy} ${minuteText} for sent</span>.`;
+      return `Du er <span style="color: #2563eb; font-weight: bold;">${distanceText}</span> unna og det tar ca <span style="color: #2563eb; font-weight: bold;">${drivingTimeText}</span> å kjøre. <span style="color: #dc2626; font-weight: bold;">Du kommer ${missedBy} ${minuteText} for sent</span>. ${waitTimeText}`;
     } else {
       const missedHours = Math.floor(missedBy / 60);
       const missedMinutes = missedBy % 60;
       if (missedMinutes === 0) {
-        return `Du er <span style="color: #2563eb; font-weight: bold;">${distanceText}</span> unna og det tar ca <span style="color: #2563eb; font-weight: bold;">${drivingTimeText}</span> å kjøre. <span style="color: #dc2626; font-weight: bold;">Du kommer ${missedHours} timer for sent</span>.`;
+        return `Du er <span style="color: #2563eb; font-weight: bold;">${distanceText}</span> unna og det tar ca <span style="color: #2563eb; font-weight: bold;">${drivingTimeText}</span> å kjøre. <span style="color: #dc2626; font-weight: bold;">Du kommer ${missedHours} timer for sent</span>. ${waitTimeText}`;
       } else {
         const minuteText = missedMinutes === 1 ? 'minutt' : 'minutter';
-        return `Du er <span style="color: #2563eb; font-weight: bold;">${distanceText}</span> unna og det tar ca <span style="color: #2563eb; font-weight: bold;">${drivingTimeText}</span> å kjøre. <span style="color: #dc2626; font-weight: bold;">Du kommer ${missedHours} timer og ${missedMinutes} ${minuteText} for sent</span>.`;
+        return `Du er <span style="color: #2563eb; font-weight: bold;">${distanceText}</span> unna og det tar ca <span style="color: #2563eb; font-weight: bold;">${drivingTimeText}</span> å kjøre. <span style="color: #dc2626; font-weight: bold;">Du kommer ${missedHours} timer og ${missedMinutes} ${minuteText} for sent</span>. ${waitTimeText}`;
       }
     }
   }
@@ -377,6 +382,72 @@ const formatDrivingTime = (minutes) => {
       return `${hours} t`;
     } else {
       return `${hours} t ${remainingMinutes} min`;
+    }
+  }
+};
+
+// Calculate wait time at ferry terminal after arriving there
+const calculateWaitTimeForNextFerry = (allDepartures, timeToDeparture, drivingTime) => {
+  if (!allDepartures || allDepartures.length === 0) {
+    return 0; // No departures available
+  }
+  
+  // Calculate when we will arrive at the ferry terminal
+  const now = new Date();
+  const arrivalTime = new Date(now.getTime() + (drivingTime * 60000)); // Add driving time to now
+  
+  // Find departures that are after our arrival time
+  const futureDepartures = allDepartures.filter(departure => {
+    const departureTime = departure.aimed || departure.aimedDepartureTime;
+    if (!departureTime) return false;
+    
+    const departureDate = new Date(departureTime);
+    return departureDate > arrivalTime; // Only departures after we arrive
+  });
+  
+  if (futureDepartures.length === 0) {
+    return 0; // No future departures found
+  }
+  
+  // Sort by departure time and get the next one
+  futureDepartures.sort((a, b) => {
+    const timeA = new Date(a.aimed || a.aimedDepartureTime);
+    const timeB = new Date(b.aimed || b.aimedDepartureTime);
+    return timeA - timeB;
+  });
+  
+  const nextDeparture = futureDepartures[0];
+  const nextDepartureTime = new Date(nextDeparture.aimed || nextDeparture.aimedDepartureTime);
+  
+  // Calculate wait time: time from arrival to next departure
+  const waitTimeMinutes = Math.max(0, Math.round((nextDepartureTime - arrivalTime) / 60000));
+  
+  return waitTimeMinutes;
+};
+
+// Helper function to format wait time at ferry terminal
+const formatWaitTime = (waitMinutes) => {
+  if (waitMinutes === 0) {
+    return '<span style="color: #dc2626; font-weight: bold;">Ingen flere avganger i dag</span>';
+  } else if (waitMinutes < 5) {
+    const minuteText = waitMinutes === 1 ? 'minutt' : 'minutter';
+    return `<span style="color: #f59e0b; font-weight: bold;">Du må vente ${waitMinutes} ${minuteText} på fergekaien</span>`;
+  } else if (waitMinutes < 15) {
+    const minuteText = waitMinutes === 1 ? 'minutt' : 'minutter';
+    return `<span style="color: #16a34a; font-weight: bold;">Du må vente ${waitMinutes} ${minuteText} på fergekaien</span>`;
+  } else if (waitMinutes < 60) {
+    const minuteText = waitMinutes === 1 ? 'minutt' : 'minutter';
+    return `<span style="color: #16a34a; font-weight: bold;">Du må vente ${waitMinutes} ${minuteText} på fergekaien</span>`;
+  } else {
+    const hours = Math.floor(waitMinutes / 60);
+    const minutes = waitMinutes % 60;
+    if (minutes === 0) {
+      const hourText = hours === 1 ? 'time' : 'timer';
+      return `<span style="color: #16a34a; font-weight: bold;">Du må vente ${hours} ${hourText} på fergekaien</span>`;
+    } else {
+      const hourText = hours === 1 ? 'time' : 'timer';
+      const minuteText = minutes === 1 ? 'minutt' : 'minutter';
+      return `<span style="color: #16a34a; font-weight: bold;">Du må vente ${hours} ${hourText} og ${minutes} ${minuteText} på fergekaien</span>`;
     }
   }
 };

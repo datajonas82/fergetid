@@ -330,11 +330,11 @@ function App() {
       
       // Grow search window until we find enough results (handles many nearby water stops without departures)
       const collectedWithDepartures = [];
-      const chunkSize = 30;
-      const maxCandidates = Math.min(nearbyCandidates.length, 200);
+      const chunkSize = 20; // Reduced from 30
+      const maxCandidates = Math.min(nearbyCandidates.length, 100); // Reduced from 200
       console.log(`📍 GPS Search: Processing up to ${maxCandidates} candidates in chunks of ${chunkSize}`);
       
-      for (let i = 0; i < maxCandidates && collectedWithDepartures.length < 5; i += chunkSize) {
+      for (let i = 0; i < maxCandidates && collectedWithDepartures.length < 8; i += chunkSize) { // Increased from 5 to 8
         const chunk = nearbyCandidates.slice(i, i + chunkSize);
         console.log(`📍 GPS Search: Processing chunk ${Math.floor(i/chunkSize) + 1} with ${chunk.length} candidates`);
         const results = await Promise.all(chunk.map(fetchDepartures));
@@ -355,46 +355,66 @@ function App() {
         return;
       }
 
-      // Choose up to 5 stops that are drivable by road (avoid ferries in routing) and compute their driving times/distances
+      // Choose up to 8 stops that are drivable by road (avoid ferries in routing) and compute their driving times/distances
       const origin = { lat: latitude, lng: longitude };
-      const drivableStops = [];
+      const localDrivingDistances = {}; // Local storage for distances
       console.log('📍 GPS Search: Calculating driving times for stops...');
       
-      for (const stop of collectedWithDepartures) {
-        if (drivableStops.length >= 5) break;
-                   try {
-             console.log(`📍 GPS Search: Calculating driving time to ${stop.name}...`);
-             const result = await calculateDrivingTime(origin, { lat: stop.latitude, lng: stop.longitude }, { roadOnly: true });
-             // Accept only real Google results; skip if we fell back to simple estimate
-             if (
-               result &&
-               result.source &&
-               (result.source.startsWith('routes_v2') || result.source.startsWith('directions_v1')) &&
-               typeof result.distance === 'number' &&
-               result.distance <= 60000 // must be within radius by road, not luftlinje
-             ) {
-                               // Check if the route contains ferries despite avoidFerries parameter
-                if (result.hasFerry) {
-                  console.warn(`📍 GPS Search: Skipped ${stop.name} - route contains ferries despite avoidFerries=true`);
-                  continue; // Skip this stop and try the next one
-                }
-                
-                setDrivingTimes(prev => ({ ...prev, [stop.id]: result.time }));
-                setDrivingDistances(prev => ({ ...prev, [stop.id]: result.distance }));
-                setDrivingTimeSources(prev => ({ ...prev, [stop.id]: result.source }));
-                drivableStops.push(stop);
-                console.log(`📍 GPS Search: Added ${stop.name} - ${result.distance.toFixed(0)}m, ${result.time}min (road only)`);
-             } else {
-               console.log(`📍 GPS Search: Skipped ${stop.name} - invalid result or too far`);
-             }
-           } catch (error) {
-             console.error(`📍 GPS Search: Error calculating driving time to ${stop.name}:`, error);
-             // skip stops that aren't reachable by road-only route
-           }
+      // Process first 8 stops in parallel for better performance
+      const stopsToProcess = collectedWithDepartures.slice(0, 8);
+      const drivingTimePromises = stopsToProcess.map(async (stop) => {
+        try {
+          console.log(`📍 GPS Search: Calculating driving time to ${stop.name}...`);
+          const result = await calculateDrivingTime(origin, { lat: stop.latitude, lng: stop.longitude }, { roadOnly: true });
+          
+          // Debug: Log the result for Magerholm
+          if (stop.name.includes('Magerholm')) {
+            console.log(`📍 GPS Search: Magerholm result:`, result);
+          }
+          
+          return { stop, result };
+        } catch (error) {
+          console.error(`📍 GPS Search: Error calculating driving time to ${stop.name}:`, error);
+          return { stop, result: null };
+        }
+      });
+      
+      const drivingTimeResults = await Promise.all(drivingTimePromises);
+      const drivableStops = [];
+      
+      for (const { stop, result } of drivingTimeResults) {
+        // Accept only real Google results; skip if we fell back to simple estimate
+        if (
+          result &&
+          result.source &&
+          (result.source.startsWith('routes_v2') || result.source.startsWith('directions_v1')) &&
+          typeof result.distance === 'number' &&
+          result.distance <= 60000 // must be within radius by road, not luftlinje
+        ) {
+          // Check if the route contains ferries despite avoidFerries parameter
+          if (result.hasFerry) {
+            console.warn(`📍 GPS Search: Skipped ${stop.name} - route contains ferries despite avoidFerries=true`);
+            continue; // Skip this stop and try the next one
+          }
+          
+          setDrivingTimes(prev => ({ ...prev, [stop.id]: result.time }));
+          setDrivingDistances(prev => ({ ...prev, [stop.id]: result.distance }));
+          setDrivingTimeSources(prev => ({ ...prev, [stop.id]: result.source }));
+          localDrivingDistances[stop.id] = result.distance; // Store locally for sorting
+          drivableStops.push(stop);
+          console.log(`📍 GPS Search: Added ${stop.name} - ${result.distance.toFixed(0)}m, ${result.time}min (road only)`);
+        } else {
+          console.log(`📍 GPS Search: Skipped ${stop.name} - invalid result or too far (result:`, result, `)`);
+        }
       }
       
-      const finalPlaces = drivableStops;
-      console.log(`📍 GPS Search: Final result: ${finalPlaces.length} drivable stops`);
+      // Sort by driving distance
+      const finalPlaces = drivableStops.sort((a, b) => {
+        const distanceA = localDrivingDistances[a.id] || a.distance;
+        const distanceB = localDrivingDistances[b.id] || b.distance;
+        return distanceA - distanceB;
+      });
+      console.log(`📍 GPS Search: Final result: ${finalPlaces.length} drivable stops sorted by distance`);
 
       if (finalPlaces.length === 0) {
         console.log('📍 GPS Search: No drivable stops found');
@@ -403,9 +423,10 @@ function App() {
         return;
       }
 
-      // Step 3: Fetch return cards for the final list of stops
+      // Step 3: Fetch return cards for the first 5 stops only (for performance)
       console.log('📍 GPS Search: Loading return cards...');
-      const returnCardPromises = finalPlaces.map(stop => loadReturnCardForStop(stop));
+      const stopsForReturnCards = finalPlaces.slice(0, 5);
+      const returnCardPromises = stopsForReturnCards.map(stop => loadReturnCardForStop(stop));
       const resolvedReturnCards = await Promise.all(returnCardPromises);
 
       // Step 4: Prepare all state updates

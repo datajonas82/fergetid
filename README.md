@@ -34,6 +34,7 @@ Appen bruker Vercel Analytics for å spore brukerinteraksjoner og forbedre bruke
 - **`gps_search_clicked`** - Når brukeren klikker på GPS-knappen
 - **`gps_search_success`** - Når GPS-søk finner fergekaier
 - **`gps_error`** - Når GPS-funksjonen feiler
+- **`gps_coordinates_snapped`** - Når GPS-koordinater justeres til nærmeste vei
 - **`search_success`** - Når manuelt søk finner resultater
 - **`search_no_results`** - Når søk ikke finner resultater
 - **`driving_times_toggled`** - Når kjøretidsberegning aktiveres/deaktiveres
@@ -45,6 +46,16 @@ Appen bruker Vercel Analytics for å spore brukerinteraksjoner og forbedre bruke
 
 ### Vercel Speed Insights
 Automatisk performance-overvåking for å identifisere treghetsproblemer.
+
+## 📍 GPS-funksjonalitet
+
+### Snap to Road
+Appen bruker Google Maps Roads API for å justere GPS-koordinater til nærmeste vei:
+
+- **Automatisk justering** av GPS-punkter som er på sjø eller i mark
+- **Maksimal avstand** på 500m for justering
+- **Visuell indikator** "(nærmeste vei)" når koordinater justeres
+- **Tracking** av når koordinater justeres for analyse
 
 ## 🚀 Getting Started
 

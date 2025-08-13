@@ -24,6 +24,28 @@ A modern, cross-platform mobile app for finding ferry timetables and nearby ferr
 
 *Screenshots coming soon*
 
+## 📊 Analytics og Performance
+
+### Vercel Analytics
+Appen bruker Vercel Analytics for å spore brukerinteraksjoner og forbedre brukeropplevelsen:
+
+#### Sporede hendelser:
+- **`app_initialized`** - Når appen starter opp
+- **`gps_search_clicked`** - Når brukeren klikker på GPS-knappen
+- **`gps_search_success`** - Når GPS-søk finner fergekaier
+- **`gps_error`** - Når GPS-funksjonen feiler
+- **`search_success`** - Når manuelt søk finner resultater
+- **`search_no_results`** - Når søk ikke finner resultater
+- **`driving_times_toggled`** - Når kjøretidsberegning aktiveres/deaktiveres
+
+#### Konfigurasjon:
+- Analytics er aktivert i `vercel.json`
+- Custom events sendes med relevant metadata
+- Ingen personlig informasjon spores
+
+### Vercel Speed Insights
+Automatisk performance-overvåking for å identifisere treghetsproblemer.
+
 ## 🚀 Getting Started
 
 ### Prerequisites

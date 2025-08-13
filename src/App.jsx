@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { GraphQLClient, gql } from 'graphql-request';
 import { Capacitor } from '@capacitor/core';
+import { track } from '@vercel/analytics';
 import LoadingSpinner from './components/LoadingSpinner';
 import { calculateDrivingTime, generateTravelDescription } from './utils/googleMapsService';
 import { 
@@ -449,6 +450,12 @@ function App() {
         setHasInteracted(true);
         setSelectedStop(finalPlaces[0].id);
         console.log('📍 GPS Search: Successfully found and displayed ferry stops');
+        
+        // Track successful GPS search
+        track('gps_search_success', { 
+          stops_found: finalPlaces.length,
+          location: locationName 
+        });
       }
     };
 
@@ -534,6 +541,12 @@ function App() {
       
       setError(errorMessage);
       setLoading(false);
+      
+      // Track GPS error
+      track('gps_error', { 
+        error: err.code || 'unknown',
+        message: errorMessage 
+      });
     }
   };
 
@@ -587,6 +600,12 @@ function App() {
 
   // Initialize app function
   const initializeApp = async () => {
+    // Track app initialization
+    track('app_initialized', { 
+      platform: isIOS ? 'ios' : 'web',
+      userAgent: navigator.userAgent 
+    });
+    
     // Vis splash screen
     // await SplashScreen.show(); // Removed SplashScreen import
     
@@ -788,10 +807,19 @@ function App() {
       setFerryStops(formattedStops);
       setHasInteracted(true);
       setSelectedStop(formattedStops[0].id);
+      
+      // Track successful search
+      track('search_success', { 
+        query: query,
+        results: formattedStops.length 
+      });
     } else {
       setFerryStops([]);
       setHasInteracted(false);
       setSelectedStop(null);
+      
+      // Track search with no results
+      track('search_no_results', { query: query });
     }
   };
 
@@ -848,9 +876,13 @@ function App() {
     
     console.log('🚀 Starting GPS location search...');
     
+    // Track GPS usage
+    track('gps_search_clicked');
+    
     // Test GPS availability first
     if (!navigator.geolocation) {
       setError('GPS er ikke tilgjengelig i denne nettleseren. Prøv en annen nettleser eller enhet.');
+      track('gps_error', { error: 'geolocation_not_supported' });
       return;
     }
     
@@ -1604,6 +1636,13 @@ function App() {
                   // Brukeren har allerede kjøpt funksjonen
                   const newState = !showDrivingTimes;
                   setShowDrivingTimes(newState);
+                  
+                  // Track driving times toggle
+                  track('driving_times_toggled', { 
+                    enabled: newState,
+                    mode: mode 
+                  });
+                  
                   if (newState && mode === 'gps') {
                     await calculateDrivingTimesForExistingStops();
                   }

@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1" version="1.1" creator="Fergetid App - Møre og Romsdal Ferry Quays">
+	<metadata>
+		<name><![CDATA[Møre og Romsdal Fergekaier]]></name>
+		<desc><![CDATA[Alle fergekaier i Møre og Romsdal]]></desc>
+		<time>2025-08-12T20:23:38.195Z</time>
+	</metadata>
+	<wpt lat="62.432278" lon="6.497206">
+		<name>Magerholm ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.482077" lon="6.811448">
+		<name><![CDATA[Sjøholt kai]]></name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.495872" lon="6.128569">
+		<name><![CDATA[Valderøya ferjekai]]></name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.820356" lon="6.574953">
+		<name><![CDATA[Sandøya ferjekai]]></name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.171858" lon="5.400899">
+		<name>Haugsholmen kai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="61.881071" lon="5.715246">
+		<name>Isane ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.370199" lon="6.030877">
+		<name>Hareid ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.19782" lon="5.41986">
+		<name><![CDATA[Kvamsøya ferjekai]]></name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.375029" lon="6.330914">
+		<name><![CDATA[Festøya ferjekai]]></name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.087357" lon="6.870134">
+		<name>Hellesylt ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.410155" lon="6.547888">
+		<name>Sykkylven ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.607793" lon="6.448381">
+		<name><![CDATA[Brattvåg ferjekai]]></name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.892139" lon="6.825302">
+		<name><![CDATA[Nordre Bjørnsund]]></name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.198709" lon="5.419897">
+		<name><![CDATA[Kvamsøya kai]]></name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.164619" lon="5.942546">
+		<name>Lauvstad ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="61.846394" lon="6.082006">
+		<name>Anda ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.205733" lon="6.534416">
+		<name>Lekneset ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.260899" lon="6.500594">
+		<name>Trandal ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.144738" lon="6.063364">
+		<name>Volda ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.179264" lon="6.533197">
+		<name><![CDATA[Skår ferjekai]]></name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.863831" lon="6.544660">
+		<name>Ona ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.78637" lon="6.653803">
+		<name>Orta ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.266216" lon="6.423177">
+		<name>Standal ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.526996" lon="6.203699">
+		<name><![CDATA[Store Kalvøy ferjekai]]></name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.806625" lon="6.767580">
+		<name><![CDATA[Småge ferjekai]]></name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.804112" lon="6.509072">
+		<name><![CDATA[Finnøya ferjekai]]></name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.211055" lon="6.475382">
+		<name><![CDATA[Sæbø ferjekai]]></name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.639754" lon="6.522982">
+		<name>Dryna ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.19834" lon="5.49581">
+		<name><![CDATA[Åram ferjekai]]></name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.215203" lon="5.474451">
+		<name>Voksa ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.395567" lon="6.168038">
+		<name>Sulesund ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.371677" lon="6.424135">
+		<name>Hundeidvik ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.207000" lon="5.568894">
+		<name>Larsnes ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.191470" lon="5.634301">
+		<name><![CDATA[Årvika ferjekai]]></name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.413810" lon="6.327628">
+		<name><![CDATA[Solavågen ferjekai]]></name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.120005" lon="6.033154">
+		<name>Folkestad ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.169574" lon="5.643387">
+		<name>Koparneset ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.709962" lon="6.422986">
+		<name><![CDATA[Fjørtofta ferjekai]]></name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.251563" lon="5.487660">
+		<name>Sandshamn kai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.342122" lon="5.634898">
+		<name><![CDATA[Fosnavåg kai]]></name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="62.250952" lon="5.904805">
+		<name>Eiksundet kai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="61.913975" lon="5.724472">
+		<name><![CDATA[Stårheim ferjekai]]></name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+	<wpt lat="61.864048" lon="6.079394">
+		<name>Lote ferjekai</name>
+		<desc><![CDATA[Fergekai i Møre og Romsdal]]></desc>
+		<sym>ferry</sym>
+	</wpt>
+</gpx>

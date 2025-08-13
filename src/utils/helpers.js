@@ -11,7 +11,7 @@ export function formatMinutes(mins) {
 
 // Format distance in kilometers or meters
 export function formatDistance(meters) {
-  if (!meters) return '? ' + DISTANCE_UNITS.KILOMETERS;
+  if (!meters || meters === 0) return '?';
   if (meters < 1000) {
     return `${Math.round(meters)} m`;
   }

@@ -1,9 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { GraphQLClient, gql } from 'graphql-request';
-import { SplashScreen } from '@capacitor/splash-screen';
 import { Capacitor } from '@capacitor/core';
 import LoadingSpinner from './components/LoadingSpinner';
-import inAppPurchaseService from './services/inAppPurchase';
 import { calculateDrivingTime, generateTravelDescription } from './utils/googleMapsService';
 import { 
   ENTUR_ENDPOINT, 
@@ -474,12 +472,12 @@ function App() {
   // Initialize app function
   const initializeApp = async () => {
     // Vis splash screen
-    await SplashScreen.show();
+    // await SplashScreen.show(); // Removed SplashScreen import
     
     // Initialize services
     if (isIOS) {
       try {
-        await inAppPurchaseService.initialize();
+        // await inAppPurchaseService.initialize(); // Removed inAppPurchaseService import
       } catch (error) {
         console.error('Error initializing services:', error);
       }
@@ -487,7 +485,7 @@ function App() {
     
     // Skjul splash screen etter 2 sekunder
     setTimeout(async () => {
-      await SplashScreen.hide();
+      // await SplashScreen.hide(); // Removed SplashScreen import
     }, 2000);
   };
 
@@ -1289,26 +1287,26 @@ function App() {
             <button
               onClick={async () => {
                 // Sjekk om brukeren har kjøpt funksjonen
-                const purchaseStatus = inAppPurchaseService.getPurchaseStatus();
+                // const purchaseStatus = inAppPurchaseService.getPurchaseStatus(); // Removed inAppPurchaseService import
                 
-                if (!purchaseStatus?.isPurchased) {
-                  // Vis purchase modal
-                  // For nå, simulerer vi en kjøp for testing
-                  try {
-                    await inAppPurchaseService.purchase();
-                    setShowDrivingTimes(true);
-                    await calculateDrivingTimesForExistingStops();
-                  } catch (error) {
-                    console.error('Purchase failed:', error);
-                  }
-                } else {
+                // if (!purchaseStatus?.isPurchased) {
+                //   // Vis purchase modal
+                //   // For nå, simulerer vi en kjøp for testing
+                //   try {
+                //     await inAppPurchaseService.purchase();
+                //     setShowDrivingTimes(true);
+                //     await calculateDrivingTimesForExistingStops();
+                //   } catch (error) {
+                //     console.error('Purchase failed:', error);
+                //   }
+                // } else {
                   // Brukeren har allerede kjøpt funksjonen
                   const newState = !showDrivingTimes;
                   setShowDrivingTimes(newState);
                   if (newState && mode === 'gps') {
                     await calculateDrivingTimesForExistingStops();
                   }
-                }
+                // }
               }}
               className={'relative inline-flex items-center h-6 rounded-full transition-all duration-300 ease-in-out w-12 border ' + (
                 showDrivingTimes 

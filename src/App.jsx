@@ -248,7 +248,7 @@ function App() {
             console.log('📍 GPS Search: Fetching location name...');
             const response = await fetch(geocodingUrl);
             const data = await response.json();
-            if (data?.results?.length > 0) {
+            if (data?.items?.length > 0 || data?.results?.length > 0) {
               setLocationName(extractLocationName(data));
               console.log('📍 GPS Search: Location name set to:', extractLocationName(data));
               return;
@@ -573,11 +573,17 @@ function App() {
 
   // Load all ferry stops function (we'll use quay info from Line.quays for matching)
   const loadAllFerryStops = async () => {
-    try {      const data = await client.request(ALL_FERRY_STOPS_QUERY);
+    try {
+      console.log('🔄 Loading all ferry stops...');
+      const data = await client.request(ALL_FERRY_STOPS_QUERY);
+      console.log('📊 Raw ferry stops data:', data);
       
       
       
-      const stops = (data.stopPlaces || []).filter(
+      const allStops = data.stopPlaces || [];
+      console.log('📊 Total stops from API:', allStops.length);
+      
+      const stops = allStops.filter(
         (stop) => {
           if (!Array.isArray(stop.transportMode) || !stop.transportMode.includes('water')) return false;
           if (EXCLUDED_SUBMODES.includes(stop.transportSubmode)) {
@@ -596,6 +602,8 @@ function App() {
           return true;
         }
       );
+      
+      console.log('🚢 Filtered ferry stops:', stops.length);
       
       // Apply manual coordinate overrides
       const stopsWithOverrides = stops.map((stop) => {

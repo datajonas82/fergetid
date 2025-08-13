@@ -53,9 +53,11 @@ export const config = {
       
       const origin = `${fromLat},${fromLng}`;
       const destination = `${toLat},${toLng}`;
-      const avoid = options.roadOnly ? '&avoid[features]=ferry' : '';
       
-      const url = `${config.HERE_CONFIG.ROUTING_BASE_URL}?origin=${origin}&destination=${destination}&transportMode=car&routingMode=fast&return=summary${avoid}&apiKey=${apiKey}`;
+      // More strict ferry avoidance
+      const avoid = options.roadOnly ? '&avoid[features]=ferry&avoid[areas]=ferry' : '';
+      
+      const url = `${config.HERE_CONFIG.ROUTING_BASE_URL}?origin=${origin}&destination=${destination}&transportMode=car&routingMode=fast&return=summary,notices${avoid}&apiKey=${apiKey}`;
       
       if (import.meta.env.DEV) {
         console.log('🔗 HERE API URL:', url);

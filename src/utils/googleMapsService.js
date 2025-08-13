@@ -190,6 +190,33 @@ const calculateDrivingTimeWithHERE = async (startCoords, endCoords, options = {}
   }
   
   const route = data.routes[0];
+  
+  // Check for ferry violations in the route
+  let hasFerry = false;
+  if (options.roadOnly) {
+    // Check for ferry notices in the route
+    const notices = data.notices || [];
+    const ferryNotices = notices.filter(notice => 
+      notice.code === 'violatedAvoidFerry' || 
+      notice.title?.toLowerCase().includes('ferry')
+    );
+    
+    // Also check sections for ferry transport
+    const ferrySections = route.sections?.filter(section => 
+      section.transport?.mode === 'ferry'
+    );
+    
+    if (ferryNotices.length > 0 || ferrySections.length > 0) {
+      hasFerry = true;
+      if (import.meta.env.DEV) {
+        console.warn('🚢 HERE API: Ferry detected despite avoid[features]=ferry:', {
+          notices: ferryNotices,
+          ferrySections: ferrySections.length
+        });
+      }
+    }
+  }
+  
   const summary = route.sections?.[0]?.summary;
   
   if (!summary) {
@@ -202,14 +229,14 @@ const calculateDrivingTimeWithHERE = async (startCoords, endCoords, options = {}
   const distanceMeters = summary.length || 0;
   
   if (import.meta.env.DEV) {
-    console.log('🔗 HERE API Result:', { durationSeconds, durationMinutes, distanceMeters });
+    console.log('🔗 HERE API Result:', { durationSeconds, durationMinutes, distanceMeters, hasFerry });
   }
   
   return { 
     time: durationMinutes, 
     distance: distanceMeters, 
     source: 'here_routing_v8',
-    hasFerry: false // HERE handles ferry exclusion natively
+    hasFerry: hasFerry
   };
 };
 

@@ -194,23 +194,15 @@ const calculateDrivingTimeWithHERE = async (startCoords, endCoords, options = {}
   // Check for ferry violations in the route
   let hasFerry = false;
   if (options.roadOnly) {
-    // Check for ferry notices in the route
-    const notices = data.notices || [];
-    const ferryNotices = notices.filter(notice => 
-      notice.code === 'violatedAvoidFerry' || 
-      notice.title?.toLowerCase().includes('ferry')
-    );
-    
-    // Also check sections for ferry transport
+    // Check sections for ferry transport
     const ferrySections = route.sections?.filter(section => 
       section.transport?.mode === 'ferry'
     );
     
-    if (ferryNotices.length > 0 || ferrySections.length > 0) {
+    if (ferrySections.length > 0) {
       hasFerry = true;
       if (import.meta.env.DEV) {
         console.warn('🚢 HERE API: Ferry detected despite avoid[features]=ferry:', {
-          notices: ferryNotices,
           ferrySections: ferrySections.length
         });
       }

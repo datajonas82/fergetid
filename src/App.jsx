@@ -383,11 +383,11 @@ function App() {
       const drivableStops = [];
       
       for (const { stop, result } of drivingTimeResults) {
-        // Accept only real Google results; skip if we fell back to simple estimate
+        // Accept only real routing API results; skip if we fell back to simple estimate
         if (
           result &&
           result.source &&
-          (result.source.startsWith('routes_v2') || result.source.startsWith('directions_v1')) &&
+          (result.source.startsWith('routes_v2') || result.source.startsWith('directions_v1') || result.source.startsWith('here_routing_v8')) &&
           typeof result.distance === 'number' &&
           result.distance <= 60000 // must be within radius by road, not luftlinje
         ) {

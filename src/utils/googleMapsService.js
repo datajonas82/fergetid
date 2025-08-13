@@ -179,16 +179,31 @@ const calculateDrivingTimeWithHERE = async (startCoords, endCoords, options = {}
   if (!response.ok) throw new Error(`HERE Routing API failed: ${response.status}`);
   
   const data = await response.json();
-  if (!data.routes || data.routes.length === 0) throw new Error('No routes found in HERE response');
+  
+  if (import.meta.env.DEV) {
+    console.log('🔗 HERE API Response:', JSON.stringify(data, null, 2));
+  }
+  
+  if (!data.routes || data.routes.length === 0) {
+    console.warn('HERE API: No routes found, response:', data);
+    throw new Error('No routes found in HERE response');
+  }
   
   const route = data.routes[0];
   const summary = route.sections?.[0]?.summary;
   
-  if (!summary) throw new Error('No summary found in HERE route');
+  if (!summary) {
+    console.warn('HERE API: No summary found in route:', route);
+    throw new Error('No summary found in HERE route');
+  }
   
   const durationSeconds = summary.duration || 0;
   const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
   const distanceMeters = summary.length || 0;
+  
+  if (import.meta.env.DEV) {
+    console.log('🔗 HERE API Result:', { durationSeconds, durationMinutes, distanceMeters });
+  }
   
   return { 
     time: durationMinutes, 

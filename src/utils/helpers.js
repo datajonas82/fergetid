@@ -41,8 +41,41 @@ export function normalizeText(str) {
 
 
 
-// Get location name from reverse geocoding data (Google Maps API format)
+// Get location name from reverse geocoding data (HERE API format)
 export function extractLocationName(data) {
+  // Handle HERE API response
+  if (data.items && data.items.length > 0) {
+    const item = data.items[0];
+    const address = item.address;
+    
+    if (address) {
+      // Try to get street name and city
+      const streetName = address.street || '';
+      const cityName = address.city || address.county || '';
+      
+      // Return street name and city if both are available
+      if (streetName && cityName) {
+        return `${streetName}, ${cityName}`;
+      }
+      
+      // Return street name if available
+      if (streetName) {
+        return streetName;
+      }
+      
+      // Return city name if available
+      if (cityName) {
+        return cityName;
+      }
+      
+      // Fallback to title
+      if (item.title) {
+        return item.title;
+      }
+    }
+  }
+  
+  // Fallback for Google Maps API format (if still used)
   if (data.results && data.results.length > 0) {
     const result = data.results[0];
     const addressComponents = result.address_components;

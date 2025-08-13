@@ -86,16 +86,17 @@ export const config = {
       return import.meta.env.VITE_GOOGLE_MAPS_API_KEY_WEB;
     },
     
-    GEOCODING_BASE_URL: 'https://maps.googleapis.com/maps/api/geocode/json',
+    // Use HERE Geocoding API instead of Google Maps (since we have a valid HERE key)
+    GEOCODING_BASE_URL: 'https://revgeocode.search.hereapi.com/v1/revgeocode',
     
-    // Get reverse geocoding URL
+    // Get reverse geocoding URL using HERE API
     getGeocodingUrl: (lat, lon) => {
-      const apiKey = config.GOOGLE_MAPS_CONFIG.getApiKey();
+      const apiKey = config.HERE_CONFIG.getApiKey();
       if (!apiKey) {
         return null;
       }
       
-      return `${config.GOOGLE_MAPS_CONFIG.GEOCODING_BASE_URL}?latlng=${lat},${lon}&key=${apiKey}&language=no`;
+      return `${config.GOOGLE_MAPS_CONFIG.GEOCODING_BASE_URL}?at=${lat},${lon}&apiKey=${apiKey}&lang=no`;
     },
     
     // Check if API key is configured

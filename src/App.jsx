@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { GraphQLClient, gql } from 'graphql-request';
 import { Capacitor } from '@capacitor/core';
+import { SplashScreen } from '@capacitor/splash-screen';
 import { track } from '@vercel/analytics';
 import LoadingSpinner from './components/LoadingSpinner';
 import { calculateDrivingTime, generateTravelDescription } from './utils/googleMapsService';
@@ -642,9 +643,6 @@ function App() {
       userAgent: navigator.userAgent 
     });
     
-    // Vis splash screen
-    // await SplashScreen.show(); // Removed SplashScreen import
-    
     // Initialize services
     if (isIOS) {
       try {
@@ -653,11 +651,6 @@ function App() {
         console.error('Error initializing services:', error);
       }
     }
-    
-    // Skjul splash screen etter 2 sekunder
-    setTimeout(async () => {
-      // await SplashScreen.hide(); // Removed SplashScreen import
-    }, 2000);
   };
 
   // Initialize app
@@ -909,7 +902,22 @@ function App() {
     }
   }, [location, showDrivingTimes]);
 
+  // Hide splash screen when app is ready
+  useEffect(() => {
+    const hideSplashScreen = async () => {
+      try {
+        await SplashScreen.hide();
+        console.log('🎨 Splash screen hidden');
+      } catch (error) {
+        console.error('Error hiding splash screen:', error);
+      }
+    };
 
+    // Hide splash screen when ferry stops are loaded and app is ready
+    if (ferryStopsLoaded && allFerryQuays.length > 0) {
+      hideSplashScreen();
+    }
+  }, [ferryStopsLoaded, allFerryQuays.length]);
 
   // GPS functionality
   const handleGPSLocation = async () => {

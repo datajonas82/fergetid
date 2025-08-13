@@ -205,7 +205,7 @@ function App() {
   const [allFerryQuays, setAllFerryQuays] = useState([]);
 
       // Driving time calculation state
-    const [showDrivingTimes, setShowDrivingTimes] = useState(!Capacitor.isNativePlatform());
+    const [showDrivingTimes, setShowDrivingTimes] = useState(true); // Always show driving times on iOS
     const [drivingTimes, setDrivingTimes] = useState({});
     const [drivingDistances, setDrivingDistances] = useState({});
     const [drivingTimesLoading, setDrivingTimesLoading] = useState({});
@@ -1509,7 +1509,7 @@ function App() {
         setSelectedStop(null);
         setDrivingTimes({});
         setDrivingTimesLoading({});
-        setShowDrivingTimes(false); // Deaktiver kjøretidsberegning
+        // Kjøretid beholdes aktivt på iOS
         break;
       case 'Enter':
         // Lukk tastaturet på mobil ved å fjerne fokus fra input-feltet
@@ -1657,55 +1657,7 @@ function App() {
           </div>
         )}
 
-        {/* Toggle for kjøretidsberegning - kun synlig i GPS-modus når fergekaier er lastet (skjult i web) */}
-        {isIOS && mode === 'gps' && hasInteracted && ferryStops.length > 0 && (
-          <div className="w-full max-w-[350px] sm:max-w-md mb-4 px-3 sm:px-4 flex justify-center items-center gap-3">
-            <span className="text-white text-sm font-medium">Beregn kjøretid</span>
-            <button
-              onClick={async () => {
-                // Sjekk om brukeren har kjøpt funksjonen
-                // const purchaseStatus = inAppPurchaseService.getPurchaseStatus(); // Removed inAppPurchaseService import
-                
-                // if (!purchaseStatus?.isPurchased) {
-                //   // Vis purchase modal
-                //   // For nå, simulerer vi en kjøp for testing
-                //   try {
-                //     await inAppPurchaseService.purchase();
-                //     setShowDrivingTimes(true);
-                //     await calculateDrivingTimesForExistingStops();
-                //   } catch (error) {
-                //     console.error('Purchase failed:', error);
-                //   }
-                // } else {
-                  // Brukeren har allerede kjøpt funksjonen
-                  const newState = !showDrivingTimes;
-                  setShowDrivingTimes(newState);
-                  
-                  // Track driving times toggle
-                  track('driving_times_toggled', { 
-                    enabled: newState,
-                    mode: mode 
-                  });
-                  
-                  if (newState && mode === 'gps') {
-                    await calculateDrivingTimesForExistingStops();
-                  }
-                // }
-              }}
-              className={'relative inline-flex items-center h-6 rounded-full transition-all duration-300 ease-in-out w-12 border ' + (
-                showDrivingTimes 
-                  ? 'border-white bg-transparent' 
-                  : 'border-gray-300 bg-transparent'
-              )}
-            >
-              <span className={'absolute w-5 h-5 rounded-full shadow-sm transition-all duration-300 ease-in-out ' + (
-                showDrivingTimes 
-                  ? 'bg-white right-0.5' 
-                  : 'bg-gray-300 left-0.5'
-              )}></span>
-            </button>
-          </div>
-        )}
+        {/* Toggle for kjøretidsberegning - fjernet fra iOS */}
 
         {/* Loading and Error States */}
         <div 

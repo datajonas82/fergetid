@@ -29,7 +29,37 @@ export const config = {
     }
   },
   
-  // Google Maps API Configuration
+  // HERE API Configuration
+  HERE_CONFIG: {
+    // Get HERE API key
+    getApiKey: () => {
+      return import.meta.env.VITE_HERE_API_KEY;
+    },
+    
+    // Check if API key is configured
+    isConfigured: () => {
+      const apiKey = config.HERE_CONFIG.getApiKey();
+      return !!apiKey;
+    },
+    
+    ROUTING_BASE_URL: 'https://router.hereapi.com/v8/routes',
+    
+    // Get routing URL for driving time calculation
+    getRoutingUrl: (fromLat, fromLng, toLat, toLng, options = {}) => {
+      const apiKey = config.HERE_CONFIG.getApiKey();
+      if (!apiKey) {
+        return null;
+      }
+      
+      const origin = `${fromLat},${fromLng}`;
+      const destination = `${toLat},${toLng}`;
+      const avoid = options.roadOnly ? '&avoid[features]=ferry' : '';
+      
+      return `${config.HERE_CONFIG.ROUTING_BASE_URL}?origin=${origin}&destination=${destination}&transportMode=car&routingMode=fast&return=summary${avoid}&apiKey=${apiKey}`;
+    }
+  },
+  
+  // Google Maps API Configuration (now as fallback)
   GOOGLE_MAPS_CONFIG: {
     // Get the appropriate API key based on platform
     getApiKey: () => {

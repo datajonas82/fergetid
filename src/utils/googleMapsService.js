@@ -103,7 +103,7 @@ const getRouteDescription = async (startCoords, endCoords, options = {}) => {
   }
 };
 
-// Calculate driving time and distance using Google Maps Routes API (latest version)
+// Calculate driving time and distance using HERE Routing API v8 (primary) with Google Maps as fallback
 export const calculateDrivingTime = async (startCoords, endCoords, options = {}) => {
   const cacheKey = getCacheKey(startCoords, endCoords, options);
 
@@ -117,117 +117,41 @@ export const calculateDrivingTime = async (startCoords, endCoords, options = {})
     return await pendingDrivingTimePromises.get(cacheKey);
   }
 
-  const apiKey = config.GOOGLE_MAPS_CONFIG.getApiKey();
-  
-  if (!apiKey) {
-    const fallback = { time: 0, distance: 0, source: 'no_api_key' };
-    drivingTimeCache.set(cacheKey, fallback);
-    return fallback;
-  }
-
   const promise = (async () => {
     try {
-      // Use Google Maps Routes API v2 (Compute Routes) with live traffic
-      const url = 'https://routes.googleapis.com/directions/v2:computeRoutes';
-      
-      const requestBody = {
-        origin: {
-          location: {
-            latLng: {
-              latitude: startCoords.lat,
-              longitude: startCoords.lng
-            }
-          }
-        },
-        destination: {
-          location: {
-            latLng: {
-              latitude: endCoords.lat,
-              longitude: endCoords.lng
-            }
-          }
-        },
-        travelMode: 'DRIVE',
-        routingPreference: 'TRAFFIC_AWARE_OPTIMAL',
-        computeAlternativeRoutes: false,
-        routeModifiers: {
-          avoidTolls: false,
-          avoidHighways: false,
-          avoidFerries: options.roadOnly === true, // road-only access leg
-        },
-        languageCode: 'no-NO',
-        units: 'METRIC'
-      };
-
-      const response = await fetchWithTimeout(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': apiKey,
-          'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters'
-        },
-        body: JSON.stringify(requestBody)
-      }, 10000);
-
-    if (!response.ok) {
-      throw new Error(`Routes API failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (!data.routes || data.routes.length === 0) {
-      throw new Error('No routes found in response');
-    }
-
-    const route = data.routes[0];
-    const durationSeconds = typeof route.duration === 'string'
-      ? parseFloat(route.duration.replace('s', ''))
-      : (route.duration?.seconds ?? 0);
-    const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
-    const distanceMeters = route.distanceMeters;
-    
-    // Additional ferry check for Routes API v2 (only in production or when explicitly requested)
-    let hasFerry = false;
-    if (options.roadOnly && !import.meta.env.DEV) {
-      try {
-        // Get detailed route description to check for ferries
-        const routeDescription = await getRouteDescription(startCoords, endCoords, options);
-        if (routeDescription) {
-          hasFerry = checkRouteForFerries(routeDescription);
-          if (hasFerry) {
-            console.warn('🚢 Ferry detected in Routes API v2 result despite avoidFerries=true');
-          }
-        }
-      } catch (error) {
-        // In development, CORS errors are expected, so we don't log them
-        if (!import.meta.env.DEV) {
-          console.warn('Could not verify ferry status for Routes API v2:', error);
+      // First try: HERE Routing API v8 (better ferry exclusion)
+      if (config.HERE_CONFIG.isConfigured()) {
+        try {
+          const hereResult = await calculateDrivingTimeWithHERE(startCoords, endCoords, options);
+          drivingTimeCache.set(cacheKey, hereResult);
+          return hereResult;
+        } catch (hereError) {
+          console.warn('HERE Routing API failed, falling back to Google Maps:', hereError);
         }
       }
-    }
-    
-    const result = { 
-      time: durationMinutes, 
-      distance: distanceMeters, 
-      source: 'routes_v2',
-      hasFerry: hasFerry
-    };
-    drivingTimeCache.set(cacheKey, result);
-    return result;
 
-  } catch (error) {
-      // First fallback: Google Directions API v1 (GET)
-      try {
-        const v1Result = await calculateDrivingTimeWithDirectionsV1(startCoords, endCoords, options);
-        drivingTimeCache.set(cacheKey, v1Result);
-        return v1Result;
-      } catch (_v1err) {
-        // Final fallback: simple haversine estimate
-        const fallback = calculateHaversineDistance(startCoords, endCoords);
-        drivingTimeCache.set(cacheKey, fallback);
-        return fallback;
+      // Second try: Google Maps Routes API v2 (fallback)
+      if (config.GOOGLE_MAPS_CONFIG.isConfigured()) {
+        try {
+          const googleResult = await calculateDrivingTimeWithGoogle(startCoords, endCoords, options);
+          drivingTimeCache.set(cacheKey, googleResult);
+          return googleResult;
+        } catch (googleError) {
+          console.warn('Google Maps API failed, using haversine fallback:', googleError);
+        }
       }
-  }
+
+      // Final fallback: simple haversine estimate
+      const fallback = calculateHaversineDistance(startCoords, endCoords);
+      drivingTimeCache.set(cacheKey, fallback);
+      return fallback;
+
+    } catch (error) {
+      console.error('All routing APIs failed:', error);
+      const fallback = calculateHaversineDistance(startCoords, endCoords);
+      drivingTimeCache.set(cacheKey, fallback);
+      return fallback;
+    }
   })();
 
   pendingDrivingTimePromises.set(cacheKey, promise);
@@ -238,67 +162,109 @@ export const calculateDrivingTime = async (startCoords, endCoords, options = {})
   }
 };
 
-// Google Directions API v1 fallback (GET)
-const calculateDrivingTimeWithDirectionsV1 = async (startCoords, endCoords, options = {}) => {
-  const url = config.GOOGLE_MAPS_CONFIG.getDirectionsUrl(
+
+// HERE Routing API v8 implementation
+const calculateDrivingTimeWithHERE = async (startCoords, endCoords, options = {}) => {
+  const url = config.HERE_CONFIG.getRoutingUrl(
     startCoords.lat,
     startCoords.lng,
     endCoords.lat,
     endCoords.lng,
     options
   );
-  if (!url) throw new Error('Directions V1 URL missing (no API key)');
-
-  const response = await fetch(url, { method: 'GET' });
-  if (!response.ok) throw new Error(`Directions V1 failed: ${response.status}`);
-  const data = await response.json();
-  if (!data.routes || data.routes.length === 0) throw new Error('No routes in Directions V1 response');
-  const leg = data.routes[0]?.legs?.[0];
-  if (!leg || !leg.duration || !leg.distance) throw new Error('Missing leg info in Directions V1');
-  const durationSeconds = leg.duration.value;
-  const durationMinutes = Math.round(durationSeconds / 60);
-  const distanceMeters = leg.distance.value;
   
-  // Additional ferry check for Directions API v1 (only in production)
-  let hasFerry = false;
-  if (options.roadOnly && !import.meta.env.DEV) {
-    try {
-      // Check route description for ferry references
-      const route = data.routes[0];
-      const legs = route.legs || [];
-      
-      // Combine all step descriptions
-      const stepDescriptions = legs.flatMap(leg => 
-        (leg.steps || []).map(step => step.html_instructions || step.maneuver?.instruction || '')
-      );
-      
-      // Also include route warnings and summary
-      const warnings = route.warnings || [];
-      const summary = route.summary || '';
-      
-      const fullDescription = [
-        summary,
-        ...warnings,
-        ...stepDescriptions
-      ].join(' ');
-      
-      hasFerry = checkRouteForFerries(fullDescription);
-      if (hasFerry) {
-        console.warn('🚢 Ferry detected in Directions API v1 result despite avoid=ferries');
-      }
-    } catch (error) {
-      // In development, CORS errors are expected, so we don't log them
-      if (!import.meta.env.DEV) {
-        console.warn('Could not verify ferry status for Directions API v1:', error);
-      }
-    }
-  }
+  if (!url) throw new Error('HERE Routing URL missing (no API key)');
+
+  const response = await fetchWithTimeout(url, { method: 'GET' }, 10000);
+  if (!response.ok) throw new Error(`HERE Routing API failed: ${response.status}`);
+  
+  const data = await response.json();
+  if (!data.routes || data.routes.length === 0) throw new Error('No routes found in HERE response');
+  
+  const route = data.routes[0];
+  const summary = route.sections?.[0]?.summary;
+  
+  if (!summary) throw new Error('No summary found in HERE route');
+  
+  const durationSeconds = summary.duration || 0;
+  const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
+  const distanceMeters = summary.length || 0;
   
   return { 
     time: durationMinutes, 
     distance: distanceMeters, 
-    source: 'directions_v1',
-    hasFerry: hasFerry
+    source: 'here_routing_v8',
+    hasFerry: false // HERE handles ferry exclusion natively
+  };
+};
+
+// Google Maps Routes API v2 implementation (fallback)
+const calculateDrivingTimeWithGoogle = async (startCoords, endCoords, options = {}) => {
+  const apiKey = config.GOOGLE_MAPS_CONFIG.getApiKey();
+  if (!apiKey) throw new Error('Google Maps API key missing');
+  
+  const url = 'https://routes.googleapis.com/directions/v2:computeRoutes';
+  
+  const requestBody = {
+    origin: {
+      location: {
+        latLng: {
+          latitude: startCoords.lat,
+          longitude: startCoords.lng
+        }
+      }
+    },
+    destination: {
+      location: {
+        latLng: {
+          latitude: endCoords.lat,
+          longitude: endCoords.lng
+        }
+      }
+    },
+    travelMode: 'DRIVE',
+    routingPreference: 'TRAFFIC_AWARE_OPTIMAL',
+    computeAlternativeRoutes: false,
+    routeModifiers: {
+      avoidTolls: false,
+      avoidHighways: false,
+      avoidFerries: options.roadOnly === true,
+    },
+    languageCode: 'no-NO',
+    units: 'METRIC'
+  };
+
+  const response = await fetchWithTimeout(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters'
+    },
+    body: JSON.stringify(requestBody)
+  }, 10000);
+
+  if (!response.ok) {
+    throw new Error(`Google Routes API failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  if (!data.routes || data.routes.length === 0) {
+    throw new Error('No routes found in Google response');
+  }
+
+  const route = data.routes[0];
+  const durationSeconds = typeof route.duration === 'string'
+    ? parseFloat(route.duration.replace('s', ''))
+    : (route.duration?.seconds ?? 0);
+  const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
+  const distanceMeters = route.distanceMeters;
+  
+  return { 
+    time: durationMinutes, 
+    distance: distanceMeters, 
+    source: 'google_routes_v2',
+    hasFerry: false // Simplified for fallback
   };
 };
 

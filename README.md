@@ -17,6 +17,7 @@ A modern, cross-platform mobile app for finding ferry timetables and nearby ferr
 - **Mobile**: Capacitor.js for native iOS/Android builds
 - **Styling**: Tailwind CSS with custom glassmorphism design
 - **API**: Entur GraphQL API for Norwegian public transportation data
+- **Routing**: HERE Routing API v8 (primary) with Google Maps Routes API v2 (fallback)
 - **Geolocation**: Google Maps Geocoding API for location names
 - **Build Tool**: Vite for fast development and optimized builds
 
@@ -48,6 +49,14 @@ Appen bruker Vercel Analytics for å spore brukerinteraksjoner og forbedre bruke
 Automatisk performance-overvåking for å identifisere treghetsproblemer.
 
 ## 📍 GPS-funksjonalitet
+
+### Routing API
+Appen bruker HERE Routing API v8 som primær routing-tjeneste med Google Maps som fallback:
+
+- **HERE Routing API v8** - Bedre ferry-ekskludering og nøyaktigere ruter
+- **Google Maps Routes API v2** - Fallback hvis HERE ikke er tilgjengelig
+- **Haversine-beregning** - Enkel avstandsberegning som siste fallback
+- **Automatisk failover** mellom API-tjenester for pålitelighet
 
 ### Snap to Road
 Appen bruker Google Maps Roads API for å justere GPS-koordinater til nærmeste vei:
@@ -82,6 +91,7 @@ Appen bruker Google Maps Roads API for å justere GPS-koordinater til nærmeste 
 3. **Set up environment variables**
    Create a `.env` file in the root directory:
    ```env
+   VITE_HERE_API_KEY=your_here_api_key_here
    VITE_GOOGLE_MAPS_API_KEY_IOS=your_ios_api_key_here
    VITE_GOOGLE_MAPS_API_KEY_WEB=your_web_api_key_here
    VITE_ENTUR_CLIENT_NAME=your_entur_client_name

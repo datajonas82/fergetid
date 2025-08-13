@@ -25,6 +25,84 @@ const getCacheKey = (startCoords, endCoords, options) => {
   return `${s}|${e}|${flags}`;
 };
 
+// Function to check if route description contains ferry references
+const checkRouteForFerries = (routeDescription) => {
+  if (!routeDescription) return false;
+  
+  const ferryKeywords = [
+    'ferry', 'ferge', 'ferje', 'ferry crossing', 'fergeoverfart',
+    'ferry terminal', 'fergekai', 'ferjekai', 'ferry route',
+    'this route includes a ferry', 'ferry service', 'fergeforbindelse'
+  ];
+  
+  const lowerDescription = routeDescription.toLowerCase();
+  return ferryKeywords.some(keyword => lowerDescription.includes(keyword));
+};
+
+// Function to enable ferry checking (for testing purposes)
+export const enableFerryChecking = () => {
+  console.log('🔧 Ferry checking enabled for testing');
+  return true;
+};
+
+// Function to disable ferry checking (default in development)
+export const disableFerryChecking = () => {
+  console.log('🔧 Ferry checking disabled (development mode)');
+  return false;
+};
+
+// Function to get detailed route description from Google Maps
+const getRouteDescription = async (startCoords, endCoords, options = {}) => {
+  const apiKey = config.GOOGLE_MAPS_CONFIG.getApiKey();
+  if (!apiKey) return null;
+
+  try {
+    // Use Google Maps Directions API v1 to get detailed route description
+    const url = config.GOOGLE_MAPS_CONFIG.getDirectionsUrl(
+      startCoords.lat,
+      startCoords.lng,
+      endCoords.lat,
+      endCoords.lng,
+      options
+    );
+    
+    if (!url) return null;
+
+    const response = await fetchWithTimeout(url, { method: 'GET' }, 8000);
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (!data.routes || data.routes.length === 0) return null;
+
+    const route = data.routes[0];
+    const legs = route.legs || [];
+    
+    // Combine all step descriptions
+    const stepDescriptions = legs.flatMap(leg => 
+      (leg.steps || []).map(step => step.html_instructions || step.maneuver?.instruction || '')
+    );
+    
+    // Also include route warnings and summary
+    const warnings = route.warnings || [];
+    const summary = route.summary || '';
+    
+    const fullDescription = [
+      summary,
+      ...warnings,
+      ...stepDescriptions
+    ].join(' ');
+
+    return fullDescription;
+  } catch (error) {
+    // In development, don't log CORS errors as they're expected
+    if (import.meta.env.DEV && error.message.includes('CORS')) {
+      return null; // Silently fail in development
+    }
+    console.error('Error fetching route description:', error);
+    return null;
+  }
+};
+
 // Calculate driving time and distance using Google Maps Routes API (latest version)
 export const calculateDrivingTime = async (startCoords, endCoords, options = {}) => {
   const cacheKey = getCacheKey(startCoords, endCoords, options);
@@ -107,7 +185,33 @@ export const calculateDrivingTime = async (startCoords, endCoords, options = {})
       : (route.duration?.seconds ?? 0);
     const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
     const distanceMeters = route.distanceMeters;
-    const result = { time: durationMinutes, distance: distanceMeters, source: 'routes_v2' };
+    
+    // Additional ferry check for Routes API v2 (only in production or when explicitly requested)
+    let hasFerry = false;
+    if (options.roadOnly && !import.meta.env.DEV) {
+      try {
+        // Get detailed route description to check for ferries
+        const routeDescription = await getRouteDescription(startCoords, endCoords, options);
+        if (routeDescription) {
+          hasFerry = checkRouteForFerries(routeDescription);
+          if (hasFerry) {
+            console.warn('🚢 Ferry detected in Routes API v2 result despite avoidFerries=true');
+          }
+        }
+      } catch (error) {
+        // In development, CORS errors are expected, so we don't log them
+        if (!import.meta.env.DEV) {
+          console.warn('Could not verify ferry status for Routes API v2:', error);
+        }
+      }
+    }
+    
+    const result = { 
+      time: durationMinutes, 
+      distance: distanceMeters, 
+      source: 'routes_v2',
+      hasFerry: hasFerry
+    };
     drivingTimeCache.set(cacheKey, result);
     return result;
 
@@ -154,7 +258,48 @@ const calculateDrivingTimeWithDirectionsV1 = async (startCoords, endCoords, opti
   const durationSeconds = leg.duration.value;
   const durationMinutes = Math.round(durationSeconds / 60);
   const distanceMeters = leg.distance.value;
-  return { time: durationMinutes, distance: distanceMeters, source: 'directions_v1' };
+  
+  // Additional ferry check for Directions API v1 (only in production)
+  let hasFerry = false;
+  if (options.roadOnly && !import.meta.env.DEV) {
+    try {
+      // Check route description for ferry references
+      const route = data.routes[0];
+      const legs = route.legs || [];
+      
+      // Combine all step descriptions
+      const stepDescriptions = legs.flatMap(leg => 
+        (leg.steps || []).map(step => step.html_instructions || step.maneuver?.instruction || '')
+      );
+      
+      // Also include route warnings and summary
+      const warnings = route.warnings || [];
+      const summary = route.summary || '';
+      
+      const fullDescription = [
+        summary,
+        ...warnings,
+        ...stepDescriptions
+      ].join(' ');
+      
+      hasFerry = checkRouteForFerries(fullDescription);
+      if (hasFerry) {
+        console.warn('🚢 Ferry detected in Directions API v1 result despite avoid=ferries');
+      }
+    } catch (error) {
+      // In development, CORS errors are expected, so we don't log them
+      if (!import.meta.env.DEV) {
+        console.warn('Could not verify ferry status for Directions API v1:', error);
+      }
+    }
+  }
+  
+  return { 
+    time: durationMinutes, 
+    distance: distanceMeters, 
+    source: 'directions_v1',
+    hasFerry: hasFerry
+  };
 };
 
 // Simple haversine distance calculation as fallback

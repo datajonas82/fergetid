@@ -217,6 +217,12 @@ function App() {
   
     // GPS search function - moved outside useEffect for direct calling
   const executeGpsSearch = async () => {
+    // Prevent multiple simultaneous GPS searches
+    if (loading) {
+      console.log('📍 GPS Search: Already loading, skipping...');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     setQuery('');
@@ -225,6 +231,7 @@ function App() {
     setHasInteracted(false);
     setSelectedStop(null);
     setMode('gps');
+    setShowDrivingTimes(true); // Ensure driving times are enabled for GPS mode
     // Don't clear inlineDestinations - keep existing return cards
 
     console.log('📍 GPS Search: Waiting for ferry stops to load...');
@@ -894,6 +901,14 @@ function App() {
     };
   }, [showDrivingTimes, location, ferryStops, mode]);
 
+  // Automatically enable driving times when GPS location is available
+  useEffect(() => {
+    if (location && !showDrivingTimes) {
+      console.log('📍 Auto-enabling driving times due to GPS location availability');
+      setShowDrivingTimes(true);
+    }
+  }, [location, showDrivingTimes]);
+
 
 
   // GPS functionality
@@ -1541,7 +1556,7 @@ function App() {
                       // Sett mode til search så snart brukeren skriver noe
                       if (e.target.value.trim()) {
                         setMode('search');
-                        setShowDrivingTimes(false); // Deaktiver kjøretidsberegning i søk-modus
+                        // Ikke deaktiver kjøretidsberegning - behold den for GPS-resultater
                       }
                     }}
                     onKeyDown={handleKeyDown}
@@ -1801,7 +1816,7 @@ function App() {
                     <hr className="border-gray-300 my-2" />
                     
                     {/* Kjøretidsbeskrivelse rett etter fergekainavn */}
-                    {showDrivingTimes && mode === 'gps' && drivingTimes[stopData.id] && (
+                    {showDrivingTimes && drivingTimes[stopData.id] && location && (
                       <div className="mt-2 text-sm text-gray-600 leading-relaxed">
                         <div dangerouslySetInnerHTML={{
                           __html: generateTravelDescription(

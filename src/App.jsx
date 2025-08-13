@@ -659,6 +659,21 @@ function App() {
     loadAllFerryStops(); // Load all ferry stops on initial app load
   }, []);
 
+  // Hide splash screen immediately when component mounts
+  useEffect(() => {
+    const hideSplashScreen = async () => {
+      try {
+        await SplashScreen.hide();
+        console.log('🎨 Splash screen hidden (immediate)');
+      } catch (error) {
+        console.error('Error hiding splash screen:', error);
+      }
+    };
+
+    // Hide splash screen after a short delay to ensure app is ready
+    setTimeout(hideSplashScreen, 500);
+  }, []);
+
   // Live search function - show ferry cards as user types
   const performLiveSearch = async () => {
     processedStopsRef.current.clear(); // Clear processed stops for new search
@@ -913,10 +928,21 @@ function App() {
       }
     };
 
-    // Hide splash screen when ferry stops are loaded and app is ready
-    if (ferryStopsLoaded && allFerryQuays.length > 0) {
-      hideSplashScreen();
-    }
+    // Hide splash screen as soon as app is initialized
+    const hideSplashWhenReady = () => {
+      // Hide immediately if ferry stops are loaded
+      if (ferryStopsLoaded && allFerryQuays.length > 0) {
+        hideSplashScreen();
+        return;
+      }
+      
+      // Fallback: Hide after 1 second if ferry stops are still loading
+      setTimeout(() => {
+        hideSplashScreen();
+      }, 1000);
+    };
+
+    hideSplashWhenReady();
   }, [ferryStopsLoaded, allFerryQuays.length]);
 
   // GPS functionality

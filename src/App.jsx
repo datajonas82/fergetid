@@ -395,12 +395,13 @@ function App() {
         if (
           result &&
           result.source &&
-          (result.source.startsWith('routes_v2') || result.source.startsWith('directions_v1') || result.source.startsWith('here_routing_v8')) &&
+          (result.source.startsWith('routes_v2') || result.source.startsWith('directions_v1') || result.source.startsWith('here_routing_v8') || result.source === 'haversine') &&
           typeof result.distance === 'number' &&
-          result.distance <= 60000 // must be within radius by road, not luftlinje
+          result.distance > 0 && // Must have a valid distance
+          (result.distance <= 60000 || result.source === 'haversine') // Allow haversine results within luftlinje radius
         ) {
-          // Check if the route contains ferries despite avoidFerries parameter
-          if (result.hasFerry) {
+          // Check if the route contains ferries despite avoidFerries parameter (only for routing APIs, not haversine)
+          if (result.hasFerry && result.source !== 'haversine') {
             console.warn(`📍 GPS Search: Skipped ${stop.name} - route contains ferries despite avoidFerries=true`);
             continue; // Skip this stop and try the next one
           }
@@ -410,7 +411,7 @@ function App() {
           setDrivingTimeSources(prev => ({ ...prev, [stop.id]: result.source }));
           localDrivingDistances[stop.id] = result.distance; // Store locally for sorting
           drivableStops.push(stop);
-          console.log(`📍 GPS Search: Added ${stop.name} - ${result.distance.toFixed(0)}m, ${result.time}min (road only)`);
+          console.log(`📍 GPS Search: Added ${stop.name} - ${result.distance.toFixed(0)}m, ${result.time}min (${result.source})`);
         } else {
           console.log(`📍 GPS Search: Skipped ${stop.name} - invalid result or too far (result:`, result, `)`);
         }
@@ -1780,9 +1781,25 @@ function App() {
                 <div key={stopData.id + '-' + (distance || '')} className="flex flex-col">
                   {/* Km-avstand som egen boks over fergekortet */}
                   {distance && (
-                                         <div className="bg-blue-500 text-white text-base font-bold px-2 py-1.5 rounded-full shadow-lg mb-[-10px] self-start relative z-20 -ml-2">
-                       {formatDistance(drivingDistances[stopData.id] ?? distance)}
-                     </div>
+                    <div className="bg-blue-500 text-white text-base font-bold px-2 py-1.5 rounded-full shadow-lg mb-[-10px] self-start relative z-20 -ml-2">
+                      {(() => {
+                        const drivingDistance = drivingDistances[stopData.id];
+                        const fallbackDistance = distance;
+                        const finalDistance = drivingDistance ?? fallbackDistance;
+                        
+                        // Debug log for iOS distance issue
+                        if (import.meta.env.DEV) {
+                          console.log(`📍 Distance debug for ${stopData.name}:`, {
+                            drivingDistance,
+                            fallbackDistance,
+                            finalDistance,
+                            isIOS: Capacitor.isNativePlatform()
+                          });
+                        }
+                        
+                        return formatDistance(finalDistance);
+                      })()}
+                    </div>
                   )}
                   
                   <div

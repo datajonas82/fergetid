@@ -224,6 +224,12 @@ const calculateDrivingTimeWithHERE = async (startCoords, endCoords, options = {}
     console.log('🔗 HERE API Result:', { durationSeconds, durationMinutes, distanceMeters, hasFerry });
   }
   
+  // If HERE API returns 0 distance, fall back to haversine
+  if (distanceMeters === 0) {
+    console.warn('HERE API returned 0 distance, falling back to haversine');
+    throw new Error('HERE API returned 0 distance');
+  }
+  
   return { 
     time: durationMinutes, 
     distance: distanceMeters, 

@@ -1392,6 +1392,13 @@ function App() {
     return 'text-green-600'; // Grønn for gode marginer
   };
 
+  const isDepartureMissed = (departureTime, drivingTime) => {
+    if (!showDrivingTimes || !drivingTime || mode !== 'gps') return false;
+    
+    const timeToDeparture = calculateTimeDiff(departureTime);
+    return timeToDeparture <= drivingTime; // Missed if we can't make it
+  };
+
   // Funksjon for å beregne optimal font-størrelse basert på tekstlengde
   const getOptimalFontSize = (text, maxWidth = 320) => {
     if (!text) return '1.5rem'; // Standard størrelse
@@ -2028,18 +2035,21 @@ function App() {
                             const allDepartures = [nextDeparture, ...laterDepartures].filter(Boolean);
                             return allDepartures.slice(0, 5).map((dep, idx) => {
                               const mins = Math.max(0, Math.round((dep.aimed - now) / 60000));
+                              const isMissed = isDepartureMissed(dep.aimedDepartureTime || dep.aimed, drivingTimes[stopData.id]);
+                              const strikeClass = isMissed ? 'line-through' : '';
+                              
                               return (
                                 <li key={dep.aimedDepartureTime + '-' + idx} className="flex items-center py-0.5 leading-snug">
-                                  <span className="font-bold w-16 text-left text-sm">
+                                  <span className={`font-bold w-16 text-left text-sm ${strikeClass}`}>
                                     {dep.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                   </span>
                                   <span className="flex-1 flex justify-start items-center gap-1">
-                                                                          <span className={'text-sm font-bold align-middle whitespace-nowrap pl-4 ' + getDepartureTimeColor(dep.aimedDepartureTime || dep.aimed, drivingTimes[stopData.id])}>
+                                    <span className={`text-sm font-bold align-middle whitespace-nowrap pl-4 ${getDepartureTimeColor(dep.aimedDepartureTime || dep.aimed, drivingTimes[stopData.id])} ${strikeClass}`}>
                                       {formatMinutes(mins)}
                                     </span>
                                   </span>
                                   <span 
-                                    className="w-24 text-gray-700 text-right font-semibold"
+                                    className={`w-24 text-gray-700 text-right font-semibold ${strikeClass}`}
                                     style={{ 
                                       fontSize: getOptimalFontSize(cleanDestinationText(dep.destinationDisplay?.frontText), 96) // 96px = 6rem = w-24
                                     }}
@@ -2069,18 +2079,21 @@ function App() {
                             <ul className="space-y-0">
                               {destination.departures.slice(0, 5).map((dep, idx) => {
                                 const mins = Math.max(0, Math.round((dep.aimed - now) / 60000));
+                                const isMissed = isDepartureMissed(dep.aimedDepartureTime || dep.aimed, drivingTimes[destination.stopId]);
+                                const strikeClass = isMissed ? 'line-through' : '';
+                                
                                 return (
-                                                                      <li key={'inline-' + destination.stopId + '-' + dep.aimedDepartureTime + '-' + idx} className="flex items-center py-0.5 leading-snug">
-                                    <span className="font-bold w-16 text-left text-sm">
+                                  <li key={'inline-' + destination.stopId + '-' + dep.aimedDepartureTime + '-' + idx} className="flex items-center py-0.5 leading-snug">
+                                    <span className={`font-bold w-16 text-left text-sm ${strikeClass}`}>
                                       {dep.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </span>
                                     <span className="flex-1 flex justify-start items-center gap-1">
-                                      <span className="text-sm font-bold align-middle whitespace-nowrap pl-1 text-green-600">
+                                      <span className={`text-sm font-bold align-middle whitespace-nowrap pl-1 text-green-600 ${strikeClass}`}>
                                         {formatMinutes(mins)}
                                       </span>
                                     </span>
                                     <span 
-                                      className="w-24 text-gray-700 text-right font-semibold"
+                                      className={`w-24 text-gray-700 text-right font-semibold ${strikeClass}`}
                                       style={{ 
                                         fontSize: getOptimalFontSize(cleanDestinationText(dep.destinationDisplay?.frontText), 96)
                                       }}

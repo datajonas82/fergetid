@@ -1894,7 +1894,7 @@ function App() {
         >
           {loading && (
             <LoadingSpinner 
-              message="Laster posisjon og fergekaier..." 
+              message={location ? "Laster fergekaier..." : "Laster posisjon og fergekaier..."} 
             />
           )}
         </div>

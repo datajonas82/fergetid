@@ -441,23 +441,23 @@ const formatWaitTime = (waitMinutes) => {
     return '<span style="color: #dc2626; font-weight: bold;">Ingen flere avganger i dag</span>';
   } else if (waitMinutes < 5) {
     const minuteText = waitMinutes === 1 ? 'minutt' : 'minutter';
-    return `<span style="color: #f59e0b; font-weight: bold;">Du må vente ${waitMinutes} ${minuteText} på fergekaien</span>`;
+    return `<span style="color: #f59e0b; font-weight: bold;">Du må vente i ${waitMinutes} ${minuteText} til neste avgang</span>`;
   } else if (waitMinutes < 15) {
     const minuteText = waitMinutes === 1 ? 'minutt' : 'minutter';
-    return `<span style="color: #16a34a; font-weight: bold;">Du må vente ${waitMinutes} ${minuteText} på fergekaien</span>`;
+    return `<span style="color: #16a34a; font-weight: bold;">Du må vente i ${waitMinutes} ${minuteText} til neste avgang</span>`;
   } else if (waitMinutes < 60) {
     const minuteText = waitMinutes === 1 ? 'minutt' : 'minutter';
-    return `<span style="color: #16a34a; font-weight: bold;">Du må vente ${waitMinutes} ${minuteText} på fergekaien</span>`;
+    return `<span style="color: #16a34a; font-weight: bold;">Du må vente i ${waitMinutes} ${minuteText} til neste avgang</span>`;
   } else {
     const hours = Math.floor(waitMinutes / 60);
     const minutes = waitMinutes % 60;
     if (minutes === 0) {
       const hourText = hours === 1 ? 'time' : 'timer';
-      return `<span style="color: #16a34a; font-weight: bold;">Du må vente ${hours} ${hourText} på fergekaien</span>`;
+      return `<span style="color: #16a34a; font-weight: bold;">Du må vente i ${hours} ${hourText} til neste avgang</span>`;
     } else {
       const hourText = hours === 1 ? 'time' : 'timer';
       const minuteText = minutes === 1 ? 'minutt' : 'minutter';
-      return `<span style="color: #16a34a; font-weight: bold;">Du må vente ${hours} ${hourText} og ${minutes} ${minuteText} på fergekaien</span>`;
+      return `<span style="color: #16a34a; font-weight: bold;">Du må vente i ${hours} ${hourText} og ${minutes} ${minuteText} til neste avgang</span>`;
     }
   }
 };

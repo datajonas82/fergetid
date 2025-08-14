@@ -1,0 +1,105 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "Driving Time Description provides access to driving time, color-coded departures and information about whether you'll make the departure.",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "CD73B0E0",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "49.00",
+      "familyShareable" : false,
+      "internalID" : "6749610951",
+      "localizations" : [
+        {
+          "description" : "Get driving time, color-coded departures and information about whether you'll make the departure",
+          "displayName" : "Driving Time Description",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "kjoretidbeskrivelse",
+      "promotionalImageID" : "1E2CBF53",
+      "referenceName" : "Driving Time Description",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6749610950",
+    "_developerTeamID" : "4KXD6TXQZQ",
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 776883275.92246199,
+    "_locale" : "nb",
+    "_storefront" : "NOR",
+    "_storeKitErrors" : [
+      {
+        "current" : {
+          "index" : 2,
+          "type" : "generic"
+        },
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : {
+          "index" : 1,
+          "type" : "purchase"
+        },
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : {
+          "index" : 0,
+          "type" : "verification"
+        },
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

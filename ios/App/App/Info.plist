@@ -65,5 +65,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>SKPaymentTransactionObserverClass</key>
+	<string>CDVStoreKit</string>
 </dict>
 </plist>

@@ -1,5 +1,5 @@
 {
-  "appId": "com.fergetid.ferryapp",
+  "appId": "com.fergetid.app",
   "appName": "Fergetid",
   "webDir": "dist",
   "ios": {
@@ -44,6 +44,9 @@
         "locationAlwaysAndWhenInUseUsageDescription": "FergeTid trenger tilgang til din posisjon for å vise nærliggende fergekaier og beregne kjøretid.",
         "locationWhenInUseUsageDescription": "FergeTid trenger tilgang til din posisjon for å vise nærliggende fergekaier og beregne kjøretid."
       }
+    },
+    "cordova-plugin-purchase": {
+      "BILLING_KEY": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..."
     }
   }
 }

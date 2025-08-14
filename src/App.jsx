@@ -945,104 +945,32 @@ function App() {
     processedStopsRef.current.clear(); // Clear processed stops for new search
     setInlineDestinations({}); // Clear previous return cards
     
-    
     // Load ferry quays on-demand if not already loaded
     if (!ferryStopsLoaded || allFerryQuays.length === 0) {
       await loadAllFerryStops();
     }
     
-    const normQuery = normalizeText(query).toLowerCase();
-    const originalQuery = query.toLowerCase();
-    
-    
+    const searchQuery = query.toLowerCase().trim();
     
     let stops = allFerryQuays.filter(stop => {
       if (!stop || !stop.name) return false;
       
-      const normName = normalizeText(stop.name);
-      const originalName = stop.name.toLowerCase();
+      const name = stop.name.toLowerCase();
       
-      // Sjekk både normalisert og original tekst
-      const matches = normName.includes(normQuery) || originalName.includes(originalQuery);
+      // Enkelt søk: vis kun fergekaier som starter med søkeordet
+      const matches = name.startsWith(searchQuery);
       
-      // Gi høyere prioritet til treff som starter med søkeordet
-      if (matches) {
-        const startsWithNorm = normName.startsWith(normQuery);
-        const startsWithOrig = originalName.startsWith(originalQuery);
-        
-        // Legg til en vektingsfaktor for bedre sortering
-        stop.searchScore = 0;
-        
-        // Gi høyest prioritet til treff som matcher original tekst (med æ, ø, å)
-        if (originalName.includes(originalQuery)) {
-          stop.searchScore += 300; // Høyest prioritet for treff med originale tegn
-          
-          // Ekstra bonus hvis det er et eksakt treff eller nesten eksakt treff
-          if (originalName === originalQuery) {
-            stop.searchScore += 200; // Ekstra bonus for eksakt treff med originale tegn
-          } else if (originalName.startsWith(originalQuery) && originalName.length <= originalQuery.length + 2) {
-            stop.searchScore += 150; // Ekstra bonus for nesten eksakt treff med originale tegn
-          }
-        }
-        
-        if (startsWithNorm || startsWithOrig) {
-          stop.searchScore += 100; // Høy prioritet for treff som starter med søkeordet
-        }
-        if (normName === normQuery || originalName === originalQuery) {
-          stop.searchScore += 200; // Høyest prioritet for eksakte treff
-        } else if (originalName === originalQuery) {
-          stop.searchScore += 250; // Ekstra høy prioritet for eksakt treff med originale tegn
-        } else if (normName.startsWith(normQuery) && normName.length <= normQuery.length + 2) {
-          stop.searchScore += 150; // Høy prioritet for navn som starter med søkeordet og er nesten like lange
-        }
-        // Reduser score for treff som bare inneholder søkeordet midt i navnet
-        if (!startsWithNorm && !startsWithOrig) {
-          stop.searchScore -= 50;
-        }
-        
-        // Gi høyere prioritet til kortere navn som matcher søkeordet
-        // Dette hjelper med at "Skår" kommer før "Skarberget" når man søker på "ska"
-        const nameLength = stop.name.length;
-        const queryLength = query.length;
-        
-        // Spesiell håndtering for tilfeller som "moss" vs "Molde"
-        // Hvis søkeordet er en del av navnet, men navnet starter ikke med søkeordet
-        if (originalName.includes(originalQuery) && !originalName.startsWith(originalQuery)) {
-          // Reduser score betydelig hvis navnet starter med noe annet enn søkeordet
-          // Dette hjelper med at "Moss" kommer før "Molde" når man søker på "moss"
-          stop.searchScore -= 100;
-        }
-        
-        if (nameLength <= queryLength + 3) { // Navn som er like lange eller bare litt lengre enn søkeordet
-          stop.searchScore += 25;
-        } else if (nameLength > queryLength + 10) { // Reduser score for veldig lange navn
-          stop.searchScore -= 25;
-        }
-        
-        // Ekstra bonus for navn som er nesten eksakt like lange som søkeordet
-        if (nameLength === queryLength) {
-          stop.searchScore += 50; // Høy bonus for navn som er like lange som søkeordet
-        } else if (nameLength === queryLength + 1) {
-          stop.searchScore += 30; // Bonus for navn som er bare én bokstav lengre
-        }
+      // Debug: logg alle fergekaier som starter med "skår"
+      if (searchQuery === 'skår') {
+        console.log(`"${stop.name}" starter med "skår": ${matches}`);
       }
       
       return matches;
     });
     
-    
-    
-    // Sorter basert på searchScore og deretter alfabetisk
+    // Sorter alfabetisk - det er alt!
     stops = stops.sort((a, b) => {
-      // Først sorter etter searchScore (høyest først)
-      if (a.searchScore !== b.searchScore) {
-        return b.searchScore - a.searchScore;
-      }
-      
-      // Hvis searchScore er lik, sorter alfabetisk
-      const aOrigName = a.name.toLowerCase();
-      const bOrigName = b.name.toLowerCase();
-      return aOrigName.localeCompare(bOrigName);
+      return a.name.localeCompare(b.name, 'nb-NO');
     });
 
     // Limit to 10 results for live search

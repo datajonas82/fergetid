@@ -32,7 +32,28 @@ const InAppPurchaseModal = ({ isOpen, onClose, onPurchaseSuccess }) => {
       onClose();
     } catch (error) {
       console.error('Purchase failed:', error);
-      setError('Kjøpet feilet. Prøv igjen senere.');
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      console.error('Error message:', error.message);
+      console.error('Error name:', error.name);
+      
+      // Show more specific error messages
+      let errorMessage = 'Kjøpet feilet. Prøv igjen senere.';
+      
+      if (error.message) {
+        if (error.message.includes('Product not found')) {
+          errorMessage = 'Produktet ble ikke funnet. Sjekk StoreKit konfigurasjon.';
+        } else if (error.message.includes('Payment cancelled')) {
+          errorMessage = 'Betalingen ble avbrutt.';
+        } else if (error.message.includes('already purchased')) {
+          errorMessage = 'Du har allerede kjøpt dette produktet.';
+        } else if (error.message.includes('not available')) {
+          errorMessage = 'Produktet er ikke tilgjengelig for kjøp.';
+        } else {
+          errorMessage = `Kjøpet feilet: ${error.message}`;
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

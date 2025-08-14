@@ -498,7 +498,7 @@ function App() {
         console.log('📍 GPS Search: Trying low-accuracy position...');
         
         if (isIOS) {
-          // Use Capacitor Geolocation plugin on iOS for native permission dialog
+          // Try Capacitor Geolocation plugin first, fallback to browser geolocation
           try {
             // Check permissions first
             const permissionState = await Geolocation.checkPermissions();
@@ -521,15 +521,28 @@ function App() {
             });
             pos = position;
             console.log('📍 GPS Search: Low-accuracy position obtained via Capacitor');
-          } catch (lowAccuracyError) {
-            console.log('📍 GPS Search: Low-accuracy failed, trying high-accuracy...', lowAccuracyError);
-            const position = await Geolocation.getCurrentPosition({
-              enableHighAccuracy: true,
-              timeout: 15000,
-              maximumAge: 10000
+          } catch (capacitorError) {
+            console.log('📍 GPS Search: Capacitor Geolocation failed, falling back to browser geolocation:', capacitorError);
+            
+            // Fallback to browser geolocation
+            pos = await new Promise((resolve, reject) => {
+              const timeoutId = setTimeout(() => {
+                reject(new Error('Low-accuracy GPS timeout'));
+              }, 5000);
+              
+              navigator.geolocation.getCurrentPosition(
+                (position) => {
+                  clearTimeout(timeoutId);
+                  resolve(position);
+                },
+                (error) => {
+                  clearTimeout(timeoutId);
+                  reject(error);
+                },
+                { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
+              );
             });
-            pos = position;
-            console.log('📍 GPS Search: High-accuracy position obtained via Capacitor');
+            console.log('📍 GPS Search: Low-accuracy position obtained via browser fallback');
           }
         } else {
           // Use browser geolocation on web
@@ -556,7 +569,7 @@ function App() {
         console.log('📍 GPS Search: Low-accuracy failed, trying high-accuracy...', lowAccuracyError);
         
         if (isIOS) {
-          // Use Capacitor Geolocation plugin on iOS
+          // Try Capacitor Geolocation plugin first, fallback to browser geolocation
           try {
             const position = await Geolocation.getCurrentPosition({
               enableHighAccuracy: true,
@@ -565,9 +578,28 @@ function App() {
             });
             pos = position;
             console.log('📍 GPS Search: High-accuracy position obtained via Capacitor');
-          } catch (highAccuracyError) {
-            console.error('📍 GPS Search: High-accuracy also failed:', highAccuracyError);
-            throw highAccuracyError;
+          } catch (capacitorError) {
+            console.log('📍 GPS Search: Capacitor Geolocation failed, falling back to browser geolocation:', capacitorError);
+            
+            // Fallback to browser geolocation
+            pos = await new Promise((resolve, reject) => {
+              const timeoutId = setTimeout(() => {
+                reject(new Error('High-accuracy GPS timeout'));
+              }, 15000);
+              
+              navigator.geolocation.getCurrentPosition(
+                (position) => {
+                  clearTimeout(timeoutId);
+                  resolve(position);
+                },
+                (error) => {
+                  clearTimeout(timeoutId);
+                  reject(error);
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+              );
+            });
+            console.log('📍 GPS Search: High-accuracy position obtained via browser fallback');
           }
         } else {
           // Fallback to high-accuracy with shorter cache
@@ -1070,7 +1102,7 @@ function App() {
       let position;
       
       if (isIOS) {
-        // Use Capacitor Geolocation plugin on iOS
+        // Try Capacitor Geolocation plugin first, fallback to browser geolocation
         try {
           // Check permissions first
           const permissionState = await Geolocation.checkPermissions();
@@ -1091,9 +1123,27 @@ function App() {
             timeout: 5000,
             maximumAge: 600000
           });
-        } catch (error) {
-          console.error('🔍 GPS Diagnosis: Capacitor Geolocation failed:', error);
-          throw error;
+        } catch (capacitorError) {
+          console.log('🔍 GPS Diagnosis: Capacitor Geolocation failed, falling back to browser geolocation:', capacitorError);
+          
+          // Fallback to browser geolocation
+          position = await new Promise((resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+              reject(new Error('GPS timeout during diagnosis'));
+            }, 5000);
+            
+            navigator.geolocation.getCurrentPosition(
+              (pos) => {
+                clearTimeout(timeoutId);
+                resolve(pos);
+              },
+              (error) => {
+                clearTimeout(timeoutId);
+                reject(error);
+              },
+              { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
+            );
+          });
         }
       } else {
         // Use browser geolocation on web

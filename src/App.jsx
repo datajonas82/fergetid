@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { GraphQLClient, gql } from 'graphql-request';
 import { Capacitor } from '@capacitor/core';
 import { SplashScreen } from '@capacitor/splash-screen';
+import { Geolocation } from '@capacitor/geolocation';
 import { track } from '@vercel/analytics';
 import LoadingSpinner from './components/LoadingSpinner';
 import { calculateDrivingTime, generateTravelDescription } from './utils/googleMapsService';
@@ -495,45 +496,81 @@ function App() {
       let pos;
       try {
         console.log('📍 GPS Search: Trying low-accuracy position...');
-        pos = await new Promise((resolve, reject) => {
-          const timeoutId = setTimeout(() => {
-            reject(new Error('Low-accuracy GPS timeout'));
-          }, 5000);
-          
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              clearTimeout(timeoutId);
-              resolve(position);
-            },
-            (error) => {
-              clearTimeout(timeoutId);
-              reject(error);
-            },
-            { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
-          );
-        });
-        console.log('📍 GPS Search: Low-accuracy position obtained');
+        
+        if (isIOS) {
+          // Use Capacitor Geolocation plugin on iOS for native permission dialog
+          try {
+            const position = await Geolocation.getCurrentPosition({
+              enableHighAccuracy: false,
+              timeout: 5000,
+              maximumAge: 600000
+            });
+            pos = position;
+            console.log('📍 GPS Search: Low-accuracy position obtained via Capacitor');
+          } catch (lowAccuracyError) {
+            console.log('📍 GPS Search: Low-accuracy failed, trying high-accuracy...', lowAccuracyError);
+            const position = await Geolocation.getCurrentPosition({
+              enableHighAccuracy: true,
+              timeout: 15000,
+              maximumAge: 10000
+            });
+            pos = position;
+            console.log('📍 GPS Search: High-accuracy position obtained via Capacitor');
+          }
+        } else {
+          // Use browser geolocation on web
+          pos = await new Promise((resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+              reject(new Error('Low-accuracy GPS timeout'));
+            }, 5000);
+            
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                clearTimeout(timeoutId);
+                resolve(position);
+              },
+              (error) => {
+                clearTimeout(timeoutId);
+                reject(error);
+              },
+              { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
+            );
+          });
+          console.log('📍 GPS Search: Low-accuracy position obtained via browser');
+        }
       } catch (lowAccuracyError) {
         console.log('📍 GPS Search: Low-accuracy failed, trying high-accuracy...', lowAccuracyError);
-        // Fallback to high-accuracy with shorter cache
-        pos = await new Promise((resolve, reject) => {
-          const timeoutId = setTimeout(() => {
-            reject(new Error('High-accuracy GPS timeout'));
-          }, 15000);
-          
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              clearTimeout(timeoutId);
-              resolve(position);
-            },
-            (error) => {
-              clearTimeout(timeoutId);
-              reject(error);
-            },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-          );
-        });
-        console.log('📍 GPS Search: High-accuracy position obtained');
+        
+        if (isIOS) {
+          // Use Capacitor Geolocation plugin on iOS
+          const position = await Geolocation.getCurrentPosition({
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 10000
+          });
+          pos = position;
+          console.log('📍 GPS Search: High-accuracy position obtained via Capacitor');
+        } else {
+          // Fallback to high-accuracy with shorter cache
+          pos = await new Promise((resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+              reject(new Error('High-accuracy GPS timeout'));
+            }, 15000);
+            
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                clearTimeout(timeoutId);
+                resolve(position);
+              },
+              (error) => {
+                clearTimeout(timeoutId);
+                reject(error);
+              },
+              { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+            );
+          });
+          console.log('📍 GPS Search: High-accuracy position obtained via browser');
+        }
       }
 
       try {
@@ -959,7 +996,7 @@ function App() {
     track('gps_search_clicked');
     
     // Test GPS availability first
-    if (!navigator.geolocation) {
+    if (!isIOS && !navigator.geolocation) {
       setError('GPS er ikke tilgjengelig i denne nettleseren. Prøv en annen nettleser eller enhet.');
       track('gps_error', { error: 'geolocation_not_supported' });
       return;
@@ -971,6 +1008,11 @@ function App() {
 
   // Test GPS permissions and availability
   const testGPSAvailability = () => {
+    if (isIOS) {
+      // On iOS, we use Capacitor Geolocation plugin
+      return { available: true, reason: null };
+    }
+    
     if (!navigator.geolocation) {
       return { available: false, reason: 'GPS ikke støttet' };
     }
@@ -1006,23 +1048,35 @@ function App() {
     // Test 3: Try to get a quick position
     try {
       console.log('🔍 Testing GPS position...');
-      const position = await new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-          reject(new Error('GPS timeout during diagnosis'));
-        }, 5000);
-        
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            clearTimeout(timeoutId);
-            resolve(pos);
-          },
-          (error) => {
-            clearTimeout(timeoutId);
-            reject(error);
-          },
-          { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
-        );
-      });
+      let position;
+      
+      if (isIOS) {
+        // Use Capacitor Geolocation plugin on iOS
+        position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: false,
+          timeout: 5000,
+          maximumAge: 600000
+        });
+      } else {
+        // Use browser geolocation on web
+        position = await new Promise((resolve, reject) => {
+          const timeoutId = setTimeout(() => {
+            reject(new Error('GPS timeout during diagnosis'));
+          }, 5000);
+          
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              clearTimeout(timeoutId);
+              resolve(pos);
+            },
+            (error) => {
+              clearTimeout(timeoutId);
+              reject(error);
+            },
+            { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
+          );
+        });
+      }
       
       console.log('🔍 GPS position obtained:', position.coords);
       

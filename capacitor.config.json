@@ -38,7 +38,10 @@
       "iosSpinnerStyle": "large"
     },
     "Geolocation": {
-      "permissions": ["location"]
+      "permissions": ["location"],
+      "ios": {
+        "usageDescription": "FergeTid trenger tilgang til din posisjon for å vise nærliggende fergekaier og beregne kjøretid."
+      }
     }
   }
 }

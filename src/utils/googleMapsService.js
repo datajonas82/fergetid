@@ -180,9 +180,7 @@ const calculateDrivingTimeWithHERE = async (startCoords, endCoords, options = {}
   
   const data = await response.json();
   
-  if (import.meta.env.DEV) {
-    console.log('🔗 HERE API Response:', JSON.stringify(data, null, 2));
-  }
+
   
   if (!data.routes || data.routes.length === 0) {
     console.warn('HERE API: No routes found, response:', data);

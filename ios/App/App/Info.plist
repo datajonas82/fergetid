@@ -57,6 +57,8 @@
 	<string>FergeTid trenger tilgang til din posisjon for å vise nærliggende fergekaier og beregne kjøretid.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>FergeTid trenger tilgang til din posisjon for å vise nærliggende fergekaier og beregne kjøretid.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>FergeTid bruker bevegelsessensorer for å forbedre GPS-nøyaktigheten.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>UIRequiresFullScreen</key>

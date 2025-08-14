@@ -65,7 +65,7 @@ const InAppPurchaseModal = ({ isOpen, onClose, onPurchaseSuccess }) => {
       <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-800 mb-4">
-            Kjøretidberegning
+            Kjøretidbeskrivelse
           </h2>
           
           <div className="mb-6">
@@ -74,7 +74,7 @@ const InAppPurchaseModal = ({ isOpen, onClose, onPurchaseSuccess }) => {
                 Hva får du?
               </h3>
               <ul className="text-sm text-fuchsia-700 space-y-1">
-                <li>• Beregn kjøretid til fergekaier</li>
+                <li>• Kjøretid til fergekaier</li>
                 <li>• Fargekodet avganger (grønn/rød)</li>
                 <li>• Informasjon om du rekker avgangen</li>
                 <li>• Ventetid til neste avgang</li>

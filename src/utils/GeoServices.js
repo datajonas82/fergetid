@@ -354,15 +354,15 @@ export const generateTravelDescription = (distance, drivingTime, timeToDeparture
     if (waitTimeForNextFerry > 15) {
       if (missedBy < 60) {
         const minuteText = missedBy === 1 ? 'minutt' : 'minutter';
-        return `Du er <span style="color: #2563eb; font-weight: bold;">${distanceText}</span> unna og det tar ca <span style="color: #2563eb; font-weight: bold;">${drivingTimeText}</span> å kjøre. <span style="color: #dc2626; font-weight: bold;">Du kommer ${missedBy} ${minuteText} for sent</span>. ${waitTimeText}`;
+        return `Du er <span style="color: #2563eb; font-weight: bold;">${distanceText}</span> unna og det tar ca <span style="color: #2563eb; font-weight: bold;">${drivingTimeText}</span> å kjøre. Du kommer <span style="color: #dc2626; font-weight: bold;">${missedBy} ${minuteText}</span> for sent. ${waitTimeText}`;
       } else {
         const missedHours = Math.floor(missedBy / 60);
         const missedMinutes = missedBy % 60;
         if (missedMinutes === 0) {
-          return `Du er <span style="color: #2563eb; font-weight: bold;">${distanceText}</span> unna og det tar ca <span style="color: #2563eb; font-weight: bold;">${drivingTimeText}</span> å kjøre. <span style="color: #dc2626; font-weight: bold;">Du kommer ${missedHours} timer for sent</span>. ${waitTimeText}`;
+          return `Du er <span style="color: #2563eb; font-weight: bold;">${distanceText}</span> unna og det tar ca <span style="color: #2563eb; font-weight: bold;">${drivingTimeText}</span> å kjøre. Du kommer <span style="color: #dc2626; font-weight: bold;">${missedHours} timer</span> for sent. ${waitTimeText}`;
         } else {
           const minuteText = missedMinutes === 1 ? 'minutt' : 'minutter';
-          return `Du er <span style="color: #2563eb; font-weight: bold;">${distanceText}</span> unna og det tar ca <span style="color: #2563eb; font-weight: bold;">${drivingTimeText}</span> å kjøre. <span style="color: #dc2626; font-weight: bold;">Du kommer ${missedHours} timer og ${missedMinutes} ${minuteText} for sent</span>. ${waitTimeText}`;
+          return `Du er <span style="color: #2563eb; font-weight: bold;">${distanceText}</span> unna og det tar ca <span style="color: #2563eb; font-weight: bold;">${drivingTimeText}</span> å kjøre. Du kommer <span style="color: #dc2626; font-weight: bold;">${missedHours} timer og ${missedMinutes} ${minuteText}</span> for sent. ${waitTimeText}`;
         }
       }
     } else {
@@ -441,13 +441,13 @@ const formatWaitTime = (waitMinutes, allDepartures = [], drivingTime = 0) => {
     return '<span style="color: #dc2626; font-weight: bold;">Ingen flere avganger i dag</span>';
   } else if (waitMinutes < 5) {
     const minuteText = waitMinutes === 1 ? 'minutt' : 'minutter';
-    return `<span style="color: #16a34a; font-weight: bold;">Du må vente i ${waitMinutes} ${minuteText} til neste avgang</span>`;
+    return `<span style="color: #16a34a;">Du må vente i <span style="font-weight: bold;">${waitMinutes} ${minuteText}</span> til neste avgang</span>`;
   } else if (waitMinutes < 15) {
     const minuteText = waitMinutes === 1 ? 'minutt' : 'minutter';
-    return `<span style="color: #f59e0b; font-weight: bold;">Du må vente i ${waitMinutes} ${minuteText} til neste avgang</span>`;
+    return `<span style="color: #f59e0b;">Du må vente i <span style="font-weight: bold;">${waitMinutes} ${minuteText}</span> til neste avgang</span>`;
   } else if (waitMinutes < 20) {
     const minuteText = waitMinutes === 1 ? 'minutt' : 'minutter';
-    return `<span style="color: #f59e0b; font-weight: bold;">Du må vente i ${waitMinutes} ${minuteText} til neste avgang</span>`;
+    return `<span style="color: #f59e0b;">Du må vente i <span style="font-weight: bold;">${waitMinutes} ${minuteText}</span> til neste avgang</span>`;
   } else {
     // For ventetid over 20 minutter, foreslå når man bør starte å kjøre
     const suggestedDepartureTime = calculateSuggestedDepartureTime(allDepartures, drivingTime);

@@ -441,13 +441,13 @@ const formatWaitTime = (waitMinutes, allDepartures = [], drivingTime = 0) => {
     return '<span style="color: #dc2626; font-weight: bold;">Ingen flere avganger i dag</span>';
   } else if (waitMinutes < 5) {
     const minuteText = waitMinutes === 1 ? 'minutt' : 'minutter';
-    return `<span style="color: #16a34a;">Du må vente i <span style="font-weight: bold;">${waitMinutes} ${minuteText}</span> til neste avgang</span>`;
+    return `Du må vente i <span style="color: #16a34a; font-weight: bold;">${waitMinutes} ${minuteText}</span> til neste avgang`;
   } else if (waitMinutes < 15) {
     const minuteText = waitMinutes === 1 ? 'minutt' : 'minutter';
-    return `<span style="color: #f59e0b;">Du må vente i <span style="font-weight: bold;">${waitMinutes} ${minuteText}</span> til neste avgang</span>`;
+    return `Du må vente i <span style="color: #f59e0b; font-weight: bold;">${waitMinutes} ${minuteText}</span> til neste avgang`;
   } else if (waitMinutes < 20) {
     const minuteText = waitMinutes === 1 ? 'minutt' : 'minutter';
-    return `<span style="color: #f59e0b;">Du må vente i <span style="font-weight: bold;">${waitMinutes} ${minuteText}</span> til neste avgang</span>`;
+    return `Du må vente i <span style="color: #f59e0b; font-weight: bold;">${waitMinutes} ${minuteText}</span> til neste avgang`;
   } else {
     // For ventetid over 20 minutter, foreslå når man bør starte å kjøre
     const suggestedDepartureTime = calculateSuggestedDepartureTime(allDepartures, drivingTime);

@@ -1,6 +1,6 @@
 {
   "name": "fergetid-app",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": true,
   "scripts": {
     "dev": "vite",
@@ -8,7 +8,10 @@
     "preview": "vite preview",
     "lint:css": "stylelint src/**/*.css",
     "routes:generate": "node scripts/generateRouteMap.mjs",
-    "build:with-routes": "npm run routes:generate && vite build"
+    "build:with-routes": "npm run routes:generate && vite build",
+    "sync-ios-version": "node scripts/sync-ios-version.mjs",
+    "bump-build": "node scripts/bump-build.mjs",
+    "version-bump": "node scripts/version-bump.mjs"
   },
   "dependencies": {
     "@capacitor/cli": "^7.4.2",

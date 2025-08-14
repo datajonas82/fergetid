@@ -239,9 +239,21 @@ function App() {
     console.log('📍 GPS Search: Waiting for ferry stops to load...');
 
     // Wait for all ferry quays to be loaded before proceeding
-    if (!ferryStopsLoaded) {
+    if (!ferryStopsLoaded || !allFerryQuays || allFerryQuays.length === 0) {
       console.log('📍 GPS Search: Ferry stops not loaded, waiting...');
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for stops to load
+      let attempts = 0;
+      while ((!ferryStopsLoaded || !allFerryQuays || allFerryQuays.length === 0) && attempts < 10) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        attempts++;
+        console.log(`📍 GPS Search: Waiting for ferry stops... attempt ${attempts}`);
+      }
+      
+      if (!allFerryQuays || allFerryQuays.length === 0) {
+        console.error('📍 GPS Search: Ferry stops still not loaded after waiting');
+        setError('Fergekaier er ikke lastet ennå. Prøv igjen om noen sekunder.');
+        setLoading(false);
+        return;
+      }
     }
 
     // Helper to compute nearby stops and update UI based on coordinates
@@ -283,6 +295,15 @@ function App() {
       })();
       
       console.log('📍 GPS Search: Calculating distances to ferry quays...');
+      
+      // Double-check that ferry quays are loaded
+      if (!allFerryQuays || allFerryQuays.length === 0) {
+        console.error('📍 GPS Search: No ferry quays available for distance calculation');
+        setError('Fergekaier er ikke tilgjengelige. Prøv igjen om noen sekunder.');
+        setLoading(false);
+        return;
+      }
+      
       // Step 1: Calculate simple Haversine distance for ALL quays (fast, no network)
       const placesWithDistance = allFerryQuays.map(stop => {
         const dLat = (stop.latitude - latitude) * 111000;

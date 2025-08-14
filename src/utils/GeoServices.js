@@ -476,20 +476,32 @@ const formatWaitTime = (waitMinutes, allDepartures = [], drivingTime = 0) => {
 // Calculate suggested departure time to arrive 5 minutes before ferry departure
 const calculateSuggestedDepartureTime = (allDepartures, drivingTime) => {
   if (!allDepartures || allDepartures.length === 0 || !drivingTime) {
+    if (import.meta.env.DEV) {
+      console.log('🚫 calculateSuggestedDepartureTime: Missing data:', { 
+        allDepartures: allDepartures?.length, 
+        drivingTime 
+      });
+    }
     return null;
   }
   
-  // Find the next departure
+  // Use the same logic as calculateWaitTimeForNextFerry to find the next departure
   const now = new Date();
+  const arrivalTime = new Date(now.getTime() + (drivingTime * 60000)); // Add driving time to now
+  
+  // Find departures that are after our arrival time
   const futureDepartures = allDepartures.filter(departure => {
     const departureTime = departure.aimed || departure.aimedDepartureTime;
     if (!departureTime) return false;
     
     const departureDate = new Date(departureTime);
-    return departureDate > now;
+    return departureDate > arrivalTime; // Only departures after we arrive
   });
   
   if (futureDepartures.length === 0) {
+    if (import.meta.env.DEV) {
+      console.log('🚫 calculateSuggestedDepartureTime: No future departures after arrival');
+    }
     return null;
   }
   
@@ -511,14 +523,36 @@ const calculateSuggestedDepartureTime = (allDepartures, drivingTime) => {
   
   // Only suggest if the suggested departure time is in the future
   if (suggestedDepartureTime <= now) {
+    if (import.meta.env.DEV) {
+      console.log('🚫 calculateSuggestedDepartureTime: Suggested time is in the past:', {
+        suggestedDepartureTime: suggestedDepartureTime.toLocaleTimeString(),
+        now: now.toLocaleTimeString()
+      });
+    }
     return null;
   }
   
   // Calculate how much time we can save by waiting
   const timeToSave = Math.max(0, Math.round((suggestedDepartureTime - now) / 60000));
   
+  if (import.meta.env.DEV) {
+    console.log('⏰ calculateSuggestedDepartureTime debug:', {
+      allDepartures: allDepartures.length,
+      drivingTime,
+      arrivalTime: arrivalTime.toLocaleTimeString(),
+      nextDepartureTime: nextDepartureTime.toLocaleTimeString(),
+      targetArrivalTime: targetArrivalTime.toLocaleTimeString(),
+      suggestedDepartureTime: suggestedDepartureTime.toLocaleTimeString(),
+      timeToSave,
+      willSuggest: timeToSave >= 10
+    });
+  }
+  
   // Only suggest if we can save more than 10 minutes by waiting
   if (timeToSave < 10) {
+    if (import.meta.env.DEV) {
+      console.log('🚫 calculateSuggestedDepartureTime: Time to save too low:', timeToSave);
+    }
     return null;
   }
   

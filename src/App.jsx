@@ -5,7 +5,7 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { Geolocation } from '@capacitor/geolocation';
 import { track } from '@vercel/analytics';
 import LoadingSpinner from './components/LoadingSpinner';
-import { calculateDrivingTime, generateTravelDescription } from './utils/googleMapsService';
+import { calculateDrivingTime, generateTravelDescription } from './utils/GeoServices';
 import { 
   ENTUR_ENDPOINT, 
   TRANSPORT_MODES, 

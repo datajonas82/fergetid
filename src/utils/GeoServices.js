@@ -466,7 +466,7 @@ const formatWaitTime = (waitMinutes, allDepartures = [], drivingTime = 0) => {
     }
     
     if (suggestedDepartureTime) {
-      return `<span style="color: #f59e0b; font-weight: bold;">Du må vente i ${waitTimeText} til neste avgang. <span style="color: #000000; font-weight: bold;">Start å kjøre kl. ${suggestedDepartureTime} for å rekke fergen med 5 minutter margin.</span></span>`;
+      return `<span style="color: #f59e0b; font-weight: bold;">Du må vente i ${waitTimeText} til neste avgang. <span style="color: #000000; font-weight: bold;">Du kan vente hjemme og starte å kjøre kl. ${suggestedDepartureTime} for å rekke fergen med 5 minutter margin.</span></span>`;
     } else {
       return `<span style="color: #f59e0b; font-weight: bold;">Du må vente i ${waitTimeText} til neste avgang</span>`;
     }
@@ -511,6 +511,14 @@ const calculateSuggestedDepartureTime = (allDepartures, drivingTime) => {
   
   // Only suggest if the suggested departure time is in the future
   if (suggestedDepartureTime <= now) {
+    return null;
+  }
+  
+  // Calculate how much time we can save by waiting
+  const timeToSave = Math.max(0, Math.round((suggestedDepartureTime - now) / 60000));
+  
+  // Only suggest if we can save more than 10 minutes by waiting
+  if (timeToSave < 10) {
     return null;
   }
   

@@ -469,9 +469,9 @@ const formatWaitTime = (waitMinutes, allDepartures = [], drivingTime = 0) => {
     }
     
     if (suggestedDepartureTime) {
-      return `<span style="color: #f59e0b;">Du må vente i <span style="font-weight: bold;">${waitTimeText}</span> til neste avgang. <span style="color: #000000;">Start å kjør kl. <span style="font-weight: bold;">${suggestedDepartureTime}</span> for å rekke fergen med <span style="font-weight: bold;">5 minutter</span> margin.</span></span>`;
+      return `Du må vente i <span style="color: #f59e0b; font-weight: bold;">${waitTimeText}</span> til neste avgang. <span style="color: #000000;">Start å kjør kl. <span style="font-weight: bold;">${suggestedDepartureTime}</span> for å rekke fergen med <span style="font-weight: bold;">5 minutter</span> margin.</span>`;
     } else {
-      return `<span style="color: #f59e0b;">Du må vente i <span style="font-weight: bold;">${waitTimeText}</span> til neste avgang</span>`;
+      return `Du må vente i <span style="color: #f59e0b; font-weight: bold;">${waitTimeText}</span> til neste avgang`;
     }
   }
 };

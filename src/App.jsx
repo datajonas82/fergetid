@@ -258,6 +258,7 @@ function App() {
   
   // Inline destinations state - now supports multiple destinations per stop
   const [inlineDestinations, setInlineDestinations] = useState({}); // { [parentStopId]: [{ stopId, name, departures: array }] }
+  const liveSearchRequestIdRef = useRef(0);
   
     // Check GPS permission function
   const checkGPSPermission = async () => {
@@ -943,7 +944,7 @@ function App() {
   // Live search function - show ferry cards as user types
   const performLiveSearch = async () => {
     processedStopsRef.current.clear(); // Clear processed stops for new search
-    setInlineDestinations({}); // Clear previous return cards
+    const requestId = ++liveSearchRequestIdRef.current; // Beskytt mot utdaterte søk
     
     // Load ferry quays on-demand if not already loaded
     if (!ferryStopsLoaded || allFerryQuays.length === 0) {
@@ -1074,6 +1075,8 @@ function App() {
     const returnCardPromises = formattedStops.map(stop => loadReturnCardForStop(stop));
 
     const resolvedReturnCards = await Promise.all(returnCardPromises);
+    // Avbryt hvis dette søket er utdatert
+    if (requestId !== liveSearchRequestIdRef.current) return;
     const newInlineDestinations = resolvedReturnCards.reduce((acc, card) => {
       if (card) {
         // Håndter både enkelt kort og arrays av kort (for spesielle fergesamband)
@@ -1091,10 +1094,31 @@ function App() {
       return acc;
     }, {});
 
-    setInlineDestinations(newInlineDestinations);
+    // Bevare eksisterende returkort for fergekaier som fortsatt er i resultatet
+    setInlineDestinations(prev => {
+      const preserved = {};
+      
+      // Behold eksisterende returkort for fergekaier som fortsatt er i resultatet
+      Object.keys(prev).forEach(stopId => {
+        if (formattedStops.some(stop => stop.id === stopId)) {
+          preserved[stopId] = prev[stopId];
+        }
+      });
+      
+      // Legg til nye returkort
+      Object.keys(newInlineDestinations).forEach(stopId => {
+        if (!preserved[stopId]) {
+          preserved[stopId] = newInlineDestinations[stopId];
+        }
+      });
+      
+      return preserved;
+    });
 
     // Kun sett hasInteracted til true hvis vi faktisk har resultater
     if (formattedStops.length > 0) {
+      // Avbryt hvis dette søket er utdatert
+      if (requestId !== liveSearchRequestIdRef.current) return;
       setFerryStops(formattedStops);
       setHasInteracted(true);
       setSelectedStop(formattedStops[0].id);
@@ -1124,9 +1148,14 @@ function App() {
 
   // Live search effect - show ferry cards as user types
   useEffect(() => {
+    // Bare kjør live-søk i søkemodus
+    if (mode !== 'search') return;
+
     // Kun kjøre live search hvis brukeren faktisk har skrevet noe
     if (!query.trim()) {
       setFerryStops([]);
+      setInlineDestinations({});
+      setDeparturesMap({});
       setHasInteracted(false);
       setSelectedStop(null);
       return;
@@ -1135,7 +1164,7 @@ function App() {
     // Debounce search to avoid too many API calls
     const timeoutId = setTimeout(performLiveSearch, 300);
     return () => clearTimeout(timeoutId);
-  }, [query, location, allFerryQuays, ferryStopsLoaded]);
+  }, [query, allFerryQuays, ferryStopsLoaded, mode]);
 
   // Fjern feilmeldinger når mode endres til search eller query endres
   useEffect(() => {
@@ -1658,6 +1687,8 @@ function App() {
         setFerryStops([]);
         setHasInteracted(false);
         setSelectedStop(null);
+        setInlineDestinations({});
+        setDeparturesMap({});
         setDrivingTimes({});
         setDrivingTimesLoading({});
         // Kjøretid beholdes aktivt på iOS
@@ -1944,7 +1975,7 @@ function App() {
               }
 
               return (
-                <div key={stopData.id + '-' + (distance || '')} className="flex flex-col">
+                <div key={stopData.id} className="flex flex-col">
                   {/* Km-avstand som egen boks over fergekortet */}
                   {distance && (
                     <div className="bg-blue-500 text-white text-base font-bold px-2 py-1.5 rounded-full shadow-lg mb-[-10px] self-start relative z-20 -ml-2">

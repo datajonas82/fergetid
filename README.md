@@ -1,6 +1,14 @@
-# FergeTid - Norwegian Ferry Timetable App v3.0.0
+# FergeTid - Norwegian Ferry Timetable App v3.0.1
 
 A modern, cross-platform mobile app for finding ferry timetables and nearby ferry stops in Norway. Built with React, Capacitor, and powered by Entur's public transportation API.
+
+## 🎉 Version 3.0.1 - iOS Fixes
+
+### Bug Fixes
+- **Fixed distance display on iOS** - Resolved issue where distances showed as "0m" instead of correct values
+- **Improved Haversine fallback** - Now accepts Haversine distance calculations when routing APIs fail
+- **Enhanced HERE API handling** - Better fallback when HERE API returns 0m distances
+- **Fixed SplashScreen timing** - Improved splash screen hiding to prevent timeout warnings
 
 ## 🎉 Version 3.0.0 - Major Update
 

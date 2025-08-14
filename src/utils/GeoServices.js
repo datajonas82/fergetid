@@ -456,7 +456,10 @@ const formatWaitTime = (waitMinutes, allDepartures = [], drivingTime = 0) => {
     const minutes = waitMinutes % 60;
     let waitTimeText;
     
-    if (minutes === 0) {
+    if (hours === 0) {
+      const minuteText = minutes === 1 ? 'minutt' : 'minutter';
+      waitTimeText = `${minutes} ${minuteText}`;
+    } else if (minutes === 0) {
       const hourText = hours === 1 ? 'time' : 'timer';
       waitTimeText = `${hours} ${hourText}`;
     } else {
@@ -466,7 +469,7 @@ const formatWaitTime = (waitMinutes, allDepartures = [], drivingTime = 0) => {
     }
     
     if (suggestedDepartureTime) {
-      return `<span style="color: #f59e0b; font-weight: bold;">Du må vente i ${waitTimeText} til neste avgang. <span style="color: #000000; font-weight: bold;">Du kan vente hjemme og starte å kjøre kl. ${suggestedDepartureTime} for å rekke fergen med 5 minutter margin.</span></span>`;
+      return `<span style="color: #f59e0b; font-weight: bold;">Du må vente i ${waitTimeText} til neste avgang. <span style="color: #000000; font-weight: bold;">Start å kjøre kl. ${suggestedDepartureTime} for å rekke fergen med 5 minutter margin.</span></span>`;
     } else {
       return `<span style="color: #f59e0b; font-weight: bold;">Du må vente i ${waitTimeText} til neste avgang</span>`;
     }

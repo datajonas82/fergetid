@@ -88,11 +88,11 @@ const formatWaitTime = (waitMinutes, allDepartures = [], drivingTime = 0, isCurr
   } else if (waitMinutes < 15) {
     const minuteText = waitMinutes === 1 ? 'minutt' : 'minutter';
     return `Du må vente i <span style="color: #f59e0b; font-weight: bold;">${waitMinutes} ${minuteText}</span> til neste avgang`;
-  } else if (waitMinutes < 20) {
+  } else if (waitMinutes < 25) {
     const minuteText = waitMinutes === 1 ? 'minutt' : 'minutter';
     return `Du må vente i <span style="color: #f59e0b; font-weight: bold;">${waitMinutes} ${minuteText}</span> til neste avgang`;
   } else {
-    // For ventetid over 20 minutter, foreslå når man bør starte å kjøre
+    // For ventetid over 25 minutter, foreslå når man bør starte å kjøre
     const suggestedDepartureTime = calculateSuggestedDepartureTime(allDepartures, drivingTime);
     
     const hours = Math.floor(waitMinutes / 60);

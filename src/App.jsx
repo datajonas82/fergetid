@@ -1301,220 +1301,15 @@ function App() {
     // Track GPS usage
     track('gps_search_clicked');
     
-    // Test GPS availability first
-    if (!isIOS && !navigator.geolocation) {
-      setError('GPS er ikke tilgjengelig i denne nettleseren. Prøv en annen nettleser eller enhet.');
-      track('gps_error', { error: 'geolocation_not_supported' });
-      return;
-    }
+
     
     // Call executeGpsSearch directly - no blocking mechanism
     await executeGpsSearch();
   };
 
-  // Test GPS permissions and availability
-  const testGPSAvailability = () => {
-    if (isIOS) {
-      // On iOS, we use Capacitor Geolocation plugin
-      return { available: true, reason: null };
-    }
-    
-    if (!navigator.geolocation) {
-      return { available: false, reason: 'GPS ikke støttet' };
-    }
-    
-    // Check if we're in a secure context (HTTPS or localhost)
-    if (!window.isSecureContext) {
-      return { available: false, reason: 'HTTPS kreves for GPS' };
-    }
-    
-    return { available: true, reason: null };
-  };
 
-  // Diagnostic function to help debug GPS issues
-  const diagnoseGPSIssue = async () => {
-    // Test 1: Check if geolocation is available
-    const gpsTest = testGPSAvailability();
-    
-    if (!gpsTest.available) {
-      return { issue: 'gps_not_available', message: gpsTest.reason };
-    }
-    
-    // Test 2: Check if we have ferry stops loaded
-    if (!ferryStopsLoaded || allFerryQuays.length === 0) {
-      return { issue: 'ferry_stops_not_loaded', message: 'Fergekaier ikke lastet' };
-    }
-    
-    // Test 3: Try to get a quick position
-    try {
-      let position;
-      
-      if (isIOS) {
-        // Use Capacitor Geolocation plugin on iOS for native permission dialog
-        try {
-          // Check permissions first
-          const permissionState = await Geolocation.checkPermissions();
-          
-          if (permissionState.location !== 'granted') {
-            const requestResult = await Geolocation.requestPermissions();
-            
-            if (requestResult.location !== 'granted') {
-              throw new Error('Location permission denied');
-            }
-          }
-          
-          position = await Geolocation.getCurrentPosition({
-            enableHighAccuracy: false,
-            timeout: 5000,
-            maximumAge: 600000
-          });
-        } catch (capacitorError) {
-          console.error('🔍 GPS Diagnosis: Capacitor Geolocation failed:', capacitorError);
-          
-          // If Capacitor fails with UNIMPLEMENTED, try browser geolocation
-          if (capacitorError.code === 'UNIMPLEMENTED') {
-            
-            try {
-              position = await new Promise((resolve, reject) => {
-                const timeoutId = setTimeout(() => {
-                  reject(new Error('GPS timeout during diagnosis'));
-                }, 5000);
-                
-                navigator.geolocation.getCurrentPosition(
-                  (pos) => {
-                    clearTimeout(timeoutId);
-                    resolve(pos);
-                  },
-                  (error) => {
-                    clearTimeout(timeoutId);
-                    reject(error);
-                  },
-                  { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
-                );
-              });
-              return 'GPS fungerer via browser geolocation. Aktiver GPS i iOS-innstillingene for bedre opplevelse.';
-            } catch (browserError) {
-              return 'GPS-funksjonen er ikke tilgjengelig. Vennligst aktiver GPS i iOS-innstillingene og prøv igjen.';
-            }
-          }
-          
-          throw capacitorError; // Don't fallback for other Capacitor errors
-        }
-      } else {
-        // Use browser geolocation on web
-        position = await new Promise((resolve, reject) => {
-          const timeoutId = setTimeout(() => {
-            reject(new Error('GPS timeout during diagnosis'));
-          }, 5000);
-          
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              clearTimeout(timeoutId);
-              resolve(pos);
-            },
-            (error) => {
-              clearTimeout(timeoutId);
-              reject(error);
-            },
-            { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
-          );
-        });
-      }
-      
 
-      
-      // Test 4: Check if there are any ferry quays nearby
-      const { latitude, longitude } = position.coords;
-      const placesWithDistance = allFerryQuays.map(stop => {
-        const dLat = (stop.latitude - latitude) * 111000;
-        const dLng = (stop.longitude - longitude) * 111000 * Math.cos(latitude * Math.PI / 180);
-        const distance = Math.sqrt(dLat * dLat + dLng * dLng);
-        return { ...stop, distance };
-      });
-      
-      const nearbyCandidates = placesWithDistance
-        .filter(p => p.distance <= 60000) // 60 km radius
-        .sort((a, b) => a.distance - b.distance);
-      
 
-      
-      if (nearbyCandidates.length === 0) {
-        return { 
-          issue: 'no_nearby_ferries', 
-          message: 'Ingen fergekaier innen 60 km fra din posisjon',
-          position: { latitude, longitude }
-        };
-      }
-      
-      // Test 5: Try to fetch departures for the closest quay
-      const closestQuay = nearbyCandidates[0];
-
-      
-      try {
-        const queryParams = getDepartureQueryParams();
-        const depData = await client.request(DEPARTURES_QUERY, { 
-          id: closestQuay.id,
-          ...queryParams
-        });
-        const calls = depData.stopPlace?.estimatedCalls || [];
-        const departures = calls
-          .filter(call => {
-            const sub = call.serviceJourney?.journeyPattern?.line?.transportSubmode;
-            return sub && !EXCLUDED_SUBMODES.includes(sub);
-          })
-          .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime));
-        
-  
-        
-        if (departures.length === 0) {
-          return { 
-            issue: 'no_departures', 
-            message: 'Ingen avganger funnet for nærmeste fergekai',
-            position: { latitude, longitude },
-            closestQuay: closestQuay.name
-          };
-        }
-        
-        return { 
-          issue: 'working', 
-          message: 'GPS-funksjonen fungerer normalt',
-          position: { latitude, longitude },
-          nearbyQuays: nearbyCandidates.length,
-          departures: departures.length
-        };
-        
-      } catch (apiError) {
-        console.error('🔍 API error during diagnosis:', apiError);
-        return { 
-          issue: 'api_error', 
-          message: 'Feil ved henting av avganger fra Entur API',
-          position: { latitude, longitude },
-          error: apiError.message
-        };
-      }
-      
-    } catch (gpsError) {
-      console.error('🔍 GPS error during diagnosis:', gpsError);
-      
-      let errorMessage = 'Ukjent GPS-feil';
-      if (gpsError.code === 1) {
-        errorMessage = 'GPS-tillatelse avvist';
-      } else if (gpsError.code === 2) {
-        errorMessage = 'Posisjon ikke tilgjengelig';
-      } else if (gpsError.code === 3) {
-        errorMessage = 'GPS-tidsavbrudd';
-      } else if (gpsError.message && gpsError.message.includes('timeout')) {
-        errorMessage = 'GPS-tidsavbrudd';
-      }
-      
-      return { 
-        issue: 'gps_error', 
-        message: errorMessage,
-        error: gpsError.message,
-        code: gpsError.code
-      };
-    }
-  };
 
   // Funksjon for å beregne kjøretider for eksisterende fergekaier
   const calculateDrivingTimesForExistingStops = async () => {
@@ -2067,6 +1862,8 @@ function App() {
           </div>
         )}
 
+
+
         {/* Activate Driving Time Description Button */}
         {isIOS && !purchaseStatus?.isPurchased && (mode === 'gps' || ferryStops.length > 0) && (
           <div className="mb-4 px-3">
@@ -2090,30 +1887,6 @@ function App() {
           <div className="text-sm text-white/80 mb-4 text-center px-3">
             <p>GPS-funksjon aktivert</p>
             <p className="text-xs mt-1">Henter posisjon og fergekaier...</p>
-            <div className="mt-2 space-y-1">
-              <button
-                onClick={async () => {
-                  const diagnosis = await diagnoseGPSIssue();
-                  alert(`GPS-diagnose: ${diagnosis.message}`);
-                }}
-                className="px-3 py-1 bg-white/20 text-white text-xs rounded border border-white/30 hover:bg-white/30"
-              >
-                Diagnostiser GPS-problem
-              </button>
-              <button
-                onClick={async () => {
-                  try {
-                    await checkGPSPermission();
-                    alert('GPS-tillatelse OK!');
-                  } catch (error) {
-                    alert(`GPS-tillatelse feilet: ${error.message}`);
-                  }
-                }}
-                className="px-3 py-1 bg-white/20 text-white text-xs rounded border border-white/30 hover:bg-white/30"
-              >
-                Test GPS-tillatelse
-              </button>
-            </div>
           </div>
         )}
 

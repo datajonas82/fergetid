@@ -509,6 +509,11 @@ const calculateSuggestedDepartureTime = (allDepartures, drivingTime) => {
   // Calculate when we should start driving
   const suggestedDepartureTime = new Date(targetArrivalTime.getTime() - (drivingTime * 60000));
   
+  // Only suggest if the suggested departure time is in the future
+  if (suggestedDepartureTime <= now) {
+    return null;
+  }
+  
   // Format as HH:MM
   return suggestedDepartureTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };

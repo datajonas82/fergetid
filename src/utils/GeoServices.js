@@ -348,7 +348,7 @@ export const generateTravelDescription = (distance, drivingTime, timeToDeparture
     
     // Calculate wait time for next ferry (after arriving at terminal)
     const waitTimeForNextFerry = calculateWaitTimeForNextFerry(allDepartures, timeToDeparture, drivingTime);
-    const waitTimeText = formatWaitTime(waitTimeForNextFerry);
+    const waitTimeText = formatWaitTime(waitTimeForNextFerry, allDepartures, drivingTime);
     
     // Only show missed time if wait time is significant (more than 15 minutes)
     if (waitTimeForNextFerry > 15) {
@@ -436,7 +436,7 @@ const calculateWaitTimeForNextFerry = (allDepartures, timeToDeparture, drivingTi
 };
 
 // Helper function to format wait time at ferry terminal
-const formatWaitTime = (waitMinutes) => {
+const formatWaitTime = (waitMinutes, allDepartures = [], drivingTime = 0) => {
   if (waitMinutes === 0) {
     return '<span style="color: #dc2626; font-weight: bold;">Ingen flere avganger i dag</span>';
   } else if (waitMinutes < 5) {
@@ -445,21 +445,72 @@ const formatWaitTime = (waitMinutes) => {
   } else if (waitMinutes < 15) {
     const minuteText = waitMinutes === 1 ? 'minutt' : 'minutter';
     return `<span style="color: #f59e0b; font-weight: bold;">Du må vente i ${waitMinutes} ${minuteText} til neste avgang</span>`;
-  } else if (waitMinutes < 60) {
+  } else if (waitMinutes < 20) {
     const minuteText = waitMinutes === 1 ? 'minutt' : 'minutter';
     return `<span style="color: #f59e0b; font-weight: bold;">Du må vente i ${waitMinutes} ${minuteText} til neste avgang</span>`;
   } else {
+    // For ventetid over 20 minutter, foreslå når man bør starte å kjøre
+    const suggestedDepartureTime = calculateSuggestedDepartureTime(allDepartures, drivingTime);
+    
     const hours = Math.floor(waitMinutes / 60);
     const minutes = waitMinutes % 60;
+    let waitTimeText;
+    
     if (minutes === 0) {
       const hourText = hours === 1 ? 'time' : 'timer';
-      return `<span style="color: #f59e0b; font-weight: bold;">Du må vente i ${hours} ${hourText} til neste avgang</span>`;
+      waitTimeText = `${hours} ${hourText}`;
     } else {
       const hourText = hours === 1 ? 'time' : 'timer';
-              const minuteText = minutes === 1 ? 'minutt' : 'minutter';
-      return `<span style="color: #f59e0b; font-weight: bold;">Du må vente i ${hours} ${hourText} og ${minutes} ${minuteText} til neste avgang</span>`;
+      const minuteText = minutes === 1 ? 'minutt' : 'minutter';
+      waitTimeText = `${hours} ${hourText} og ${minutes} ${minuteText}`;
+    }
+    
+    if (suggestedDepartureTime) {
+      return `<span style="color: #f59e0b; font-weight: bold;">Du må vente i ${waitTimeText} til neste avgang. <span style="color: #2563eb; font-weight: bold;">Start å kjøre kl. ${suggestedDepartureTime}</span> for å rekke fergen med 5 minutter margin.</span>`;
+    } else {
+      return `<span style="color: #f59e0b; font-weight: bold;">Du må vente i ${waitTimeText} til neste avgang</span>`;
     }
   }
+};
+
+// Calculate suggested departure time to arrive 5 minutes before ferry departure
+const calculateSuggestedDepartureTime = (allDepartures, drivingTime) => {
+  if (!allDepartures || allDepartures.length === 0 || !drivingTime) {
+    return null;
+  }
+  
+  // Find the next departure
+  const now = new Date();
+  const futureDepartures = allDepartures.filter(departure => {
+    const departureTime = departure.aimed || departure.aimedDepartureTime;
+    if (!departureTime) return false;
+    
+    const departureDate = new Date(departureTime);
+    return departureDate > now;
+  });
+  
+  if (futureDepartures.length === 0) {
+    return null;
+  }
+  
+  // Sort by departure time and get the next one
+  futureDepartures.sort((a, b) => {
+    const timeA = new Date(a.aimed || a.aimedDepartureTime);
+    const timeB = new Date(b.aimed || b.aimedDepartureTime);
+    return timeA - timeB;
+  });
+  
+  const nextDeparture = futureDepartures[0];
+  const nextDepartureTime = new Date(nextDeparture.aimed || nextDeparture.aimedDepartureTime);
+  
+  // Calculate when we should arrive (5 minutes before departure)
+  const targetArrivalTime = new Date(nextDepartureTime.getTime() - (5 * 60000));
+  
+  // Calculate when we should start driving
+  const suggestedDepartureTime = new Date(targetArrivalTime.getTime() - (drivingTime * 60000));
+  
+  // Format as HH:MM
+  return suggestedDepartureTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
 

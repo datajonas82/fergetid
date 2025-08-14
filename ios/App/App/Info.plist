@@ -54,9 +54,9 @@
 	<key>UIViewGroupOpacity</key>
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Denne appen trenger tilgang til din posisjon for å vise nærliggende fergekaier.</string>
+	<string>FergeTid trenger tilgang til din posisjon for å vise nærliggende fergekaier og beregne kjøretid.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Denne appen trenger tilgang til din posisjon for å vise nærliggende fergekaier.</string>
+	<string>FergeTid trenger tilgang til din posisjon for å vise nærliggende fergekaier og beregne kjøretid.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>UIRequiresFullScreen</key>

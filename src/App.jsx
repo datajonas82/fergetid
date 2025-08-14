@@ -523,6 +523,13 @@ function App() {
             console.log('📍 GPS Search: Low-accuracy position obtained via Capacitor');
           } catch (capacitorError) {
             console.error('📍 GPS Search: Capacitor Geolocation failed:', capacitorError);
+            
+            // If Capacitor fails with UNIMPLEMENTED, show iOS-specific error
+            if (capacitorError.code === 'UNIMPLEMENTED') {
+              setError('GPS-funksjonen er ikke tilgjengelig på denne iOS-versjonen. Vennligst oppdater iOS eller bruk web-appen.');
+              return;
+            }
+            
             throw capacitorError; // Don't fallback to browser geolocation on iOS
           }
         } else {
@@ -561,6 +568,13 @@ function App() {
             console.log('📍 GPS Search: High-accuracy position obtained via Capacitor');
           } catch (capacitorError) {
             console.error('📍 GPS Search: Capacitor Geolocation failed:', capacitorError);
+            
+            // If Capacitor fails with UNIMPLEMENTED, show iOS-specific error
+            if (capacitorError.code === 'UNIMPLEMENTED') {
+              setError('GPS-funksjonen er ikke tilgjengelig på denne iOS-versjonen. Vennligst oppdater iOS eller bruk web-appen.');
+              return;
+            }
+            
             throw capacitorError; // Don't fallback to browser geolocation on iOS
           }
         } else {
@@ -1087,6 +1101,12 @@ function App() {
           });
         } catch (capacitorError) {
           console.error('🔍 GPS Diagnosis: Capacitor Geolocation failed:', capacitorError);
+          
+          // If Capacitor fails with UNIMPLEMENTED, show iOS-specific error
+          if (capacitorError.code === 'UNIMPLEMENTED') {
+            return 'GPS-funksjonen er ikke tilgjengelig på denne iOS-versjonen. Vennligst oppdater iOS eller bruk web-appen.';
+          }
+          
           throw capacitorError; // Don't fallback to browser geolocation on iOS
         }
       } else {

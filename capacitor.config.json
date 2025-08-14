@@ -40,7 +40,9 @@
     "Geolocation": {
       "permissions": ["location"],
       "ios": {
-        "usageDescription": "FergeTid trenger tilgang til din posisjon for å vise nærliggende fergekaier og beregne kjøretid."
+        "usageDescription": "FergeTid trenger tilgang til din posisjon for å vise nærliggende fergekaier og beregne kjøretid.",
+        "locationAlwaysAndWhenInUseUsageDescription": "FergeTid trenger tilgang til din posisjon for å vise nærliggende fergekaier og beregne kjøretid.",
+        "locationWhenInUseUsageDescription": "FergeTid trenger tilgang til din posisjon for å vise nærliggende fergekaier og beregne kjøretid."
       }
     }
   }

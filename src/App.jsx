@@ -2020,7 +2020,7 @@ function App() {
                             (drivingDistances[stopData.id] ?? distance),
                             drivingTimes[stopData.id],
                             nextDeparture ? calculateTimeDiff(nextDeparture.aimedDepartureTime || nextDeparture.aimed) : 0,
-                            departures
+                            departuresMap[stopData.id] || []
                           )
                         }} />
                       </div>

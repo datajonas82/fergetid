@@ -498,7 +498,7 @@ function App() {
         console.log('📍 GPS Search: Trying low-accuracy position...');
         
         if (isIOS) {
-          // Use Capacitor Geolocation plugin on iOS for native permission dialog
+          // Try Capacitor Geolocation plugin first, fallback to browser geolocation with manual instructions
           try {
             // Check permissions first
             const permissionState = await Geolocation.checkPermissions();
@@ -524,13 +524,42 @@ function App() {
           } catch (capacitorError) {
             console.error('📍 GPS Search: Capacitor Geolocation failed:', capacitorError);
             
-            // If Capacitor fails with UNIMPLEMENTED, show iOS-specific error
+            // If Capacitor fails with UNIMPLEMENTED, try browser geolocation with manual instructions
             if (capacitorError.code === 'UNIMPLEMENTED') {
-              setError('GPS-funksjonen er ikke tilgjengelig på denne iOS-versjonen. Vennligst oppdater iOS eller bruk web-appen.');
-              return;
+              console.log('📍 GPS Search: Capacitor UNIMPLEMENTED, trying browser geolocation...');
+              
+              // Show manual instruction to user
+              setError('Aktiver GPS i iOS-innstillingene og prøv igjen. Gå til: Innstillinger > Personvern og sikkerhet > Plasseringstjenester > Safari > Tillat.');
+              
+              // Try browser geolocation as fallback
+              try {
+                pos = await new Promise((resolve, reject) => {
+                  const timeoutId = setTimeout(() => {
+                    reject(new Error('Low-accuracy GPS timeout'));
+                  }, 5000);
+                  
+                  navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                      clearTimeout(timeoutId);
+                      resolve(position);
+                    },
+                    (error) => {
+                      clearTimeout(timeoutId);
+                      reject(error);
+                    },
+                    { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
+                  );
+                });
+                console.log('📍 GPS Search: Low-accuracy position obtained via browser fallback');
+                setError(null); // Clear error if browser geolocation works
+              } catch (browserError) {
+                console.error('📍 GPS Search: Browser geolocation also failed:', browserError);
+                setError('GPS-funksjonen er ikke tilgjengelig. Vennligst aktiver GPS i iOS-innstillingene og prøv igjen.');
+                return;
+              }
+            } else {
+              throw capacitorError; // Don't fallback for other Capacitor errors
             }
-            
-            throw capacitorError; // Don't fallback to browser geolocation on iOS
           }
         } else {
           // Use browser geolocation on web
@@ -569,13 +598,42 @@ function App() {
           } catch (capacitorError) {
             console.error('📍 GPS Search: Capacitor Geolocation failed:', capacitorError);
             
-            // If Capacitor fails with UNIMPLEMENTED, show iOS-specific error
+            // If Capacitor fails with UNIMPLEMENTED, try browser geolocation with manual instructions
             if (capacitorError.code === 'UNIMPLEMENTED') {
-              setError('GPS-funksjonen er ikke tilgjengelig på denne iOS-versjonen. Vennligst oppdater iOS eller bruk web-appen.');
-              return;
+              console.log('📍 GPS Search: Capacitor UNIMPLEMENTED, trying browser geolocation...');
+              
+              // Show manual instruction to user
+              setError('Aktiver GPS i iOS-innstillingene og prøv igjen. Gå til: Innstillinger > Personvern og sikkerhet > Plasseringstjenester > Safari > Tillat.');
+              
+              // Try browser geolocation as fallback
+              try {
+                pos = await new Promise((resolve, reject) => {
+                  const timeoutId = setTimeout(() => {
+                    reject(new Error('High-accuracy GPS timeout'));
+                  }, 15000);
+                  
+                  navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                      clearTimeout(timeoutId);
+                      resolve(position);
+                    },
+                    (error) => {
+                      clearTimeout(timeoutId);
+                      reject(error);
+                    },
+                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+                  );
+                });
+                console.log('📍 GPS Search: High-accuracy position obtained via browser fallback');
+                setError(null); // Clear error if browser geolocation works
+              } catch (browserError) {
+                console.error('📍 GPS Search: Browser geolocation also failed:', browserError);
+                setError('GPS-funksjonen er ikke tilgjengelig. Vennligst aktiver GPS i iOS-innstillingene og prøv igjen.');
+                return;
+              }
+            } else {
+              throw capacitorError; // Don't fallback for other Capacitor errors
             }
-            
-            throw capacitorError; // Don't fallback to browser geolocation on iOS
           }
         } else {
           // Fallback to high-accuracy with shorter cache
@@ -1102,12 +1160,35 @@ function App() {
         } catch (capacitorError) {
           console.error('🔍 GPS Diagnosis: Capacitor Geolocation failed:', capacitorError);
           
-          // If Capacitor fails with UNIMPLEMENTED, show iOS-specific error
+          // If Capacitor fails with UNIMPLEMENTED, try browser geolocation
           if (capacitorError.code === 'UNIMPLEMENTED') {
-            return 'GPS-funksjonen er ikke tilgjengelig på denne iOS-versjonen. Vennligst oppdater iOS eller bruk web-appen.';
+            console.log('🔍 GPS Diagnosis: Capacitor UNIMPLEMENTED, trying browser geolocation...');
+            
+            try {
+              position = await new Promise((resolve, reject) => {
+                const timeoutId = setTimeout(() => {
+                  reject(new Error('GPS timeout during diagnosis'));
+                }, 5000);
+                
+                navigator.geolocation.getCurrentPosition(
+                  (pos) => {
+                    clearTimeout(timeoutId);
+                    resolve(pos);
+                  },
+                  (error) => {
+                    clearTimeout(timeoutId);
+                    reject(error);
+                  },
+                  { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
+                );
+              });
+              return 'GPS fungerer via browser geolocation. Aktiver GPS i iOS-innstillingene for bedre opplevelse.';
+            } catch (browserError) {
+              return 'GPS-funksjonen er ikke tilgjengelig. Vennligst aktiver GPS i iOS-innstillingene og prøv igjen.';
+            }
           }
           
-          throw capacitorError; // Don't fallback to browser geolocation on iOS
+          throw capacitorError; // Don't fallback for other Capacitor errors
         }
       } else {
         // Use browser geolocation on web

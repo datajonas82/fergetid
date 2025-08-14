@@ -31,7 +31,15 @@ export const FERRY_GROUPS = [
     'Dragsvik ferjekai',
     'Hella ferjekai', 
     'Vangsnes ferjekai'
+  ],
+  // Klokkarvik, Hjellestad og Bjelkarøy ferjekai
+  [
+    'Klokkarvik ferjekai',
+    'Hjellestad ferjekai', 
+    'Bjelkarøy ferjekai'
   ]
+
+
   
   // Eksempel på hvordan man kan legge til flere fergesamband:
   // [

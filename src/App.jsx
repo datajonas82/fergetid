@@ -500,6 +500,20 @@ function App() {
         if (isIOS) {
           // Use Capacitor Geolocation plugin on iOS for native permission dialog
           try {
+            // Check permissions first
+            const permissionState = await Geolocation.checkPermissions();
+            console.log('📍 GPS Search: Permission state:', permissionState);
+            
+            if (permissionState.location !== 'granted') {
+              console.log('📍 GPS Search: Requesting location permission...');
+              const requestResult = await Geolocation.requestPermissions();
+              console.log('📍 GPS Search: Permission request result:', requestResult);
+              
+              if (requestResult.location !== 'granted') {
+                throw new Error('Location permission denied');
+              }
+            }
+            
             const position = await Geolocation.getCurrentPosition({
               enableHighAccuracy: false,
               timeout: 5000,
@@ -543,13 +557,18 @@ function App() {
         
         if (isIOS) {
           // Use Capacitor Geolocation plugin on iOS
-          const position = await Geolocation.getCurrentPosition({
-            enableHighAccuracy: true,
-            timeout: 15000,
-            maximumAge: 10000
-          });
-          pos = position;
-          console.log('📍 GPS Search: High-accuracy position obtained via Capacitor');
+          try {
+            const position = await Geolocation.getCurrentPosition({
+              enableHighAccuracy: true,
+              timeout: 15000,
+              maximumAge: 10000
+            });
+            pos = position;
+            console.log('📍 GPS Search: High-accuracy position obtained via Capacitor');
+          } catch (highAccuracyError) {
+            console.error('📍 GPS Search: High-accuracy also failed:', highAccuracyError);
+            throw highAccuracyError;
+          }
         } else {
           // Fallback to high-accuracy with shorter cache
           pos = await new Promise((resolve, reject) => {
@@ -1052,11 +1071,30 @@ function App() {
       
       if (isIOS) {
         // Use Capacitor Geolocation plugin on iOS
-        position = await Geolocation.getCurrentPosition({
-          enableHighAccuracy: false,
-          timeout: 5000,
-          maximumAge: 600000
-        });
+        try {
+          // Check permissions first
+          const permissionState = await Geolocation.checkPermissions();
+          console.log('🔍 GPS Diagnosis: Permission state:', permissionState);
+          
+          if (permissionState.location !== 'granted') {
+            console.log('🔍 GPS Diagnosis: Requesting location permission...');
+            const requestResult = await Geolocation.requestPermissions();
+            console.log('🔍 GPS Diagnosis: Permission request result:', requestResult);
+            
+            if (requestResult.location !== 'granted') {
+              throw new Error('Location permission denied');
+            }
+          }
+          
+          position = await Geolocation.getCurrentPosition({
+            enableHighAccuracy: false,
+            timeout: 5000,
+            maximumAge: 600000
+          });
+        } catch (error) {
+          console.error('🔍 GPS Diagnosis: Capacitor Geolocation failed:', error);
+          throw error;
+        }
       } else {
         // Use browser geolocation on web
         position = await new Promise((resolve, reject) => {

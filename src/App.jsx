@@ -239,21 +239,9 @@ function App() {
     console.log('📍 GPS Search: Waiting for ferry stops to load...');
 
     // Wait for all ferry quays to be loaded before proceeding
-    if (!ferryStopsLoaded || !allFerryQuays || allFerryQuays.length === 0) {
+    while (!ferryStopsLoaded || !allFerryQuays || allFerryQuays.length === 0) {
       console.log('📍 GPS Search: Ferry stops not loaded, waiting...');
-      let attempts = 0;
-      while ((!ferryStopsLoaded || !allFerryQuays || allFerryQuays.length === 0) && attempts < 10) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        attempts++;
-        console.log(`📍 GPS Search: Waiting for ferry stops... attempt ${attempts}`);
-      }
-      
-      if (!allFerryQuays || allFerryQuays.length === 0) {
-        console.error('📍 GPS Search: Ferry stops still not loaded after waiting');
-        setError('Fergekaier er ikke lastet ennå. Prøv igjen om noen sekunder.');
-        setLoading(false);
-        return;
-      }
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     // Helper to compute nearby stops and update UI based on coordinates
@@ -299,7 +287,8 @@ function App() {
       // Double-check that ferry quays are loaded
       if (!allFerryQuays || allFerryQuays.length === 0) {
         console.error('📍 GPS Search: No ferry quays available for distance calculation');
-        setError('Fergekaier er ikke tilgjengelige. Prøv igjen om noen sekunder.');
+        // This should not happen since we waited above, but just in case
+        setError('Fergekaier er ikke tilgjengelige. Prøv igjen.');
         setLoading(false);
         return;
       }

@@ -169,7 +169,7 @@ const STOP_COORDINATE_OVERRIDES = {
 
 // Name-based overrides as fallback (normalized to lowercase)
 const STOP_COORDINATE_NAME_OVERRIDES = {
-  'sulesund ferjekai': { latitude: 62.395646, longitude: 6.167937 },
+  // Sulesund ferjekai override removed
 };
 
 function App() {

@@ -1388,7 +1388,7 @@ function App() {
     
     if (!canMakeIt) return 'text-red-600';
     if (margin < 5) return 'text-red-500'; // Rød for små marginer
-    if (margin < 15) return 'text-yellow-600'; // Gul for moderate marginer
+    if (margin < 15) return 'text-green-600'; // Grønn for moderate marginer (tidligere gul)
     return 'text-green-600'; // Grønn for gode marginer
   };
 

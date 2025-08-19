@@ -22,12 +22,13 @@
       "backgroundColor": "#d95cff",
       "showSpinner": true,
       "spinnerColor": "#ffffff",
-      "spinnerStyle": "large"
+      "spinnerStyle": "large",
+      "image": "ios-splash.png"
     }
   },
   "plugins": {
     "SplashScreen": {
-      "launchShowDuration": 2000,
+      "launchShowDuration": 5000,
       "backgroundColor": "#d95cff",
       "showSpinner": true,
       "spinnerColor": "#ffffff",
@@ -35,7 +36,13 @@
       "splashImmersive": true,
       "spinnerStyle": "large",
       "androidSpinnerStyle": "large",
-      "iosSpinnerStyle": "large"
+      "iosSpinnerStyle": "large",
+      "ios": {
+        "backgroundColor": "#d95cff",
+        "showSpinner": true,
+        "spinnerColor": "#ffffff",
+        "spinnerStyle": "large"
+      }
     },
     "Geolocation": {
       "permissions": ["location"],
@@ -45,8 +52,10 @@
         "locationWhenInUseUsageDescription": "FergeTid trenger tilgang til din posisjon for å vise nærliggende fergekaier og beregne kjøretid."
       }
     },
-    "cordova-plugin-purchase": {
-      "BILLING_KEY": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..."
+    "PurchasesPlugin": {
+      "ios": {
+        "usesStoreKit2IfAvailable": false
+      }
     }
   }
 }

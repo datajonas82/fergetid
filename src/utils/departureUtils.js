@@ -1,6 +1,6 @@
 // Utility functions for departure time formatting, coloring, and rules
 import { calculateTimeDiff } from './helpers';
-import { isCurrentlyDriving } from './drivingDetector';
+
 
 // Helper function to format distance
 const formatDistance = (distance) => {
@@ -66,7 +66,7 @@ const calculateWaitTimeForNextFerry = (allDepartures, timeToDeparture, drivingTi
 };
 
 // Helper function to format wait time at ferry terminal
-const formatWaitTime = (waitMinutes, allDepartures = [], drivingTime = 0, isCurrentlyDriving = false) => {
+const formatWaitTime = (waitMinutes, allDepartures = [], drivingTime = 0) => {
   // Sjekk om det faktisk er flere avganger i dag
   const now = new Date();
   const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
@@ -111,7 +111,7 @@ const formatWaitTime = (waitMinutes, allDepartures = [], drivingTime = 0, isCurr
       waitTimeText = `${hours} ${hourText} og ${minutes} ${minuteText}`;
     }
     
-    if (suggestedDepartureTime && !isCurrentlyDriving) {
+    if (suggestedDepartureTime) {
       return `Du må vente i <span style="color: #f59e0b; font-weight: bold;">${waitTimeText}</span> til neste avgang. <span style="color: #000000;">Start å kjør kl. <span style="font-weight: bold;">${suggestedDepartureTime}</span> for å rekke fergen med <span style="font-weight: bold;">5 minutter</span> margin.</span>`;
     } else {
       return `Du må vente i <span style="color: #f59e0b; font-weight: bold;">${waitTimeText}</span> til neste avgang`;
@@ -181,10 +181,9 @@ const calculateSuggestedDepartureTime = (allDepartures, drivingTime) => {
  * @param {number} drivingTime - Driving time in minutes
  * @param {number} timeToDeparture - Minutes until next departure
  * @param {Array} allDepartures - All available departures
- * @param {boolean} isCurrentlyDriving - Whether user is currently driving
  * @returns {string} HTML formatted description
  */
-export const generateTravelDescription = (distance, drivingTime, timeToDeparture, allDepartures = [], isCurrentlyDriving = false) => {
+export const generateTravelDescription = (distance, drivingTime, timeToDeparture, allDepartures = []) => {
   const distanceText = formatDistance(distance);
   const drivingTimeText = formatDrivingTime(drivingTime);
   
@@ -211,7 +210,7 @@ export const generateTravelDescription = (distance, drivingTime, timeToDeparture
     
     // Calculate wait time for next ferry (after arriving at terminal)
     const waitTimeForNextFerry = calculateWaitTimeForNextFerry(allDepartures, timeToDeparture, drivingTime);
-    const waitTimeText = formatWaitTime(waitTimeForNextFerry, allDepartures, drivingTime, isCurrentlyDriving);
+    const waitTimeText = formatWaitTime(waitTimeForNextFerry, allDepartures, drivingTime);
     
     // Only show missed time if wait time is significant (more than 15 minutes)
     if (waitTimeForNextFerry > 15) {
@@ -244,8 +243,8 @@ export const generateTravelDescription = (distance, drivingTime, timeToDeparture
  * @returns {string} Tailwind CSS color class
  */
 export function getDepartureTimeColor(departureTime, drivingTime, showDrivingTimes, mode) {
-  // Default green when driving times are disabled or not in GPS mode
-  if (!showDrivingTimes || !drivingTime || mode !== 'gps') {
+  // Default green when driving times are disabled
+  if (!showDrivingTimes || !drivingTime) {
     return 'text-green-600';
   }
   
@@ -268,7 +267,7 @@ export function getDepartureTimeColor(departureTime, drivingTime, showDrivingTim
  * @returns {boolean} True if departure is missed
  */
 export function isDepartureMissed(departureTime, drivingTime, showDrivingTimes, mode) {
-  if (!showDrivingTimes || !drivingTime || mode !== 'gps') {
+  if (!showDrivingTimes || !drivingTime) {
     return false;
   }
   

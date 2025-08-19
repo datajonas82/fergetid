@@ -60,7 +60,7 @@ export const config = {
       const url = `${config.HERE_CONFIG.ROUTING_BASE_URL}?origin=${origin}&destination=${destination}&transportMode=car&routingMode=fast&return=summary${avoid}&apiKey=${apiKey}`;
       
       if (import.meta.env.DEV) {
-        console.log('🔗 HERE API URL:', url);
+    
       }
       
       return url;

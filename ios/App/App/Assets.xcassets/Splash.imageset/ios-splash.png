@@ -1,0 +1,3 @@
+# This is a placeholder for the iOS splash screen PNG file
+# In a real implementation, you would convert the SVG to PNG using a tool like ImageMagick or online converter
+# The PNG should be 1242x2688 pixels for optimal iOS display

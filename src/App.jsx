@@ -3,10 +3,10 @@ import { GraphQLClient, gql } from 'graphql-request';
 import { Capacitor } from '@capacitor/core';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { Geolocation } from '@capacitor/geolocation';
-import { track } from '@vercel/analytics';
+
 import LoadingSpinner from './components/LoadingSpinner';
 
-import inAppPurchaseService from './services/inAppPurchase';
+
 import { calculateDrivingTime } from './utils/GeoServices';
 import { 
   ENTUR_ENDPOINT, 
@@ -35,11 +35,7 @@ import {
   getLaterDepartures,
   generateTravelDescription
 } from './utils/departureUtils';
-import { 
-  startDrivingDetection, 
-  stopDrivingDetection, 
-  isCurrentlyDriving as getCurrentDrivingState 
-} from './utils/drivingDetector';
+
 import { 
   getConnectedFerryQuays,
   getSpecialFerryConnections 
@@ -211,6 +207,12 @@ const STOP_COORDINATE_NAME_OVERRIDES = {
 };
 
 function App() {
+
+  
+
+  
+
+  
   // Search state
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
@@ -245,16 +247,19 @@ function App() {
   const [allFerryQuays, setAllFerryQuays] = useState([]);
 
       // Driving time calculation state
-    const [showDrivingTimes, setShowDrivingTimes] = useState(false); // Start disabled, enable if purchased
+    const [showDrivingTimes, setShowDrivingTimes] = useState(true); // Always enabled
     const [drivingTimes, setDrivingTimes] = useState({});
     const [drivingDistances, setDrivingDistances] = useState({});
     const [drivingTimesLoading, setDrivingTimesLoading] = useState({});
     const [drivingTimeSources, setDrivingTimeSources] = useState({});
-    const [isIOS] = useState(Capacitor.isNativePlatform());
-    const [purchaseStatus, setPurchaseStatus] = useState(null);
+    const [isIOS] = useState(Capacitor.getPlatform() === 'ios');
+    
+
+    
+    
+
   
-  // Driving detection state
-  const [isCurrentlyDriving, setIsCurrentlyDriving] = useState(false);
+
   
   // Inline destinations state - now supports multiple destinations per stop
   const [inlineDestinations, setInlineDestinations] = useState({}); // { [parentStopId]: [{ stopId, name, departures: array }] }
@@ -301,8 +306,6 @@ function App() {
     setHasInteracted(false);
     setSelectedStop(null);
     setMode('gps');
-    // Don't automatically enable driving times - let purchase status control this
-    // Don't clear inlineDestinations - keep existing return cards
 
     // Wait for all ferry quays to be loaded before proceeding
     while (!ferryStopsLoaded || !allFerryQuays || allFerryQuays.length === 0) {
@@ -536,11 +539,7 @@ function App() {
         setHasInteracted(true);
         setSelectedStop(finalPlaces[0].id);
         
-        // Track successful GPS search
-        track('gps_search_success', { 
-          stops_found: finalPlaces.length,
-          location: locationName 
-        });
+
       }
     };
 
@@ -572,16 +571,14 @@ function App() {
           } catch (capacitorError) {
             console.error('📍 GPS Search: Capacitor Geolocation failed:', capacitorError);
             
-            // If Capacitor fails with UNIMPLEMENTED, try browser geolocation silently
-            if (capacitorError.code === 'UNIMPLEMENTED') {
-              console.log('📍 GPS Search: Capacitor Geolocation not available, trying browser geolocation...');
-              
-              // Try browser geolocation as fallback without showing error first
+            // If Capacitor fails, try browser geolocation silently
+            if (capacitorError.code === 'OS-PLUG-GLOC-0002' || capacitorError.code === 'UNIMPLEMENTED') {
+              // Try browser geolocation as fallback silently
               try {
                 pos = await new Promise((resolve, reject) => {
                   const timeoutId = setTimeout(() => {
-                    reject(new Error('Low-accuracy GPS timeout'));
-                  }, 5000);
+                    reject(new Error('GPS timeout'));
+                  }, 8000);
                   
                   navigator.geolocation.getCurrentPosition(
                     (position) => {
@@ -660,18 +657,14 @@ function App() {
             });
             pos = position;
           } catch (capacitorError) {
-            console.error('📍 GPS Search: Capacitor Geolocation failed:', capacitorError);
-            
-            // If Capacitor fails with UNIMPLEMENTED, try browser geolocation silently
-            if (capacitorError.code === 'UNIMPLEMENTED') {
-              console.log('📍 GPS Search: Capacitor Geolocation not available, trying browser geolocation...');
-              
-              // Try browser geolocation as fallback without showing error first
+            // Handle GPS errors silently - don't show error messages for common GPS issues
+            if (capacitorError.code === 'OS-PLUG-GLOC-0002' || capacitorError.code === 'UNIMPLEMENTED') {
+              // Try browser geolocation as fallback silently
               try {
                 pos = await new Promise((resolve, reject) => {
                   const timeoutId = setTimeout(() => {
-                    reject(new Error('High-accuracy GPS timeout'));
-                  }, 15000);
+                    reject(new Error('GPS timeout'));
+                  }, 10000);
                   
                   navigator.geolocation.getCurrentPosition(
                     (position) => {
@@ -774,60 +767,13 @@ function App() {
       setError(errorMessage);
       setLoading(false);
       
-      // Track GPS error
-      track('gps_error', { 
-        error: err.code || 'unknown',
-        message: errorMessage 
-      });
+
     }
   };
 
-  // Handle purchase of driving time description
-  const handlePurchaseDrivingTimeDescription = async () => {
-    if (!isIOS) {
-      // Web app: Always show driving times
-      setShowDrivingTimes(true);
-      return;
-    }
 
-    try {
-      console.log('Starting purchase process...');
-      console.log('Current purchase status:', purchaseStatus);
-      
-      await inAppPurchaseService.purchase();
-      
-      // Update purchase status
-      const status = inAppPurchaseService.getPurchaseStatus();
-      setPurchaseStatus(status);
-      
-      // Enable driving times
-      setShowDrivingTimes(true);
-      
-      console.log('Purchase successful! New status:', status);
-      
-      // Track successful purchase
-      track('driving_time_purchase_success');
-      
-    } catch (error) {
-      console.error('Purchase failed:', error);
-      
-      // Show user-friendly error message
-      let errorMessage = 'Kjøpet feilet. Prøv igjen senere.';
-      
-      if (error.message.includes('not available')) {
-        errorMessage = 'In-app kjøp er ikke tilgjengelig på denne enheten.';
-      } else if (error.message.includes('already purchased')) {
-        errorMessage = 'Du har allerede kjøpt denne funksjonen.';
-      } else if (error.message.includes('not available in the store')) {
-        errorMessage = 'Produktet er ikke tilgjengelig i App Store ennå.';
-      }
-      
-      setError(errorMessage);
-      
-      // Track failed purchase
-      track('driving_time_purchase_failed', { error: error.message });
-    }
-  };
+
+
 
   // Load all ferry stops function (we'll use quay info from Line.quays for matching)
   const loadAllFerryStops = async () => {
@@ -878,67 +824,56 @@ function App() {
 
   // Initialize app function
   const initializeApp = async () => {
-    // Track app initialization
-    track('app_initialized', { 
-      platform: isIOS ? 'ios' : 'web',
-      userAgent: navigator.userAgent 
-    });
-    
-    // Initialize services
-    if (isIOS) {
-      try {
-        // await inAppPurchaseService.initialize(); // Removed inAppPurchaseService import
-      } catch (error) {
-        console.error('Error initializing services:', error);
-      }
+    try {
+
+      
+      // Kjøretidsberegning er alltid tilgjengelig
+      setShowDrivingTimes(true);
+      
+    } catch (error) {
+      console.error('❌ Error in initializeApp:', error);
     }
   };
 
+
+
+
+
   // Initialize app
   useEffect(() => {
-    initializeApp();
-    loadAllFerryStops(); // Load all ferry stops on initial app load
+    try {
+      initializeApp();
+      loadAllFerryStops(); // Load all ferry stops on initial app load
+    } catch (error) {
+      console.error('🔄 Error in useEffect:', error);
+    }
   }, []);
 
-  // Initialize in-app purchase service
-  useEffect(() => {
-    const initializePurchaseService = async () => {
-      try {
-        await inAppPurchaseService.initialize();
-        const status = inAppPurchaseService.getPurchaseStatus();
-        setPurchaseStatus(status);
-        
-        // Set driving times based on purchase status and platform
-        if (!isIOS) {
-          // Web app: Always show driving times
-          setShowDrivingTimes(true);
-        } else {
-          // iOS: Only show if purchased
-          setShowDrivingTimes(status.isPurchased);
-        }
-      } catch (error) {
-        console.error('Failed to initialize purchase service:', error);
-        // Fallback: show driving times on web, hide on iOS
-        setShowDrivingTimes(!isIOS);
-      }
-    };
 
-    initializePurchaseService();
-  }, [isIOS]);
 
-  // Hide splash screen immediately when component mounts
+  // Custom splash screen state
+  const [showCustomSplash, setShowCustomSplash] = useState(true);
+
+  // Hide splash screen when app is ready
   useEffect(() => {
     const hideSplashScreen = async () => {
       try {
         await SplashScreen.hide();
-
       } catch (error) {
         console.error('Error hiding splash screen:', error);
       }
     };
 
-    // Hide splash screen after a short delay to ensure app is ready
-    setTimeout(hideSplashScreen, 500);
+    // Hide splash screen quickly to avoid timeout warning
+    const hideSplashWhenReady = () => {
+      // Hide splash screen immediately when app starts
+      setTimeout(() => {
+        hideSplashScreen();
+        setShowCustomSplash(false);
+      }, 500);
+    };
+
+    hideSplashWhenReady();
   }, []);
 
   // Live search function - show ferry cards as user types
@@ -961,10 +896,7 @@ function App() {
       // Enkelt søk: vis kun fergekaier som starter med søkeordet
       const matches = name.startsWith(searchQuery);
       
-      // Debug: logg alle fergekaier som starter med "skår"
-      if (searchQuery === 'skår') {
-        console.log(`"${stop.name}" starter med "skår": ${matches}`);
-      }
+
       
       return matches;
     });
@@ -1123,26 +1055,15 @@ function App() {
       setHasInteracted(true);
       setSelectedStop(formattedStops[0].id);
       
-      // Aktiver kjøretidsvisning hvis GPS er tilgjengelig og vi har kjøretidsdata
-      if (location && !showDrivingTimes) {
-        // Only enable if purchased (iOS) or on web
-        if (!isIOS || purchaseStatus?.isPurchased) {
-          setShowDrivingTimes(true);
-        }
-      }
+      // Kjøretidsvisning er alltid aktivert
       
-      // Track successful search
-      track('search_success', { 
-        query: query,
-        results: formattedStops.length 
-      });
+
     } else {
       setFerryStops([]);
       setHasInteracted(false);
       setSelectedStop(null);
       
-      // Track search with no results
-      track('search_no_results', { query: query });
+
     }
   };
 
@@ -1177,7 +1098,7 @@ function App() {
   // Throttle driving time calculations to avoid spamming APIs on rapid updates
   const drivingTimesThrottleRef = useRef(null);
   useEffect(() => {
-    if (!(showDrivingTimes && mode === 'gps' && location && ferryStops.length > 0)) {
+    if (!(showDrivingTimes && location && ferryStops.length > 0)) {
       return;
     }
     if (drivingTimesThrottleRef.current) {
@@ -1191,60 +1112,13 @@ function App() {
         clearTimeout(drivingTimesThrottleRef.current);
       }
     };
-  }, [showDrivingTimes, location, ferryStops, mode]);
+  }, [showDrivingTimes, location, ferryStops]);
 
-  // Automatically enable driving times when GPS location is available (only if purchased or web)
-  useEffect(() => {
-    if (location && !showDrivingTimes) {
-      // Only enable if purchased (iOS) or on web
-      if (!isIOS || purchaseStatus?.isPurchased) {
-        setShowDrivingTimes(true);
-      }
-    }
-  }, [location, showDrivingTimes, isIOS, purchaseStatus]);
 
-  // Hide splash screen when app is ready
-  useEffect(() => {
-    const hideSplashScreen = async () => {
-      try {
-        await SplashScreen.hide();
 
-      } catch (error) {
-        console.error('Error hiding splash screen:', error);
-      }
-    };
 
-    // Hide splash screen as soon as app is initialized
-    const hideSplashWhenReady = () => {
-      // Hide immediately if ferry stops are loaded
-      if (ferryStopsLoaded && allFerryQuays.length > 0) {
-        hideSplashScreen();
-        return;
-      }
-      
-      // Fallback: Hide after 1 second if ferry stops are still loading
-      setTimeout(() => {
-        hideSplashScreen();
-      }, 1000);
-    };
 
-    hideSplashWhenReady();
-  }, [ferryStopsLoaded, allFerryQuays.length]);
 
-  // Start driving detection when app loads
-  useEffect(() => {
-    const handleDrivingStateChange = (isDriving) => {
-      setIsCurrentlyDriving(isDriving);
-    };
-
-    // Start driving detection
-    startDrivingDetection(handleDrivingStateChange);
-
-    // Cleanup function to stop detection when component unmounts
-    return () => {
-      stopDrivingDetection();
-    };
-  }, []);
 
   // GPS functionality
   const handleGPSLocation = async () => {
@@ -1255,8 +1129,7 @@ function App() {
     
 
     
-    // Track GPS usage
-    track('gps_search_clicked');
+
     
 
     
@@ -1704,6 +1577,23 @@ function App() {
 
   return (
     <>
+      {/* Custom Splash Screen */}
+      {showCustomSplash && (
+        <div className="fixed inset-0 bg-gradient-to-br from-fuchsia-500 to-pink-500 flex flex-col items-center justify-center z-50">
+          <div className="text-center">
+            <h1 className="text-4xl sm:text-6xl font-bold text-white mb-8 drop-shadow-lg">
+              FerjeTid
+            </h1>
+            <div className="text-white text-lg mb-6">
+              laster...
+            </div>
+            <div className="flex justify-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-gradient flex flex-col items-center min-h-screen pb-16 sm:pb-24 pt-20 sm:pt-24">
         <h1 className="text-5xl sm:text-7xl font-extrabold text-white tracking-tight mb-6 sm:mb-6 drop-shadow-lg fergetid-title">{APP_NAME}</h1>
       
@@ -1823,21 +1713,9 @@ function App() {
 
 
 
-        {/* Activate Driving Time Description Button */}
-        {isIOS && !purchaseStatus?.isPurchased && (mode === 'gps' || ferryStops.length > 0) && (
-          <div className="mb-4 px-3">
-            <button
-              onClick={handlePurchaseDrivingTimeDescription}
-              className="w-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors shadow-lg"
-            >
-              Aktiver kjøretidbeskrivelse
-              <p className="text-xs text-white/80 text-center mt-2">
-              Få kjøretid, fargekodet avganger og informasjon om du rekker avgangen
-            </p>
-            </button>
-            
-          </div>
-        )}
+
+
+
 
 
 
@@ -2046,7 +1924,7 @@ function App() {
                               
                               return uniqueDepartures;
                             })(),
-                            isCurrentlyDriving
+                            false
                           )
                         }} />
                       </div>

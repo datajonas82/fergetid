@@ -1,15 +1,5 @@
 {
-  "appPolicies" : {
-    "eula" : "",
-    "policies" : [
-      {
-        "locale" : "en_US",
-        "policyText" : "Driving Time Description provides access to driving time, color-coded departures and information about whether you'll make the departure.",
-        "policyURL" : ""
-      }
-    ]
-  },
-  "identifier" : "CD73B0E0",
+  "identifier" : "FergetidConfiguration",
   "nonRenewingSubscriptions" : [
 
   ],
@@ -17,49 +7,39 @@
     {
       "displayPrice" : "49.00",
       "familyShareable" : false,
-      "internalID" : "6749610951",
+      "internalID" : "kjoretidberegning",
       "localizations" : [
         {
-          "description" : "Get driving time, color-coded departures and information about whether you'll make the departure",
-          "displayName" : "Driving Time Description",
-          "locale" : "en_US"
+          "description" : "Få tilgang til kjøretidsberegning for å se om du rekker fergeavgangen",
+          "displayName" : "Kjøretidsberegning",
+          "locale" : "nb_NO"
         }
       ],
-      "productID" : "kjoretidbeskrivelse",
-      "promotionalImageID" : "1E2CBF53",
-      "referenceName" : "Driving Time Description",
+      "productID" : "kjoretidberegning",
+      "referenceName" : "Kjøretidsberegning",
       "type" : "NonConsumable"
     }
   ],
   "settings" : {
-    "_applicationInternalID" : "6749610950",
-    "_developerTeamID" : "4KXD6TXQZQ",
+    "_applicationInternalID" : "com.fergetid.app",
+    "_developerTeamID" : "YOUR_TEAM_ID",
     "_failTransactionsEnabled" : false,
-    "_lastSynchronizedDate" : 776883275.92246199,
-    "_locale" : "nb",
+    "_lastSynchronizedDate" : 749433600.0,
+    "_locale" : "nb_NO",
     "_storefront" : "NOR",
     "_storeKitErrors" : [
       {
-        "current" : {
-          "index" : 2,
-          "type" : "generic"
-        },
+        "current" : null,
         "enabled" : false,
         "name" : "Load Products"
       },
       {
-        "current" : {
-          "index" : 1,
-          "type" : "purchase"
-        },
+        "current" : null,
         "enabled" : false,
         "name" : "Purchase"
       },
       {
-        "current" : {
-          "index" : 0,
-          "type" : "verification"
-        },
+        "current" : null,
         "enabled" : false,
         "name" : "Verification"
       },
@@ -99,7 +79,8 @@
 
   ],
   "version" : {
-    "major" : 4,
+    "major" : 3,
     "minor" : 0
   }
 }
+

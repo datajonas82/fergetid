@@ -41,13 +41,11 @@ const checkRouteForFerries = (routeDescription) => {
 
 // Function to enable ferry checking (for testing purposes)
 export const enableFerryChecking = () => {
-  console.log('🔧 Ferry checking enabled for testing');
   return true;
 };
 
 // Function to disable ferry checking (default in development)
 export const disableFerryChecking = () => {
-  console.log('🔧 Ferry checking disabled (development mode)');
   return false;
 };
 
@@ -219,7 +217,7 @@ const calculateDrivingTimeWithHERE = async (startCoords, endCoords, options = {}
   const distanceMeters = summary.length || 0;
   
   if (import.meta.env.DEV) {
-    console.log('🔗 HERE API Result:', { durationSeconds, durationMinutes, distanceMeters, hasFerry });
+
   }
   
   // If HERE API returns 0 distance, fall back to haversine

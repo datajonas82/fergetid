@@ -45,27 +45,10 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
-	<key>UIStatusBarStyle</key>
-	<string>UIStatusBarStyleLightContent</string>
-	<key>UIStatusBarHidden</key>
-	<false/>
-	<key>UIViewEdgeAntialiasing</key>
-	<true/>
-	<key>UIViewGroupOpacity</key>
-	<true/>
+
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>FergeTid trenger tilgang til din posisjon for å vise nærliggende fergekaier og beregne kjøretid.</string>
+	<string>Fergetid bruker din posisjon for å finne nærmeste fergekaier og beregne kjøretid til disse. Dette hjelper deg å planlegge reisen din bedre.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>FergeTid trenger tilgang til din posisjon for å vise nærliggende fergekaier og beregne kjøretid.</string>
-	<key>NSMotionUsageDescription</key>
-	<string>FergeTid bruker bevegelsessensorer for å forbedre GPS-nøyaktigheten.</string>
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
-	<key>UIRequiresFullScreen</key>
-	<true/>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
-	<key>SKPaymentTransactionObserverClass</key>
-	<string>CDVStoreKit</string>
+	<string>Fergetid bruker din posisjon for å finne nærmeste fergekaier og beregne kjøretid til disse. Dette hjelper deg å planlegge reisen din bedre.</string>
 </dict>
 </plist>

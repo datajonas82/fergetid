@@ -13,7 +13,8 @@ import {
   TRANSPORT_MODES, 
   APP_NAME,
   GEOLOCATION_OPTIONS,
-  EXCLUDED_SUBMODES
+  EXCLUDED_SUBMODES,
+  GPS_SEARCH_CONFIG
 } from './constants';
 import { config } from './config';
 import { 
@@ -365,11 +366,11 @@ function App() {
 
       // Filter by distance and sort
       const nearbyCandidates = placesWithDistance
-        .filter(p => p.distance <= 60000) // 60 km radius
+        .filter(p => p.distance <= GPS_SEARCH_CONFIG.SEARCH_RADIUS_METERS) // Configurable radius
         .sort((a, b) => a.distance - b.distance);
 
       if (nearbyCandidates.length === 0) {
-        setError('Ingen fergekaier funnet innen 60 km fra din posisjon. Prøv å søke manuelt i stedet.');
+        setError(`Ingen fergekaier funnet innen ${GPS_SEARCH_CONFIG.SEARCH_RADIUS_METERS / 1000} km fra din posisjon. Prøv å søke manuelt i stedet.`);
         setLoading(false);
         return;
       }
@@ -409,10 +410,10 @@ function App() {
       
       // Grow search window until we find enough results (handles many nearby water stops without departures)
       const collectedWithDepartures = [];
-      const chunkSize = 20; // Reduced from 30
-      const maxCandidates = Math.min(nearbyCandidates.length, 100); // Reduced from 200
+      const chunkSize = GPS_SEARCH_CONFIG.CHUNK_SIZE;
+      const maxCandidates = Math.min(nearbyCandidates.length, GPS_SEARCH_CONFIG.MAX_CANDIDATES);
       
-      for (let i = 0; i < maxCandidates && collectedWithDepartures.length < 8; i += chunkSize) { // Increased from 5 to 8
+      for (let i = 0; i < maxCandidates && collectedWithDepartures.length < GPS_SEARCH_CONFIG.MAX_RESULTS; i += chunkSize) {
         const chunk = nearbyCandidates.slice(i, i + chunkSize);
         const results = await Promise.all(chunk.map(fetchDepartures));
         for (const res of results) {
@@ -428,14 +429,14 @@ function App() {
         return;
       }
 
-      // Choose up to 8 stops that are drivable by road (avoid ferries in routing) and compute their driving times/distances
+      // Choose stops that are drivable by road (avoid ferries in routing) and compute their driving times/distances
       // I GPS-funksjonen filtrerer vi bort fergekaier som krever ferge for å komme til
       // Dette er forskjellig fra søkefunksjonen som viser alle fergekaier
       const origin = { lat: latitude, lng: longitude };
       const localDrivingDistances = {}; // Local storage for distances
       
-      // Process first 8 stops in parallel for better performance
-      const stopsToProcess = collectedWithDepartures.slice(0, 8);
+      // Process stops in parallel for better performance
+      const stopsToProcess = collectedWithDepartures.slice(0, GPS_SEARCH_CONFIG.MAX_RESULTS);
       const drivingTimePromises = stopsToProcess.map(async (stop) => {
         try {
           const result = await calculateDrivingTime(origin, { lat: stop.latitude, lng: stop.longitude }, { roadOnly: true });
@@ -457,7 +458,7 @@ function App() {
           (result.source.startsWith('routes_v2') || result.source.startsWith('directions_v1') || result.source.startsWith('here_routing_v8') || result.source === 'haversine') &&
           typeof result.distance === 'number' &&
           result.distance > 0 && // Must have a valid distance
-          (result.distance <= 60000 || result.source === 'haversine') // Allow haversine results within luftlinje radius
+          (result.distance <= GPS_SEARCH_CONFIG.DRIVING_RADIUS_METERS || result.source === 'haversine') // Allow haversine results within luftlinje radius
         ) {
           // Check if the route contains ferries despite avoidFerries parameter (only for routing APIs, not haversine)
           if (result.hasFerry && result.source !== 'haversine') {
@@ -1582,7 +1583,7 @@ function App() {
         <div className="fixed inset-0 bg-gradient-to-br from-fuchsia-500 to-pink-500 flex flex-col items-center justify-center z-50">
           <div className="text-center">
             <h1 className="text-4xl sm:text-6xl font-bold text-white mb-8 drop-shadow-lg">
-              FerjeTid
+              FergeTid
             </h1>
             <div className="text-white text-lg mb-6">
               laster...

@@ -37,4 +37,22 @@ export const DISTANCE_UNITS = {
 export const TIME_FORMAT_OPTIONS = {
   hour: '2-digit',
   minute: '2-digit'
+};
+
+// GPS Search Radius Configuration
+export const GPS_SEARCH_CONFIG = {
+  // Main search radius in meters (70 km)
+  SEARCH_RADIUS_METERS: 70000,
+  
+  // Driving time calculation radius in meters (70 km)
+  DRIVING_RADIUS_METERS: 70000,
+  
+  // Maximum number of candidates to process
+  MAX_CANDIDATES: 100,
+  
+  // Chunk size for processing candidates
+  CHUNK_SIZE: 20,
+  
+  // Maximum number of results to return
+  MAX_RESULTS: 8
 }; 

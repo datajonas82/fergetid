@@ -1611,9 +1611,22 @@ function App() {
         {/* Premium CTA (kun etter GPS-klikk uten premium) */}
         {showPremiumCTA && !hasPremium && (
           <div className="w-full max-w-[350px] sm:max-w-md mb-6 px-3 sm:px-4">
-            <div className="bg-white/90 backdrop-blur-md border border-fuchsia-200 rounded-lg shadow-lg p-4">
+            {/* Modal overlay */}
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" onClick={() => setShowPremiumCTA(false)}></div>
+            {/* Modal card */}
+            <div className="relative z-50 bg-white/95 backdrop-blur-md border border-fuchsia-200 rounded-2xl shadow-2xl p-4 mx-auto">
+              {/* Close (X) */}
+              <button
+                type="button"
+                aria-label="Lukk"
+                onClick={() => setShowPremiumCTA(false)}
+                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+              >
+                ×
+              </button>
               <div className="text-gray-800 font-bold mb-2">Få Premium</div>
               <div className="text-gray-700 text-sm mb-1">GPS og kjøretidsbeskrivelse krever Premium-abonnement.</div>
+              <div className="text-gray-700 text-sm">Pris: <span className="font-semibold">29 kr/måned</span> eller <span className="font-semibold">299 kr/år</span>.</div>
               <div className="text-gray-700 text-sm mb-4"><span className="font-semibold">14 dager gratis</span>, deretter fortsetter abonnementet automatisk. Du kan avslutte når som helst.</div>
               <div className="flex gap-2">
                 <button
@@ -1634,6 +1647,7 @@ function App() {
                 >
                   Kjøp månedlig
                 </button>
+                {/* native paywall fjernet */}
                 <button
                   type="button"
                   onClick={async () => {
@@ -1653,25 +1667,27 @@ function App() {
                   Kjøp årlig
                 </button>
               </div>
-              <div className="mt-3 text-right flex gap-3 justify-end">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      await restorePurchasesIOS();
-                      const active = await isPremiumActive();
-                      setHasPremium(active);
-                      setShowDrivingTimes(!!active);
-                      if (active) setShowPremiumCTA(false);
-                    } catch (e) {
-                      console.error('Gjenoppretting feilet', e);
-                    }
-                  }}
-                  className="text-sm text-fuchsia-700 hover:underline"
-                >
-                  Gjenopprett kjøp (iOS)
-                </button>
-              </div>
+              {(typeof window !== 'undefined' && window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'ios') && (
+                <div className="mt-3 text-right flex gap-3 justify-end">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await restorePurchasesIOS();
+                        const active = await isPremiumActive();
+                        setHasPremium(active);
+                        setShowDrivingTimes(!!active);
+                        if (active) setShowPremiumCTA(false);
+                      } catch (e) {
+                        console.error('Gjenoppretting feilet', e);
+                      }
+                    }}
+                    className="text-sm text-fuchsia-700 hover:underline"
+                  >
+                    Gjenopprett kjøp (iOS)
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

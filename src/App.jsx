@@ -7,15 +7,15 @@ import { Geolocation } from '@capacitor/geolocation';
 import LoadingSpinner from './components/LoadingSpinner';
 
 
-import { calculateDrivingTime } from './utils/GeoServices';
+import { calculateDrivingTime } from './services/GeoServices';
 import { 
   ENTUR_ENDPOINT, 
   TRANSPORT_MODES, 
   APP_NAME,
   GEOLOCATION_OPTIONS,
   EXCLUDED_SUBMODES
-} from './constants';
-import { config } from './config';
+} from './config/constants';
+import { config } from './config/config';
 import { 
   formatMinutes, 
   formatDistance, 
@@ -35,6 +35,8 @@ import {
   getLaterDepartures,
   generateTravelDescription
 } from './utils/departureUtils';
+
+import { initPurchases, isPremiumActive, canMakePayments, restorePurchasesIOS } from './services/PurchasesService';
 
 import { 
   getConnectedFerryQuays,
@@ -236,6 +238,8 @@ function App() {
   const [cardLoading, setCardLoading] = useState({});
   const [error, setError] = useState(null);
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [hasPremium, setHasPremium] = useState(false);
+  const [showPremiumCTA, setShowPremiumCTA] = useState(false);
 
   // Mode state
   const [mode, setMode] = useState('search'); // 'search' or 'gps'
@@ -247,7 +251,7 @@ function App() {
   const [allFerryQuays, setAllFerryQuays] = useState([]);
 
       // Driving time calculation state
-    const [showDrivingTimes, setShowDrivingTimes] = useState(true); // Always enabled
+    const [showDrivingTimes, setShowDrivingTimes] = useState(false); // Premium-gated
     const [drivingTimes, setDrivingTimes] = useState({});
     const [drivingDistances, setDrivingDistances] = useState({});
     const [drivingTimesLoading, setDrivingTimesLoading] = useState({});
@@ -825,10 +829,16 @@ function App() {
   // Initialize app function
   const initializeApp = async () => {
     try {
-
-      
-      // Kjøretidsberegning er alltid tilgjengelig
-      setShowDrivingTimes(true);
+      await initPurchases();
+      try {
+        const capability = await canMakePayments();
+        if (capability && capability.canMakePayments === false) {
+          console.warn('Kjøp er ikke tillatt på denne enheten/kontoen');
+        }
+      } catch (_) {}
+      const active = await isPremiumActive();
+      setHasPremium(active);
+      setShowDrivingTimes(!!active);
       
     } catch (error) {
       console.error('❌ Error in initializeApp:', error);
@@ -1127,11 +1137,12 @@ function App() {
       return;
     }
     
-
-    
-
-    
-
+    if (!hasPremium) {
+      setMode('search');
+      setError(null);
+      setShowPremiumCTA(true);
+      return;
+    }
     
     // Call executeGpsSearch directly - no blocking mechanism
     await executeGpsSearch();
@@ -1596,6 +1607,74 @@ function App() {
 
       <div className="bg-gradient flex flex-col items-center min-h-screen pb-16 sm:pb-24 pt-20 sm:pt-24">
         <h1 className="text-5xl sm:text-7xl font-extrabold text-white tracking-tight mb-6 sm:mb-6 drop-shadow-lg fergetid-title">{APP_NAME}</h1>
+      
+        {/* Premium CTA (kun etter GPS-klikk uten premium) */}
+        {showPremiumCTA && !hasPremium && (
+          <div className="w-full max-w-[350px] sm:max-w-md mb-6 px-3 sm:px-4">
+            <div className="bg-white/90 backdrop-blur-md border border-fuchsia-200 rounded-lg shadow-lg p-4">
+              <div className="text-gray-800 font-bold mb-2">Få Premium</div>
+              <div className="text-gray-700 text-sm mb-1">GPS og kjøretidsbeskrivelse krever Premium-abonnement.</div>
+              <div className="text-gray-700 text-sm mb-4"><span className="font-semibold">14 dager gratis</span>, deretter fortsetter abonnementet automatisk. Du kan avslutte når som helst.</div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await (await import('./services/PurchasesService')).purchasePackageById('$rc_monthly');
+                      const active = await isPremiumActive();
+                      setHasPremium(active);
+                      setShowDrivingTimes(!!active);
+                      if (active) setShowPremiumCTA(false);
+                    } catch (e) {
+                      console.error('Kjøp månedlig feilet', e);
+                      if (e && e.details) console.log('Detaljer:', e.details);
+                    }
+                  }}
+                  className="flex-1 px-3 py-2 bg-white/90 hover:bg-white text-fuchsia-700 font-semibold rounded-md border border-fuchsia-300 shadow"
+                >
+                  Kjøp månedlig
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await (await import('./services/PurchasesService')).purchasePackageById('$rc_annual');
+                      const active = await isPremiumActive();
+                      setHasPremium(active);
+                      setShowDrivingTimes(!!active);
+                      if (active) setShowPremiumCTA(false);
+                    } catch (e) {
+                      console.error('Kjøp årlig feilet', e);
+                      if (e && e.details) console.log('Detaljer:', e.details);
+                    }
+                  }}
+                  className="flex-1 px-3 py-2 bg-white/90 hover:bg-white text-fuchsia-700 font-semibold rounded-md border border-fuchsia-300 shadow"
+                >
+                  Kjøp årlig
+                </button>
+              </div>
+              <div className="mt-3 text-right flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await restorePurchasesIOS();
+                      const active = await isPremiumActive();
+                      setHasPremium(active);
+                      setShowDrivingTimes(!!active);
+                      if (active) setShowPremiumCTA(false);
+                    } catch (e) {
+                      console.error('Gjenoppretting feilet', e);
+                    }
+                  }}
+                  className="text-sm text-fuchsia-700 hover:underline"
+                >
+                  Gjenopprett kjøp (iOS)
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       
         {/* Hidden input to catch iOS auto-focus */}
         <input 

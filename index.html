@@ -19,8 +19,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Load Cordova bridge (ignored on web; 404 is fine) -->
-    <script src="cordova.js"></script>
+    <!-- Load Cordova bridge only on Capacitor native; skipped on web -->
+    <script>
+      if (navigator.userAgent.includes('Capacitor')) {
+        var s = document.createElement('script');
+        s.src = 'cordova.js';
+        document.head.appendChild(s);
+      }
+    </script>
   </head>
   
   <body>

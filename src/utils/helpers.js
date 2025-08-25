@@ -1,4 +1,4 @@
-import { TIME_FORMAT_OPTIONS, DISTANCE_UNITS } from '../constants';
+import { TIME_FORMAT_OPTIONS, DISTANCE_UNITS } from '../config/constants';
 
 // Format minutes to human readable time
 export function formatMinutes(mins) {

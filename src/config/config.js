@@ -86,17 +86,27 @@ export const config = {
       return import.meta.env.VITE_GOOGLE_MAPS_API_KEY_WEB;
     },
     
-    // Use HERE Geocoding API instead of Google Maps (since we have a valid HERE key)
+    // HERE Reverse Geocoding (preferred)
     GEOCODING_BASE_URL: 'https://revgeocode.search.hereapi.com/v1/revgeocode',
+    // Google Geocoding fallback
+    GOOGLE_GEOCODING_BASE_URL: 'https://maps.googleapis.com/maps/api/geocode/json',
     
     // Get reverse geocoding URL using HERE API
     getGeocodingUrl: (lat, lon) => {
-      const apiKey = config.HERE_CONFIG.getApiKey();
-      if (!apiKey) {
-        return null;
+      // Prefer HERE if configured
+      const hereKey = config.HERE_CONFIG.getApiKey();
+      if (hereKey) {
+        return `${config.GOOGLE_MAPS_CONFIG.GEOCODING_BASE_URL}?at=${lat},${lon}&apikey=${hereKey}&lang=no`;
       }
-      
-      return `${config.GOOGLE_MAPS_CONFIG.GEOCODING_BASE_URL}?at=${lat},${lon}&apiKey=${apiKey}&lang=no`;
+
+      // Fallback to Google Geocoding API if HERE is not configured
+      const googleKey = config.GOOGLE_MAPS_CONFIG.getApiKey();
+      if (googleKey) {
+        return `${config.GOOGLE_MAPS_CONFIG.GOOGLE_GEOCODING_BASE_URL}?latlng=${lat},${lon}&key=${googleKey}&language=no`;
+      }
+
+      // No keys configured
+      return null;
     },
     
     // Check if API key is configured
@@ -121,5 +131,14 @@ export const config = {
       // Use live traffic like Google Maps by setting departure_time=now and traffic_model=best_guess
       return `${config.GOOGLE_MAPS_CONFIG.DIRECTIONS_BASE_URL}?origin=${origin}&destination=${destination}&mode=driving${avoid}&departure_time=now&traffic_model=best_guess&key=${apiKey}&language=no`;
     }
+  },
+  
+  // RevenueCat configuration
+  REVENUECAT_CONFIG: {
+    getIOSKey: () => import.meta.env.VITE_REVENUECAT_IOS_API_KEY,
+    getAndroidKey: () => import.meta.env.VITE_REVENUECAT_ANDROID_API_KEY,
+    getWebKey: () => import.meta.env.VITE_REVENUECAT_WEB_API_KEY,
+    getEntitlementId: () => import.meta.env.VITE_REVENUECAT_ENTITLEMENT || 'premium',
+    getOfferingId: () => import.meta.env.VITE_REVENUECAT_OFFERING || 'Premium'
   }
-}; 
+};  

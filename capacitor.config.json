@@ -22,8 +22,7 @@
       "backgroundColor": "#d95cff",
       "showSpinner": true,
       "spinnerColor": "#ffffff",
-      "spinnerStyle": "large",
-      "image": "ios-splash.png"
+      "spinnerStyle": "large"
     }
   },
   "plugins": {

@@ -4,21 +4,7 @@
 
   ],
   "products" : [
-    {
-      "displayPrice" : "49.00",
-      "familyShareable" : false,
-      "internalID" : "kjoretidberegning",
-      "localizations" : [
-        {
-          "description" : "Få tilgang til kjøretidsberegning for å se om du rekker fergeavgangen",
-          "displayName" : "Kjøretidsberegning",
-          "locale" : "nb_NO"
-        }
-      ],
-      "productID" : "kjoretidberegning",
-      "referenceName" : "Kjøretidsberegning",
-      "type" : "NonConsumable"
-    }
+
   ],
   "settings" : {
     "_applicationInternalID" : "com.fergetid.app",

@@ -1590,17 +1590,12 @@ function App() {
     <>
       {/* Custom Splash Screen */}
       {showCustomSplash && (
-        <div className="fixed inset-0 bg-gradient-to-br from-fuchsia-500 to-pink-500 flex flex-col items-center justify-center z-50">
+        <div className="fixed inset-0 bg-gradient flex flex-col items-center justify-start pt-20 sm:pt-24 z-50">
           <div className="text-center">
-            <h1 className="text-4xl sm:text-6xl font-bold text-white mb-8 drop-shadow-lg">
-              FerjeTid
+            <h1 className="text-5xl sm:text-7xl font-extrabold text-white tracking-tight mb-8 drop-shadow-lg fergetid-title">
+              FergeTid
             </h1>
-            <div className="text-white text-lg mb-6">
-              laster...
-            </div>
-            <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
-            </div>
+            <LoadingSpinner message={"laster"} />
           </div>
         </div>
       )}

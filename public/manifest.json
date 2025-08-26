@@ -1,6 +1,6 @@
 {
-  "name": "Fergetid",
-  "short_name": "Fergetid",
+  "name": "FergeTid",
+  "short_name": "FergeTid",
   "description": "Finn fergeavganger og kjøretid til fergekaier",
   "start_url": "/",
   "display": "standalone",

@@ -5,6 +5,7 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { Geolocation } from '@capacitor/geolocation';
 
 import LoadingSpinner from './components/LoadingSpinner';
+import WebPaywall from './components/WebPaywall';
 
 
 import { calculateDrivingTime } from './services/GeoServices';
@@ -1623,44 +1624,18 @@ function App() {
               <div className="text-gray-700 text-sm mb-1">GPS og kjøretidsbeskrivelse krever Premium-abonnement.</div>
               <div className="text-gray-700 text-sm">Pris: <span className="font-semibold">29 kr/måned</span> eller <span className="font-semibold">299 kr/år</span>.</div>
               <div className="text-gray-700 text-sm mb-4"><span className="font-semibold">14 dager gratis</span>, deretter fortsetter abonnementet automatisk. Du kan avslutte når som helst.</div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      const res = await (await import('./services/PurchasesService')).purchasePackageById('$rc_monthly');
-                      const active = await isPremiumActive();
-                      setHasPremium(active);
-                      setShowDrivingTimes(!!active);
-                      if (active) setShowPremiumCTA(false);
-                    } catch (e) {
-                      console.error('Kjøp månedlig feilet', e);
-                      if (e && e.details) console.log('Detaljer:', e.details);
-                    }
+              <div className="mt-3">
+                <WebPaywall
+                  onSuccess={async () => {
+                    const active = await isPremiumActive();
+                    setHasPremium(active);
+                    setShowDrivingTimes(!!active);
+                    if (active) setShowPremiumCTA(false);
                   }}
-                  className="flex-1 px-3 py-2 bg-white/90 hover:bg-white text-fuchsia-700 font-semibold rounded-md border border-fuchsia-300 shadow"
-                >
-                  Kjøp månedlig
-                </button>
-                {/* native paywall fjernet */}
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      const res = await (await import('./services/PurchasesService')).purchasePackageById('$rc_annual');
-                      const active = await isPremiumActive();
-                      setHasPremium(active);
-                      setShowDrivingTimes(!!active);
-                      if (active) setShowPremiumCTA(false);
-                    } catch (e) {
-                      console.error('Kjøp årlig feilet', e);
-                      if (e && e.details) console.log('Detaljer:', e.details);
-                    }
+                  onError={(e) => {
+                    console.error('Web paywall kjøp feilet', e);
                   }}
-                  className="flex-1 px-3 py-2 bg-white/90 hover:bg-white text-fuchsia-700 font-semibold rounded-md border border-fuchsia-300 shadow"
-                >
-                  Kjøp årlig
-                </button>
+                />
               </div>
               {(typeof window !== 'undefined' && window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'ios') && (
                 <div className="mt-3 text-right flex gap-3 justify-end">

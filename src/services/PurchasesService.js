@@ -5,6 +5,14 @@ import { config } from '../config/config';
 
 let webPurchases = PurchasesWeb;
 
+function getStripeLinkForPackageId(pkgIdOrType) {
+  const monthly = config?.STRIPE_CONFIG?.getMonthlyPaymentLink?.();
+  const annual = config?.STRIPE_CONFIG?.getAnnualPaymentLink?.();
+  if (pkgIdOrType === '$rc_monthly' || pkgIdOrType === 'MONTHLY') return monthly || null;
+  if (pkgIdOrType === '$rc_annual' || pkgIdOrType === 'ANNUAL') return annual || null;
+  return null;
+}
+
 async function getSDKAndKey(appUserID) {
   const platform = Capacitor.getPlatform();
   if (platform === 'ios' || platform === 'android') {
@@ -56,7 +64,11 @@ export async function isPremiumActive() {
 
 export async function getOfferings() {
   const { sdk } = await getSDKAndKey();
-  return await sdk.getOfferings();
+  if (typeof sdk?.getOfferings === 'function') {
+    return await sdk.getOfferings();
+  }
+  // Not supported by current web SDK; return null so callers can fallback
+  return null;
 }
 
 export async function canMakePayments() {
@@ -71,49 +83,62 @@ export async function canMakePayments() {
 }
 
 export async function purchasePackageById(pkgIdOrType = '$rc_monthly') {
-  const { sdk } = await getSDKAndKey();
-  const offeringId = config.REVENUECAT_CONFIG.getOfferingId();
-  const offerings = await getOfferings();
-  const current = offerings?.current || offerings?.offerings?.current;
-  const offering =
-    (offerings?.all && offeringId && offerings.all[offeringId]) ||
-    current || offerings;
-
-  // Normaliser pakkeliste: availablePackages eller dedikerte nøkler (monthly/annual/lifetime)
-  let available = Array.isArray(offering?.availablePackages) ? offering.availablePackages.slice() : [];
-  const maybePush = (p) => { if (p && !available.includes(p)) available.push(p); };
-  if (!available.length) {
-    maybePush(offering?.monthly);
-    maybePush(offering?.annual);
-    maybePush(offering?.lifetime);
-    // Noen SDK-er eksponerer packages som 'packages'
-    if (Array.isArray(offering?.packages)) available = offering.packages;
-  }
-
-  const pkg = available?.find(
-    (p) => p?.identifier === pkgIdOrType || p?.packageType === pkgIdOrType
-  ) || available?.find((p) => (
-    (pkgIdOrType === '$rc_monthly' && (p?.identifier === '$rc_monthly' || p?.packageType === 'MONTHLY')) ||
-    (pkgIdOrType === '$rc_annual' && (p?.identifier === '$rc_annual' || p?.packageType === 'ANNUAL'))
-  )) || available?.[0];
-
-  if (!pkg) {
-    // Riktigere feilmelding med snapshot av offering for debugging
-    throw new Error('Fant ikke pakke i offering. Tilgjengelige nøkler: ' + JSON.stringify({
-      identifiers: available?.map(p => p?.identifier),
-      types: available?.map(p => p?.packageType),
-      offeringId
-    }));
-  }
-
-  // Capacitor SDK forventer { aPackage }, Web SDK forventer direkte pakken
   const platform = Capacitor.getPlatform();
-  if (platform === 'ios' || platform === 'android') {
-    // Ryddet bort ekstra verbose debuglogging
+  const isWeb = !(platform === 'ios' || platform === 'android');
+
+  // På web: hvis RevenueCat Web Key mangler, gå direkte til Stripe Payment Link
+  if (isWeb) {
+    const webKey = config?.REVENUECAT_CONFIG?.getWebKey?.();
+    if (!webKey) {
+      const stripeUrl = getStripeLinkForPackageId(pkgIdOrType);
+      if (stripeUrl && typeof window !== 'undefined') {
+        window.location.href = stripeUrl;
+        return { redirectedToStripe: true };
+      }
+      // Hvis vi ikke har Stripe-lenke heller, fortsetter vi og lar feilen boble opp
+    }
+  }
+
+  try {
+    const { sdk } = await getSDKAndKey();
+    const offeringId = config.REVENUECAT_CONFIG.getOfferingId();
+    const offerings = await getOfferings();
+    const current = offerings?.current || offerings?.offerings?.current;
+    const offering =
+      (offerings?.all && offeringId && offerings.all[offeringId]) ||
+      current || offerings;
+
+    // Normaliser pakkeliste: availablePackages eller dedikerte nøkler (monthly/annual/lifetime)
+    let available = Array.isArray(offering?.availablePackages) ? offering.availablePackages.slice() : [];
+    const maybePush = (p) => { if (p && !available.includes(p)) available.push(p); };
+    if (!available.length) {
+      maybePush(offering?.monthly);
+      maybePush(offering?.annual);
+      maybePush(offering?.lifetime);
+      // Noen SDK-er eksponerer packages som 'packages'
+      if (Array.isArray(offering?.packages)) available = offering.packages;
+    }
+
+    const pkg = available?.find(
+      (p) => p?.identifier === pkgIdOrType || p?.packageType === pkgIdOrType
+    ) || available?.find((p) => (
+      (pkgIdOrType === '$rc_monthly' && (p?.identifier === '$rc_monthly' || p?.packageType === 'MONTHLY')) ||
+      (pkgIdOrType === '$rc_annual' && (p?.identifier === '$rc_annual' || p?.packageType === 'ANNUAL'))
+    )) || available?.[0];
+
+    if (!pkg) {
+      throw new Error('Fant ikke pakke i offering.');
+    }
+
+    if (isWeb) {
+      // Web (Stripe via RevenueCat Web SDK)
+      return await sdk.purchasePackage(pkg);
+    }
+
+    // Native: Capacitor SDK forventer { aPackage }
     try {
       return await sdk.purchasePackage({ aPackage: pkg });
     } catch (e) {
-      // Fallback: noen SDK-versjoner støtter purchaseStoreProduct
       try {
         if (sdk.purchaseStoreProduct && pkg?.product?.identifier) {
           return await sdk.purchaseStoreProduct({ storeProduct: { identifier: pkg.product.identifier } });
@@ -123,9 +148,17 @@ export async function purchasePackageById(pkgIdOrType = '$rc_monthly') {
       }
       throw e;
     }
+  } catch (e) {
+    // Fallback: åpne Stripe Payment Link på web dersom tilgjengelig
+    if (isWeb) {
+      const stripeUrl = getStripeLinkForPackageId(pkgIdOrType);
+      if (stripeUrl && typeof window !== 'undefined') {
+        window.location.href = stripeUrl;
+        return { redirectedToStripe: true };
+      }
+    }
+    throw e;
   }
-  // Web (Stripe via RevenueCat Web SDK)
-  return await sdk.purchasePackage(pkg);
 }
 
 export async function restorePurchases() {

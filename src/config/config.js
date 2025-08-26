@@ -140,5 +140,11 @@ export const config = {
     getWebKey: () => import.meta.env.VITE_REVENUECAT_WEB_API_KEY,
     getEntitlementId: () => import.meta.env.VITE_REVENUECAT_ENTITLEMENT || 'premium',
     getOfferingId: () => import.meta.env.VITE_REVENUECAT_OFFERING || 'Premium'
+  },
+
+  // Stripe Payment Links (web fallback)
+  STRIPE_CONFIG: {
+    getMonthlyPaymentLink: () => import.meta.env.VITE_STRIPE_PAYMENT_LINK_MONTHLY,
+    getAnnualPaymentLink: () => import.meta.env.VITE_STRIPE_PAYMENT_LINK_ANNUAL
   }
 };  

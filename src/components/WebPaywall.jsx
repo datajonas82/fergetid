@@ -40,7 +40,7 @@ export default function WebPaywall({ onSuccess, onError }) {
       try {
         setLoading(true);
         setError(null);
-        const offerings = await getOfferings();
+        const offerings = null; // deaktivert på web
         let pkgs = [];
         if (offerings) {
           const current = offerings?.current || offerings?.offerings?.current || offerings;
@@ -68,10 +68,8 @@ export default function WebPaywall({ onSuccess, onError }) {
     return [...packages].sort((a, b) => order(a) - order(b));
   }, [packages]);
 
-  const handlePurchase = async (pkg) => {
-    const idOrType = pkg?.identifier || pkg?.packageType || '$rc_monthly';
+  const handlePurchase = async () => {
     try {
-      await purchasePackageById(idOrType);
       const active = await isPremiumActive();
       if (active && typeof onSuccess === 'function') onSuccess();
     } catch (e) {
@@ -87,46 +85,19 @@ export default function WebPaywall({ onSuccess, onError }) {
       {error && (
         <div className="text-sm text-red-600">{error}</div>
       )}
-      {!loading && !error && sortedPackages?.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {sortedPackages.map((pkg) => {
-            const label = getPackageLabel(pkg);
-            const price = getPriceString(pkg);
-            return (
-              <button
-                key={pkg?.identifier || pkg?.packageType}
-                type="button"
-                onClick={() => handlePurchase(pkg)}
-                className="w-full px-3 py-2 bg-white/90 hover:bg-white text-fuchsia-700 font-semibold rounded-md border border-fuchsia-300 shadow"
-              >
-                {price ? `${label} · ${price}` : label}
-              </button>
-            );
-          })}
+      {/* Kjøp deaktivert: Vis enkel aktiver-knapp */}
+      {!loading && !error && (
+        <div className="grid grid-cols-1 gap-2">
+          <button
+            type="button"
+            onClick={() => handlePurchase()}
+            className="w-full px-3 py-2 bg-white/90 hover:bg-white text-fuchsia-700 font-semibold rounded-md border border-fuchsia-300 shadow"
+          >
+            Aktiver Premium (midlertidig)
+          </button>
         </div>
       )}
-      {!loading && !error && (!sortedPackages || sortedPackages.length === 0) && (
-        <div className="flex flex-col gap-2">
-          <div className="text-sm text-gray-600">Ingen tilgjengelige pakker akkurat nå. Du kan fortsatt kjøpe:</div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => handlePurchase({ identifier: '$rc_monthly', packageType: 'MONTHLY' })}
-              className="w-full px-3 py-2 bg-white/90 hover:bg-white text-fuchsia-700 font-semibold rounded-md border border-fuchsia-300 shadow"
-            >
-              Månedlig{config?.STRIPE_CONFIG?.getMonthlyPaymentLink?.() ? '' : ''}
-            </button>
-            <button
-              type="button"
-              onClick={() => handlePurchase({ identifier: '$rc_annual', packageType: 'ANNUAL' })}
-              className="w-full px-3 py-2 bg-white/90 hover:bg-white text-fuchsia-700 font-semibold rounded-md border border-fuchsia-300 shadow"
-            >
-              Årlig{config?.STRIPE_CONFIG?.getAnnualPaymentLink?.() ? '' : ''}
-            </button>
-          </div>
-          <div className="text-xs text-gray-500">Kjøp håndteres via RevenueCat/Stripe. Du kan bli sendt videre for betaling.</div>
-        </div>
-      )}
+      {/* Ingen Stripe‑lenker. Kjøp er deaktivert på web. */}
     </div>
   );
 }

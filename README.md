@@ -122,135 +122,22 @@ Appen bruker Google Maps Roads API for å justere GPS-koordinater til nærmeste 
    VITE_GOOGLE_MAPS_API_KEY_IOS=your_ios_api_key_here
    VITE_GOOGLE_MAPS_API_KEY_WEB=your_web_api_key_here
    VITE_ENTUR_CLIENT_NAME=your_entur_client_name
+   
+   # RevenueCat
+   VITE_REVENUECAT_IOS_API_KEY=your_rc_ios_key
+   VITE_REVENUECAT_ANDROID_API_KEY=your_rc_android_key
+   VITE_REVENUECAT_WEB_API_KEY=your_rc_web_key
+   VITE_REVENUECAT_ENTITLEMENT=premium
+   VITE_REVENUECAT_OFFERING=Premium
+   
+   # Stripe fallback links (web)
+   VITE_STRIPE_PAYMENT_LINK_MONTHLY=https://buy.stripe.com/...
+   VITE_STRIPE_PAYMENT_LINK_ANNUAL=https://buy.stripe.com/...
+   
+   # Legal links (shown in app UI and required by Apple)
+   VITE_PRIVACY_POLICY_URL=https://yourdomain.com/privacy
+   VITE_TERMS_OF_USE_URL=https://yourdomain.com/terms
    ```
 
 4. **Build the project**
-   ```bash
-   npm run build
    ```
-
-### Development
-
-```bash
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
-```
-
-### Mobile Development
-
-```bash
-# Sync with iOS
-npx cap sync ios
-
-# Open in Xcode
-npx cap open ios
-
-# Sync with Android
-npx cap sync android
-
-# Open in Android Studio
-npx cap open android
-```
-
-## 📋 API Requirements
-
-### Entur API
-- **Endpoint**: https://api.entur.io/journey-planner/v3/graphql
-- **Client Name**: Required for API access
-- **Rate Limits**: Please respect Entur's usage guidelines
-
-### Google Maps API
-- **Geocoding API**: For reverse geocoding location names
-- **Separate keys**: iOS and web platforms require different API keys
-
-## 🔧 Troubleshooting
-
-### Geolocation Issues
-
-If you're experiencing geolocation timeout errors:
-
-1. **Development Environment**: The app uses extended timeouts (45 seconds) in development mode
-2. **Retry Logic**: The app automatically retries failed geolocation requests
-3. **Fallback Location**: If geolocation fails completely, the app will use Oslo as a fallback location
-4. **Browser Permissions**: Ensure your browser has location permissions enabled
-5. **Simulator Issues**: iOS/Android simulators may have limited geolocation support
-
-### Common Error Messages
-
-- **"Timeout ved henting av posisjon"**: Geolocation is taking too long, the app will retry automatically
-- **"Tilgang til posisjon ble avvist"**: Location permissions are denied, check browser settings
-- **"Posisjon kunne ikke bestemmes"**: Network or GPS issues, the app will retry
-
-### Debug Mode
-
-In development mode, the app logs detailed geolocation information to the console:
-- Geolocation options being used
-- Attempt counts and retry logic
-- Success/failure details
-- Location accuracy information
-- **Billing**: Google Maps API has usage-based billing
-
-## 🏗️ Project Structure
-
-```
-fergetid-app/
-├── src/
-│   ├── components/          # React components
-│   ├── utils/              # Utility functions
-│   ├── hooks/              # Custom React hooks
-│   ├── App.jsx             # Main application component
-│   ├── config.js           # Configuration and API keys
-│   └── constants.js        # App constants
-├── ios/                    # iOS native project
-├── android/                # Android native project
-├── public/                 # Static assets
-└── dist/                   # Build output
-```
-
-## 🎨 Design System
-
-The app uses a custom glassmorphism design with:
-- **Primary Colors**: Purple gradient background
-- **Accent Colors**: Blue for distance indicators and departure times
-- **Typography**: Clean, readable fonts with dynamic sizing
-- **Animations**: Smooth transitions and hover effects
-
-## 📄 Documentation
-
-- [App Support](app-support.html) - User guide and technical information
-- [Privacy Policy](privacy-policy.html) - Data handling and privacy information
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- **Entur** for providing the Norwegian public transportation API
-- **Google Maps** for geocoding services
-- **Capacitor** team for the excellent cross-platform framework
-- **React** and **Vite** communities for the amazing development tools
-
-## 📞 Support
-
-For support and questions:
-- **Email**: support@locationsentralen.no
-- **Website**: [locationsentralen.no/fergetid-app/support](https://www.locationsentralen.no/fergetid-app/support)
-
----
-
-Made with ❤️ for Norwegian ferry travelers

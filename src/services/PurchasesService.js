@@ -54,6 +54,13 @@ export async function getCustomerInfo() {
 
 export async function isPremiumActive() {
   const entitlement = config.REVENUECAT_CONFIG.getEntitlementId();
+  // Web: premium er midlertidig aktivert for alle
+  try {
+    const platform = Capacitor.getPlatform();
+    if (platform === 'web') {
+      return true;
+    }
+  } catch (_) {}
   try {
     const info = await getCustomerInfo();
     return !!info?.entitlements?.active?.[entitlement];
@@ -86,17 +93,9 @@ export async function purchasePackageById(pkgIdOrType = '$rc_monthly') {
   const platform = Capacitor.getPlatform();
   const isWeb = !(platform === 'ios' || platform === 'android');
 
-  // På web: hvis RevenueCat Web Key mangler, gå direkte til Stripe Payment Link
+  // Web: deaktiver kjøp helt (ingen redirect til Stripe)
   if (isWeb) {
-    const webKey = config?.REVENUECAT_CONFIG?.getWebKey?.();
-    if (!webKey) {
-      const stripeUrl = getStripeLinkForPackageId(pkgIdOrType);
-      if (stripeUrl && typeof window !== 'undefined') {
-        window.location.href = stripeUrl;
-        return { redirectedToStripe: true };
-      }
-      // Hvis vi ikke har Stripe-lenke heller, fortsetter vi og lar feilen boble opp
-    }
+    return { disabledOnWeb: true };
   }
 
   try {
@@ -137,11 +136,15 @@ export async function purchasePackageById(pkgIdOrType = '$rc_monthly') {
 
     // Native: Capacitor SDK forventer { aPackage }
     try {
-      return await sdk.purchasePackage({ aPackage: pkg });
+      const res = await sdk.purchasePackage({ aPackage: pkg });
+      try { await sdk.syncPurchases?.(); } catch (_) {}
+      return res;
     } catch (e) {
       try {
         if (sdk.purchaseStoreProduct && pkg?.product?.identifier) {
-          return await sdk.purchaseStoreProduct({ storeProduct: { identifier: pkg.product.identifier } });
+          const res = await sdk.purchaseStoreProduct({ storeProduct: { identifier: pkg.product.identifier } });
+          try { await sdk.syncPurchases?.(); } catch (_) {}
+          return res;
         }
       } catch (e2) {
         throw e2;

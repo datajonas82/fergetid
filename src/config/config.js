@@ -146,5 +146,11 @@ export const config = {
   STRIPE_CONFIG: {
     getMonthlyPaymentLink: () => import.meta.env.VITE_STRIPE_PAYMENT_LINK_MONTHLY,
     getAnnualPaymentLink: () => import.meta.env.VITE_STRIPE_PAYMENT_LINK_ANNUAL
+  },
+
+  // Legal links
+  LEGAL: {
+    getPrivacyPolicyUrl: () => import.meta.env.VITE_PRIVACY_POLICY_URL || '/privacy.html',
+    getTermsOfUseUrl: () => import.meta.env.VITE_TERMS_OF_USE_URL || '/terms.html'
   }
 };  

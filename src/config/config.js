@@ -151,7 +151,21 @@ export const config = {
 
   // Legal links
   LEGAL: {
-    getPrivacyPolicyUrl: () => import.meta.env.VITE_PRIVACY_POLICY_URL || '/privacy.html',
-    getTermsOfUseUrl: () => import.meta.env.VITE_TERMS_OF_USE_URL || '/terms.html'
+    getPrivacyPolicyUrl: () => {
+      const configured = (import.meta.env.VITE_PRIVACY_POLICY_URL || '').trim();
+      const path = configured || '/privacy.html';
+      if (typeof window !== 'undefined' && window.location?.origin) {
+        try { return new URL(path, window.location.origin).toString(); } catch (_) { return path; }
+      }
+      return path;
+    },
+    getTermsOfUseUrl: () => {
+      const configured = (import.meta.env.VITE_TERMS_OF_USE_URL || '').trim();
+      const path = configured || '/terms.html';
+      if (typeof window !== 'undefined' && window.location?.origin) {
+        try { return new URL(path, window.location.origin).toString(); } catch (_) { return path; }
+      }
+      return path;
+    }
   }
 };  

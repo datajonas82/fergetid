@@ -251,6 +251,12 @@ function App() {
   // Cache for all ferry quays (for autocomplete)
   const [allFerryQuays, setAllFerryQuays] = useState([]);
 
+  // Refs for latest values to avoid stale state in async waits
+  const ferryStopsLoadedRef = useRef(false);
+  const allFerryQuaysRef = useRef([]);
+  useEffect(() => { ferryStopsLoadedRef.current = ferryStopsLoaded; }, [ferryStopsLoaded]);
+  useEffect(() => { allFerryQuaysRef.current = allFerryQuays; }, [allFerryQuays]);
+
       // Driving time calculation state
     const [showDrivingTimes, setShowDrivingTimes] = useState(false); // Premium-gated
     const [drivingTimes, setDrivingTimes] = useState({});
@@ -312,10 +318,38 @@ function App() {
     setSelectedStop(null);
     setMode('gps');
 
-    // Wait for all ferry quays to be loaded before proceeding
-    while (!ferryStopsLoaded || !allFerryQuays || allFerryQuays.length === 0) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
+    // Sørg for at fergekaier er i ferd med å lastes om de ikke er det allerede
+    try {
+      if (!ferryStopsLoaded || !allFerryQuays || allFerryQuays.length === 0) {
+        loadAllFerryStops();
+      }
+    } catch (_) {}
+
+    // Quick-start: use cached last location immediately to render nearby results while fresh GPS resolves
+    try {
+      const cached = localStorage.getItem('lastLocation');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.latitude && parsed.longitude) {
+          // Only trust cache from the last 30 minutes
+          const isFresh = typeof parsed.ts === 'number' && (Date.now() - parsed.ts) <= 30 * 60 * 1000;
+          if (isFresh) {
+            // Ensure ferry quays are loaded before computing (wait up to ~2s) using refs
+            const startWait = Date.now();
+            while (!ferryStopsLoadedRef.current || !allFerryQuaysRef.current || allFerryQuaysRef.current.length === 0) {
+              await new Promise(resolve => setTimeout(resolve, 150));
+              if (Date.now() - startWait > 2000) break;
+            }
+            if (ferryStopsLoadedRef.current && allFerryQuaysRef.current && allFerryQuaysRef.current.length > 0) {
+              await computeNearbyAndUpdate(parsed.latitude, parsed.longitude);
+            }
+            // Don't stop loading yet; allow new GPS fix to overwrite with fresher data
+          }
+        }
+      }
+    } catch (_) {}
+
+    // Ikke vent på fergekaier her; start GPS umiddelbart og vent kort senere ved behov
 
     // Helper to compute nearby stops and update UI based on coordinates
     const computeNearbyAndUpdate = async (latitude, longitude) => {
@@ -351,17 +385,24 @@ function App() {
         }
       })();
       
-      // Double-check that ferry quays are loaded
-      if (!allFerryQuays || allFerryQuays.length === 0) {
-        console.error('📍 GPS Search: No ferry quays available for distance calculation');
-        // This should not happen since we waited above, but just in case
-        setError('Fergekaier er ikke tilgjengelige. Prøv igjen.');
-        setLoading(false);
-        return;
+      // Ensure ferry quays are loaded; try to load if missing (using refs to avoid stale values)
+      if (!allFerryQuaysRef.current || allFerryQuaysRef.current.length === 0) {
+        try { await loadAllFerryStops(); } catch (_) {}
+        // Wait briefly after triggering load
+        const startWaitLoad = Date.now();
+        while ((!allFerryQuaysRef.current || allFerryQuaysRef.current.length === 0) && (Date.now() - startWaitLoad) < 8000) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        if (!allFerryQuaysRef.current || allFerryQuaysRef.current.length === 0) {
+          console.error('📍 GPS Search: No ferry quays available for distance calculation');
+          setError('Fergekaier er ikke tilgjengelige. Prøv igjen.');
+          setLoading(false);
+          return;
+        }
       }
       
       // Step 1: Calculate simple Haversine distance for ALL quays (fast, no network)
-      const placesWithDistance = allFerryQuays.map(stop => {
+      const placesWithDistance = allFerryQuaysRef.current.map(stop => {
         const dLat = (stop.latitude - latitude) * 111000;
         const dLng = (stop.longitude - longitude) * 111000 * Math.cos(latitude * Math.PI / 180);
         const distance = Math.sqrt(dLat * dLat + dLng * dLng);
@@ -569,8 +610,8 @@ function App() {
             
             const position = await Geolocation.getCurrentPosition({
               enableHighAccuracy: false,
-              timeout: 5000,
-              maximumAge: 600000
+              timeout: 3000,
+              maximumAge: 300000
             });
             pos = position;
           } catch (capacitorError) {
@@ -594,7 +635,7 @@ function App() {
                       clearTimeout(timeoutId);
                       reject(error);
                     },
-                    { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
+                    { enableHighAccuracy: false, timeout: 3000, maximumAge: 300000 }
                   );
                 });
                 console.log('📍 GPS Search: Browser geolocation successful');
@@ -635,7 +676,7 @@ function App() {
           pos = await new Promise((resolve, reject) => {
             const timeoutId = setTimeout(() => {
               reject(new Error('Low-accuracy GPS timeout'));
-            }, 5000);
+            }, 4000);
             
             navigator.geolocation.getCurrentPosition(
               (position) => {
@@ -646,7 +687,7 @@ function App() {
                 clearTimeout(timeoutId);
                 reject(error);
               },
-              { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
+              { enableHighAccuracy: false, timeout: 3000, maximumAge: 300000 }
             );
           });
         }
@@ -657,8 +698,8 @@ function App() {
           try {
             const position = await Geolocation.getCurrentPosition({
               enableHighAccuracy: true,
-              timeout: 15000,
-              maximumAge: 10000
+              timeout: 10000,
+              maximumAge: 60000
             });
             pos = position;
           } catch (capacitorError) {
@@ -680,7 +721,7 @@ function App() {
                       clearTimeout(timeoutId);
                       reject(error);
                     },
-                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
                   );
                 });
                 console.log('📍 GPS Search: Browser geolocation successful');
@@ -721,7 +762,7 @@ function App() {
           pos = await new Promise((resolve, reject) => {
             const timeoutId = setTimeout(() => {
               reject(new Error('High-accuracy GPS timeout'));
-            }, 15000);
+            }, 10000);
             
             navigator.geolocation.getCurrentPosition(
               (position) => {
@@ -732,7 +773,7 @@ function App() {
                 clearTimeout(timeoutId);
                 reject(error);
               },
-              { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+              { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
             );
           });
         }
@@ -740,6 +781,14 @@ function App() {
 
       try {
         const { latitude, longitude } = pos.coords;
+        // Sett posisjonen umiddelbart for å oppdatere UI
+        setLocation({ latitude, longitude });
+        // Vent kort på fergekaier, men ikke blokkér for lenge (maks ~12s)
+        const startWaitQuays = Date.now();
+        while (!ferryStopsLoaded || !allFerryQuays || allFerryQuays.length === 0) {
+          await new Promise(resolve => setTimeout(resolve, 250));
+          if (Date.now() - startWaitQuays > 12000) break;
+        }
         await computeNearbyAndUpdate(latitude, longitude);
 
         // Store last location for faster next startup
@@ -2150,7 +2199,7 @@ function App() {
           </div>
         )}
         {/* Footer legal links */}
-        <div className="mt-auto w-full flex justify-center pb-6">
+        <div className="mt-auto w-full flex justify-center pt-8 sm:pt-10 pb-8 sm:pb-10">
           <div className="text-xs text-white/80">
             <a href={config?.LEGAL?.getTermsOfUseUrl?.()} target="_blank" rel="noopener noreferrer" className="underline mr-4">Bruksvilkår (EULA)</a>
             <a href={config?.LEGAL?.getPrivacyPolicyUrl?.()} target="_blank" rel="noopener noreferrer" className="underline">Personvernerklæring</a>

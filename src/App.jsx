@@ -1988,7 +1988,7 @@ function App() {
                 <div key={stopData.id} className="flex flex-col">
                   {/* Km-avstand som egen boks over fergekortet */}
                   {distance && (
-                    <div className="bg-blue-500 text-white text-base font-bold px-2 py-1.5 rounded-full shadow-lg mb-[-10px] self-start relative z-20 -ml-2">
+                    <div className="bg-blue-500 text-white text-lg font-bold px-2.5 py-1.5 rounded-2xl shadow-lg mb-[-10px] self-start relative z-20 -ml-4">
                       {(() => {
                         const drivingDistance = drivingDistances[stopData.id];
                         const fallbackDistance = distance;

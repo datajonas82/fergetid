@@ -1,7 +1,7 @@
 // Google Maps API service for driving times and location names
 // Using the latest Google Maps APIs with proper configuration
 
-import { config } from '../config';
+import { config } from '../config/config';
 
 // In-memory cache and de-duplication for driving time calculations
 const drivingTimeCache = new Map(); // key -> { time, distance, source }

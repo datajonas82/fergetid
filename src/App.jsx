@@ -5,18 +5,18 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { Geolocation } from '@capacitor/geolocation';
 
 import LoadingSpinner from './components/LoadingSpinner';
+import WebPaywall from './components/WebPaywall';
 
 
-import { calculateDrivingTime } from './utils/GeoServices';
+import { calculateDrivingTime } from './services/GeoServices';
 import { 
   ENTUR_ENDPOINT, 
   TRANSPORT_MODES, 
   APP_NAME,
   GEOLOCATION_OPTIONS,
-  EXCLUDED_SUBMODES,
-  GPS_SEARCH_CONFIG
-} from './constants';
-import { config } from './config';
+  EXCLUDED_SUBMODES
+} from './config/constants';
+import { config } from './config/config';
 import { 
   formatMinutes, 
   formatDistance, 
@@ -36,6 +36,8 @@ import {
   getLaterDepartures,
   generateTravelDescription
 } from './utils/departureUtils';
+
+import { initPurchases, isPremiumActive, canMakePayments, restorePurchasesIOS } from './services/PurchasesService';
 
 import { 
   getConnectedFerryQuays,
@@ -237,6 +239,8 @@ function App() {
   const [cardLoading, setCardLoading] = useState({});
   const [error, setError] = useState(null);
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [hasPremium, setHasPremium] = useState(false);
+  const [showPremiumCTA, setShowPremiumCTA] = useState(false);
 
   // Mode state
   const [mode, setMode] = useState('search'); // 'search' or 'gps'
@@ -247,8 +251,14 @@ function App() {
   // Cache for all ferry quays (for autocomplete)
   const [allFerryQuays, setAllFerryQuays] = useState([]);
 
+  // Refs for latest values to avoid stale state in async waits
+  const ferryStopsLoadedRef = useRef(false);
+  const allFerryQuaysRef = useRef([]);
+  useEffect(() => { ferryStopsLoadedRef.current = ferryStopsLoaded; }, [ferryStopsLoaded]);
+  useEffect(() => { allFerryQuaysRef.current = allFerryQuays; }, [allFerryQuays]);
+
       // Driving time calculation state
-    const [showDrivingTimes, setShowDrivingTimes] = useState(true); // Always enabled
+    const [showDrivingTimes, setShowDrivingTimes] = useState(false); // Premium-gated
     const [drivingTimes, setDrivingTimes] = useState({});
     const [drivingDistances, setDrivingDistances] = useState({});
     const [drivingTimesLoading, setDrivingTimesLoading] = useState({});
@@ -308,10 +318,38 @@ function App() {
     setSelectedStop(null);
     setMode('gps');
 
-    // Wait for all ferry quays to be loaded before proceeding
-    while (!ferryStopsLoaded || !allFerryQuays || allFerryQuays.length === 0) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
+    // Sørg for at fergekaier er i ferd med å lastes om de ikke er det allerede
+    try {
+      if (!ferryStopsLoaded || !allFerryQuays || allFerryQuays.length === 0) {
+        loadAllFerryStops();
+      }
+    } catch (_) {}
+
+    // Quick-start: use cached last location immediately to render nearby results while fresh GPS resolves
+    try {
+      const cached = localStorage.getItem('lastLocation');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.latitude && parsed.longitude) {
+          // Only trust cache from the last 30 minutes
+          const isFresh = typeof parsed.ts === 'number' && (Date.now() - parsed.ts) <= 30 * 60 * 1000;
+          if (isFresh) {
+            // Ensure ferry quays are loaded before computing (wait up to ~2s) using refs
+            const startWait = Date.now();
+            while (!ferryStopsLoadedRef.current || !allFerryQuaysRef.current || allFerryQuaysRef.current.length === 0) {
+              await new Promise(resolve => setTimeout(resolve, 150));
+              if (Date.now() - startWait > 2000) break;
+            }
+            if (ferryStopsLoadedRef.current && allFerryQuaysRef.current && allFerryQuaysRef.current.length > 0) {
+              await computeNearbyAndUpdate(parsed.latitude, parsed.longitude);
+            }
+            // Don't stop loading yet; allow new GPS fix to overwrite with fresher data
+          }
+        }
+      }
+    } catch (_) {}
+
+    // Ikke vent på fergekaier her; start GPS umiddelbart og vent kort senere ved behov
 
     // Helper to compute nearby stops and update UI based on coordinates
     const computeNearbyAndUpdate = async (latitude, longitude) => {
@@ -347,17 +385,24 @@ function App() {
         }
       })();
       
-      // Double-check that ferry quays are loaded
-      if (!allFerryQuays || allFerryQuays.length === 0) {
-        console.error('📍 GPS Search: No ferry quays available for distance calculation');
-        // This should not happen since we waited above, but just in case
-        setError('Fergekaier er ikke tilgjengelige. Prøv igjen.');
-        setLoading(false);
-        return;
+      // Ensure ferry quays are loaded; try to load if missing (using refs to avoid stale values)
+      if (!allFerryQuaysRef.current || allFerryQuaysRef.current.length === 0) {
+        try { await loadAllFerryStops(); } catch (_) {}
+        // Wait briefly after triggering load
+        const startWaitLoad = Date.now();
+        while ((!allFerryQuaysRef.current || allFerryQuaysRef.current.length === 0) && (Date.now() - startWaitLoad) < 8000) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        if (!allFerryQuaysRef.current || allFerryQuaysRef.current.length === 0) {
+          console.error('📍 GPS Search: No ferry quays available for distance calculation');
+          setError('Fergekaier er ikke tilgjengelige. Prøv igjen.');
+          setLoading(false);
+          return;
+        }
       }
       
       // Step 1: Calculate simple Haversine distance for ALL quays (fast, no network)
-      const placesWithDistance = allFerryQuays.map(stop => {
+      const placesWithDistance = allFerryQuaysRef.current.map(stop => {
         const dLat = (stop.latitude - latitude) * 111000;
         const dLng = (stop.longitude - longitude) * 111000 * Math.cos(latitude * Math.PI / 180);
         const distance = Math.sqrt(dLat * dLat + dLng * dLng);
@@ -366,11 +411,11 @@ function App() {
 
       // Filter by distance and sort
       const nearbyCandidates = placesWithDistance
-        .filter(p => p.distance <= GPS_SEARCH_CONFIG.SEARCH_RADIUS_METERS) // Configurable radius
+        .filter(p => p.distance <= 60000) // 60 km radius
         .sort((a, b) => a.distance - b.distance);
 
       if (nearbyCandidates.length === 0) {
-        setError(`Ingen fergekaier funnet innen ${GPS_SEARCH_CONFIG.SEARCH_RADIUS_METERS / 1000} km fra din posisjon. Prøv å søke manuelt i stedet.`);
+        setError('Ingen fergekaier funnet innen 60 km fra din posisjon. Prøv å søke manuelt i stedet.');
         setLoading(false);
         return;
       }
@@ -410,10 +455,10 @@ function App() {
       
       // Grow search window until we find enough results (handles many nearby water stops without departures)
       const collectedWithDepartures = [];
-      const chunkSize = GPS_SEARCH_CONFIG.CHUNK_SIZE;
-      const maxCandidates = Math.min(nearbyCandidates.length, GPS_SEARCH_CONFIG.MAX_CANDIDATES);
+      const chunkSize = 20; // Reduced from 30
+      const maxCandidates = Math.min(nearbyCandidates.length, 100); // Reduced from 200
       
-      for (let i = 0; i < maxCandidates && collectedWithDepartures.length < GPS_SEARCH_CONFIG.MAX_RESULTS; i += chunkSize) {
+      for (let i = 0; i < maxCandidates && collectedWithDepartures.length < 8; i += chunkSize) { // Increased from 5 to 8
         const chunk = nearbyCandidates.slice(i, i + chunkSize);
         const results = await Promise.all(chunk.map(fetchDepartures));
         for (const res of results) {
@@ -436,7 +481,7 @@ function App() {
       const localDrivingDistances = {}; // Local storage for distances
       
       // Process stops in parallel for better performance
-      const stopsToProcess = collectedWithDepartures.slice(0, GPS_SEARCH_CONFIG.MAX_RESULTS);
+      const stopsToProcess = collectedWithDepartures.slice(0, 8);
       const drivingTimePromises = stopsToProcess.map(async (stop) => {
         try {
           const result = await calculateDrivingTime(origin, { lat: stop.latitude, lng: stop.longitude }, { roadOnly: true });
@@ -458,7 +503,7 @@ function App() {
           (result.source.startsWith('routes_v2') || result.source.startsWith('directions_v1') || result.source.startsWith('here_routing_v8') || result.source === 'haversine') &&
           typeof result.distance === 'number' &&
           result.distance > 0 && // Must have a valid distance
-          (result.distance <= GPS_SEARCH_CONFIG.DRIVING_RADIUS_METERS || result.source === 'haversine') // Allow haversine results within luftlinje radius
+          (result.distance <= 60000 || result.source === 'haversine') // Allow haversine results within luftlinje radius
         ) {
           // Check if the route contains ferries despite avoidFerries parameter (only for routing APIs, not haversine)
           if (result.hasFerry && result.source !== 'haversine') {
@@ -565,8 +610,8 @@ function App() {
             
             const position = await Geolocation.getCurrentPosition({
               enableHighAccuracy: false,
-              timeout: 5000,
-              maximumAge: 600000
+              timeout: 3000,
+              maximumAge: 300000
             });
             pos = position;
           } catch (capacitorError) {
@@ -590,7 +635,7 @@ function App() {
                       clearTimeout(timeoutId);
                       reject(error);
                     },
-                    { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
+                    { enableHighAccuracy: false, timeout: 3000, maximumAge: 300000 }
                   );
                 });
                 console.log('📍 GPS Search: Browser geolocation successful');
@@ -631,7 +676,7 @@ function App() {
           pos = await new Promise((resolve, reject) => {
             const timeoutId = setTimeout(() => {
               reject(new Error('Low-accuracy GPS timeout'));
-            }, 5000);
+            }, 4000);
             
             navigator.geolocation.getCurrentPosition(
               (position) => {
@@ -642,7 +687,7 @@ function App() {
                 clearTimeout(timeoutId);
                 reject(error);
               },
-              { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
+              { enableHighAccuracy: false, timeout: 3000, maximumAge: 300000 }
             );
           });
         }
@@ -653,8 +698,8 @@ function App() {
           try {
             const position = await Geolocation.getCurrentPosition({
               enableHighAccuracy: true,
-              timeout: 15000,
-              maximumAge: 10000
+              timeout: 10000,
+              maximumAge: 60000
             });
             pos = position;
           } catch (capacitorError) {
@@ -676,7 +721,7 @@ function App() {
                       clearTimeout(timeoutId);
                       reject(error);
                     },
-                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
                   );
                 });
                 console.log('📍 GPS Search: Browser geolocation successful');
@@ -717,7 +762,7 @@ function App() {
           pos = await new Promise((resolve, reject) => {
             const timeoutId = setTimeout(() => {
               reject(new Error('High-accuracy GPS timeout'));
-            }, 15000);
+            }, 10000);
             
             navigator.geolocation.getCurrentPosition(
               (position) => {
@@ -728,7 +773,7 @@ function App() {
                 clearTimeout(timeoutId);
                 reject(error);
               },
-              { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+              { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
             );
           });
         }
@@ -736,6 +781,14 @@ function App() {
 
       try {
         const { latitude, longitude } = pos.coords;
+        // Sett posisjonen umiddelbart for å oppdatere UI
+        setLocation({ latitude, longitude });
+        // Vent kort på fergekaier, men ikke blokkér for lenge (maks ~12s)
+        const startWaitQuays = Date.now();
+        while (!ferryStopsLoaded || !allFerryQuays || allFerryQuays.length === 0) {
+          await new Promise(resolve => setTimeout(resolve, 250));
+          if (Date.now() - startWaitQuays > 12000) break;
+        }
         await computeNearbyAndUpdate(latitude, longitude);
 
         // Store last location for faster next startup
@@ -826,10 +879,16 @@ function App() {
   // Initialize app function
   const initializeApp = async () => {
     try {
-
-      
-      // Kjøretidsberegning er alltid tilgjengelig
-      setShowDrivingTimes(true);
+      await initPurchases();
+      try {
+        const capability = await canMakePayments();
+        if (capability && capability.canMakePayments === false) {
+          console.warn('Kjøp er ikke tillatt på denne enheten/kontoen');
+        }
+      } catch (_) {}
+      const active = await isPremiumActive();
+      setHasPremium(active);
+      setShowDrivingTimes(!!active);
       
     } catch (error) {
       console.error('❌ Error in initializeApp:', error);
@@ -1128,11 +1187,25 @@ function App() {
       return;
     }
     
-
+    // På web: aktiver premium direkte og kjør GPS-søk
+    try {
+      if (Capacitor.getPlatform && Capacitor.getPlatform() === 'web') {
+        setHasPremium(true);
+        setShowDrivingTimes(true);
+        setShowPremiumCTA(false);
+        setError(null);
+        setMode('search');
+        await executeGpsSearch();
+        return;
+      }
+    } catch (_) {}
     
-
-    
-
+    if (!hasPremium) {
+      setMode('search');
+      setError(null);
+      setShowPremiumCTA(true);
+      return;
+    }
     
     // Call executeGpsSearch directly - no blocking mechanism
     await executeGpsSearch();
@@ -1580,23 +1653,81 @@ function App() {
     <>
       {/* Custom Splash Screen */}
       {showCustomSplash && (
-        <div className="fixed inset-0 bg-gradient-to-br from-fuchsia-500 to-pink-500 flex flex-col items-center justify-center z-50">
+        <div className="fixed inset-0 bg-gradient flex flex-col items-center justify-start pt-20 sm:pt-24 z-50">
           <div className="text-center">
-            <h1 className="text-4xl sm:text-6xl font-bold text-white mb-8 drop-shadow-lg">
+            <h1 className="text-5xl sm:text-7xl font-extrabold text-white tracking-tight mb-8 drop-shadow-lg fergetid-title">
               FergeTid
             </h1>
-            <div className="text-white text-lg mb-6">
-              laster...
-            </div>
-            <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
-            </div>
+            <LoadingSpinner message={"laster"} />
           </div>
         </div>
       )}
 
       <div className="bg-gradient flex flex-col items-center min-h-screen pb-16 sm:pb-24 pt-20 sm:pt-24">
         <h1 className="text-5xl sm:text-7xl font-extrabold text-white tracking-tight mb-6 sm:mb-6 drop-shadow-lg fergetid-title">{APP_NAME}</h1>
+      
+        {/* Premium CTA (kun etter GPS-klikk uten premium) - skjul på web */}
+        {showPremiumCTA && !hasPremium && Capacitor.getPlatform && Capacitor.getPlatform() !== 'web' && (
+          <div className="w-full max-w-[350px] sm:max-w-md mb-6 px-3 sm:px-4">
+            {/* Modal overlay */}
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" onClick={() => setShowPremiumCTA(false)}></div>
+            {/* Modal card */}
+            <div className="relative z-50 bg-white/95 backdrop-blur-md border border-fuchsia-200 rounded-2xl shadow-2xl p-4 mx-auto">
+              {/* Close (X) */}
+              <button
+                type="button"
+                aria-label="Lukk"
+                onClick={() => setShowPremiumCTA(false)}
+                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+              >
+                ×
+              </button>
+              <div className="text-gray-800 font-bold mb-2">Få Premium</div>
+              <div className="text-gray-700 text-sm mb-1">GPS og kjøretidsbeskrivelse krever Premium-abonnement.</div>
+              <div className="text-gray-700 text-sm">Pris: <span className="font-semibold">29 kr/måned</span> eller <span className="font-semibold">299 kr/år</span>.</div>
+              <div className="text-gray-700 text-sm mb-4"><span className="font-semibold">14 dager gratis</span>, deretter fortsetter abonnementet automatisk. Du kan avslutte når som helst.</div>
+              <div className="text-xs text-gray-600 mb-2">
+                Ved å abonnere godtar du vår{' '}
+                <a href={config?.LEGAL?.getTermsOfUseUrl?.()} target="_blank" rel="noopener noreferrer" className="text-fuchsia-700 underline">Bruksvilkår (EULA)</a>{' '}og{' '}
+                <a href={config?.LEGAL?.getPrivacyPolicyUrl?.()} target="_blank" rel="noopener noreferrer" className="text-fuchsia-700 underline">Personvernerklæring</a>.
+              </div>
+              <div className="mt-3">
+                <WebPaywall
+                  onSuccess={async () => {
+                    const active = await isPremiumActive();
+                    setHasPremium(active);
+                    setShowDrivingTimes(!!active);
+                    if (active) setShowPremiumCTA(false);
+                  }}
+                  onError={(e) => {
+                    console.error('Web paywall kjøp feilet', e);
+                  }}
+                />
+              </div>
+              {(typeof window !== 'undefined' && window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'ios') && (
+                <div className="mt-3 text-right flex gap-3 justify-end">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await restorePurchasesIOS();
+                        const active = await isPremiumActive();
+                        setHasPremium(active);
+                        setShowDrivingTimes(!!active);
+                        if (active) setShowPremiumCTA(false);
+                      } catch (e) {
+                        console.error('Gjenoppretting feilet', e);
+                      }
+                    }}
+                    className="text-sm text-fuchsia-700 hover:underline"
+                  >
+                    Gjenopprett kjøp (iOS)
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       
         {/* Hidden input to catch iOS auto-focus */}
         <input 
@@ -1857,7 +1988,7 @@ function App() {
                 <div key={stopData.id} className="flex flex-col">
                   {/* Km-avstand som egen boks over fergekortet */}
                   {distance && (
-                    <div className="bg-blue-500 text-white text-base font-bold px-2 py-1.5 rounded-full shadow-lg mb-[-10px] self-start relative z-20 -ml-2">
+                    <div className="bg-blue-500 text-white text-lg font-bold px-2.5 py-1.5 rounded-2xl shadow-lg mb-[-10px] self-start relative z-20 -ml-4">
                       {(() => {
                         const drivingDistance = drivingDistances[stopData.id];
                         const fallbackDistance = distance;
@@ -2067,6 +2198,13 @@ function App() {
             }
           </div>
         )}
+        {/* Footer legal links */}
+        <div className="mt-auto w-full flex justify-center pt-8 sm:pt-10 pb-8 sm:pb-10">
+          <div className="text-xs text-white/80">
+            <a href={config?.LEGAL?.getTermsOfUseUrl?.()} target="_blank" rel="noopener noreferrer" className="underline mr-4">Bruksvilkår (EULA)</a>
+            <a href={config?.LEGAL?.getPrivacyPolicyUrl?.()} target="_blank" rel="noopener noreferrer" className="underline">Personvernerklæring</a>
+          </div>
+        </div>
       </div>
     </>
   );

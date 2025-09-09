@@ -51,5 +51,9 @@
         "locationWhenInUseUsageDescription": "FergeTid trenger tilgang til din posisjon for å vise nærliggende fergekaier og beregne kjøretid."
       }
     }
-  }
+  },
+  "packageClassList": [
+    "GeolocationPlugin",
+    "SplashScreenPlugin"
+  ]
 }

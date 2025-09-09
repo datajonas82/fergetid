@@ -1,7 +1,5 @@
 import UIKit
 import Capacitor
-// Ensure custom plugin is linked
-@objc(RevCatUIPaywall) class RevCatUIPaywallLink: NSObject {}
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {

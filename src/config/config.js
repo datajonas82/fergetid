@@ -153,19 +153,19 @@ export const config = {
   LEGAL: {
     getPrivacyPolicyUrl: () => {
       const configured = (import.meta.env.VITE_PRIVACY_POLICY_URL || '').trim();
-      const path = configured || '/privacy.html';
-      if (typeof window !== 'undefined' && window.location?.origin) {
-        try { return new URL(path, window.location.origin).toString(); } catch (_) { return path; }
-      }
-      return path;
+      // Returner ekstern URL hvis satt, ellers relativ lokal sti
+      if (/^https?:\/\//i.test(configured)) return configured;
+      return configured || '/privacy.html';
     },
     getTermsOfUseUrl: () => {
       const configured = (import.meta.env.VITE_TERMS_OF_USE_URL || '').trim();
-      const path = configured || '/terms.html';
-      if (typeof window !== 'undefined' && window.location?.origin) {
-        try { return new URL(path, window.location.origin).toString(); } catch (_) { return path; }
-      }
-      return path;
+      if (/^https?:\/\//i.test(configured)) return configured;
+      return configured || '/terms.html';
+    },
+    getSupportUrl: () => {
+      const configured = (import.meta.env.VITE_SUPPORT_URL || '').trim();
+      if (/^https?:\/\//i.test(configured)) return configured;
+      return configured || '/support.html';
     }
   }
 };  

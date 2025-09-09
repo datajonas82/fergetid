@@ -2104,8 +2104,37 @@ function App() {
         {/* Footer legal links */}
         <div className="mt-auto w-full flex justify-center pt-8 sm:pt-10 pb-8 sm:pb-10">
           <div className="text-xs text-white/80">
-            <a href={config?.LEGAL?.getTermsOfUseUrl?.()} target="_blank" rel="noopener noreferrer" className="underline mr-4">Bruksvilkår (EULA)</a>
-            <a href={config?.LEGAL?.getPrivacyPolicyUrl?.()} target="_blank" rel="noopener noreferrer" className="underline">Personvernerklæring</a>
+            {(() => {
+              const isIOSApp = typeof window !== 'undefined' && window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'ios';
+              const termsHref = config?.LEGAL?.getTermsOfUseUrl?.();
+              const privacyHref = config?.LEGAL?.getPrivacyPolicyUrl?.();
+              const supportHref = config?.LEGAL?.getSupportUrl?.();
+              return (
+                <>
+                  <a
+                    href={termsHref}
+                    {...(isIOSApp ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+                    className="underline mr-4"
+                  >
+                    Bruksvilkår (EULA)
+                  </a>
+                  <a
+                    href={privacyHref}
+                    {...(isIOSApp ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+                    className="underline mr-4"
+                  >
+                    Personvernerklæring
+                  </a>
+                  <a
+                    href={supportHref}
+                    {...(isIOSApp ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+                    className="underline"
+                  >
+                    Support
+                  </a>
+                </>
+              );
+            })()}
           </div>
         </div>
       </div>

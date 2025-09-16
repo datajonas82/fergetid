@@ -6,19 +6,28 @@
     <title>FergeTid – Bruksvilkår (EULA)</title>
     <meta name="description" content="Bruksvilkår (EULA) for FergeTid">
     <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 0; background: linear-gradient(135deg,#6b0f9c,#b91372); color: #1f2937; }
+      body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 0; background: linear-gradient(135deg, #d95cff 0%, #c026d3 50%, #a855f7 100%); color: #1f2937; }
       .container { max-width: 820px; margin: 0 auto; padding: 36px 16px; }
       .card { background: #fff; border-radius: 16px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-      h1 { margin-top: 0; color: #6b21a8; }
-      a { color: #6b21a8; }
+      h1 { margin-top: 0; color: #a855f7; font-size: 32px; line-height: 1.2; font-weight: 800; }
+      h2 { color: #a855f7; font-size: 22px; line-height: 1; font-weight: 700; }
+      p, li { font-size: 14px; line-height: 1; }
+      a { color: #a855f7; }
       footer { text-align: center; color: #e5e7eb; padding: 16px 0 32px; }
+      /* Embed-mode styles for modal iframe */
+      body.embed { background: transparent; color: #fff; }
+      body.embed .container { max-width: 840px; padding: 16px; }
+      body.embed .card { background: transparent; border-radius: 0; padding: 0; box-shadow: none; border: 0; }
+      body.embed h1, body.embed h2, body.embed p, body.embed li, body.embed a { color: #ffffff; }
+      body.embed a { text-decoration: underline; }
+      body.embed footer, body.embed a[aria-label="Lukk"] { display: none; }
     </style>
   </head>
   <body>
     <div class="container">
       <div class="card">
         <div style="text-align:right; margin:-8px -8px 8px 0;">
-          <a href="/" aria-label="Lukk" style="display:inline-block; font-weight:700; color:#6b21a8; text-decoration:none; font-size:20px">×</a>
+          <a href="/" aria-label="Lukk" style="display:inline-block; font-weight:400; color:#6b21a8; text-decoration:none; font-size:20px">×</a>
         </div>
         <h1>Bruksvilkår (EULA)</h1>
         <p>Sist oppdatert: 2025-08-27</p>
@@ -38,6 +47,33 @@
         <p>© FergeTid</p>
       </footer>
     </div>
+    <script>
+      (function() {
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('embed') === '1') {
+          document.body.classList.add('embed');
+          // Hide internal close link completely
+          try {
+            var closeA = document.querySelector('a[aria-label="Lukk"]');
+            if (closeA && closeA.parentElement) closeA.parentElement.style.display = 'none';
+          } catch (e) {}
+          // Ensure internal links keep embed=1
+          var keep = function(href) {
+            try {
+              var u = new URL(href, window.location.origin);
+              var path = u.pathname.replace(/^\//,'');
+              if (path === 'terms.html' || path === 'privacy.html' || path === 'support.html') {
+                if (!u.searchParams.get('embed')) u.searchParams.set('embed','1');
+              }
+              return u.pathname + (u.search || '') + (u.hash || '');
+            } catch (e) { return href; }
+          };
+          document.querySelectorAll('a[href]').forEach(function(a){
+            a.setAttribute('href', keep(a.getAttribute('href')));
+          });
+        }
+      })();
+    </script>
   </body>
   </html>
 

@@ -5,6 +5,7 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { Geolocation } from '@capacitor/geolocation';
 
 import LoadingSpinner from './components/LoadingSpinner';
+import LegalModal from './components/LegalModal';
 
 
 import { calculateDrivingTime } from './services/GeoServices';
@@ -254,6 +255,11 @@ function App() {
   const allFerryQuaysRef = useRef([]);
   useEffect(() => { ferryStopsLoadedRef.current = ferryStopsLoaded; }, [ferryStopsLoaded]);
   useEffect(() => { allFerryQuaysRef.current = allFerryQuays; }, [allFerryQuays]);
+
+  // Legal modal state for web
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalModalUrl, setLegalModalUrl] = useState('');
+  const [legalModalTitle, setLegalModalTitle] = useState('');
 
       // Driving time calculation state
     const [showDrivingTimes, setShowDrivingTimes] = useState(true); // Alltid på
@@ -2113,21 +2119,48 @@ function App() {
                 <>
                   <a
                     href={termsHref}
-                    {...(isIOSApp ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+                    onClick={(e) => {
+                      if (!isIOSApp) {
+                        e.preventDefault();
+                        setLegalModalTitle('Bruksvilkår (EULA)');
+                        const url = termsHref + (termsHref.includes('?') ? '&' : '?') + 'embed=1';
+                        setLegalModalUrl(url);
+                        setLegalModalOpen(true);
+                      }
+                    }}
+                    {...(isIOSApp ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                     className="underline mr-4"
                   >
                     Bruksvilkår (EULA)
                   </a>
                   <a
                     href={privacyHref}
-                    {...(isIOSApp ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+                    onClick={(e) => {
+                      if (!isIOSApp) {
+                        e.preventDefault();
+                        setLegalModalTitle('Personvernerklæring');
+                        const url = privacyHref + (privacyHref.includes('?') ? '&' : '?') + 'embed=1';
+                        setLegalModalUrl(url);
+                        setLegalModalOpen(true);
+                      }
+                    }}
+                    {...(isIOSApp ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                     className="underline mr-4"
                   >
                     Personvernerklæring
                   </a>
                   <a
                     href={supportHref}
-                    {...(isIOSApp ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+                    onClick={(e) => {
+                      if (!isIOSApp) {
+                        e.preventDefault();
+                        setLegalModalTitle('Support');
+                        const url = supportHref + (supportHref.includes('?') ? '&' : '?') + 'embed=1';
+                        setLegalModalUrl(url);
+                        setLegalModalOpen(true);
+                      }
+                    }}
+                    {...(isIOSApp ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                     className="underline"
                   >
                     Support
@@ -2137,6 +2170,13 @@ function App() {
             })()}
           </div>
         </div>
+        {/* Legal modal (web only) */}
+        <LegalModal
+          open={legalModalOpen}
+          url={legalModalUrl}
+          title={legalModalTitle}
+          onClose={() => setLegalModalOpen(false)}
+        />
       </div>
     </>
   );

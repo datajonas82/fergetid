@@ -28,6 +28,20 @@
         document.head.appendChild(s);
       }
     </script>
+    
+    <!-- Vercel Web Analytics (lastes kun i prod-domener) -->
+    <script>
+      (function(){
+        var host = location.hostname || '';
+        var enabled = /\.vercel\.app$/.test(host) || host === 'fergetid.app' || /\.fergetid\.app$/.test(host);
+        if (!enabled) return;
+        var s = document.createElement('script');
+        s.defer = true;
+        s.src = '/_vercel/insights/script.js';
+        document.head.appendChild(s);
+        window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments) };
+      })();
+    </script>
   </head>
   
   <body>

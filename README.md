@@ -68,8 +68,9 @@ Appen bruker Vercel Analytics for å spore brukerinteraksjoner og forbedre bruke
 - **`driving_times_toggled`** - Når kjøretidsberegning aktiveres/deaktiveres
 
 #### Konfigurasjon:
-- Analytics er aktivert i `vercel.json`
-- Custom events sendes med relevant metadata
+- Analytics er aktivert via script i `index.html`
+- Script lastes kun på `fergetid.app` og `*.vercel.app`
+- Custom events kan sendes med `window.va('event', 'navn', { ...metadata })`
 - Ingen personlig informasjon spores
 
 ### Vercel Speed Insights

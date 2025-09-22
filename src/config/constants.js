@@ -11,16 +11,21 @@ export const GEOLOCATION_OPTIONS = config.GEOLOCATION_CONFIG.getOptions();
 // Transport modes
 export const TRANSPORT_MODES = {
   WATER: 'water',
-  LOCAL_CAR_FERRY: 'localCarFerry'
+  LOCAL_CAR_FERRY: 'localCarFerry',
+  LOCAL_PASSENGER_FERRY: 'localPassengerFerry'
 };
 
 // Excluded transport submodes
 // Exclude only passenger/sightseeing submodes. Always include car ferries (local/national/vehicle).
 export const EXCLUDED_SUBMODES = [
   'regionalPassengerFerry',
-  'localPassengerFerry',
   'nationalPassengerFerry',
-  'sightSeeingService',
+  'sightSeeingService'
+];
+
+// Passenger ferry submodes that we treat as "Hurtigbåt"
+export const PASSENGER_FERRY_SUBMODES = [
+  'localPassengerFerry',
   'highSpeedPassengerService'
 ];
 

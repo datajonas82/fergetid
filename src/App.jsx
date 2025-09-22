@@ -1824,7 +1824,7 @@ function App() {
                     </svg>
                   ) : null}
                 </span>
-                <span className="text-black-400 font-thin">Passasjerbåt</span>
+                <span className="text-black-400 font-thin">Passasjerferge</span>
               </button>
             </div>
           </div>

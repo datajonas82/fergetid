@@ -14,7 +14,8 @@ import {
   TRANSPORT_MODES, 
   APP_NAME,
   GEOLOCATION_OPTIONS,
-  EXCLUDED_SUBMODES
+  EXCLUDED_SUBMODES,
+  PASSENGER_FERRY_SUBMODES
 } from './config/constants';
 import { config } from './config/config';
 import { 
@@ -260,6 +261,21 @@ function App() {
   const [legalModalOpen, setLegalModalOpen] = useState(false);
   const [legalModalUrl, setLegalModalUrl] = useState('');
   const [legalModalTitle, setLegalModalTitle] = useState('');
+  // Filter state for ferry categories
+  const [filters, setFilters] = useState({
+    carFerry: true, // localCarFerry (Bilferge)
+    passengerFerry: true // localPassengerFerry (Hurtigbåt)
+  });
+
+  // Re-run GPS visning når filter endres
+  useEffect(() => {
+    if (mode !== 'gps') return;
+    // Debounce lett for å unngå dobbeltkall ved hurtige toggles
+    const id = setTimeout(() => {
+      executeGpsSearch();
+    }, 150);
+    return () => clearTimeout(id);
+  }, [filters, mode]);
 
       // Driving time calculation state
     const [showDrivingTimes, setShowDrivingTimes] = useState(true); // Alltid på
@@ -413,9 +429,9 @@ function App() {
         return { ...stop, distance };
       });
 
-      // Filter by distance and sort
+      // Filter by distance and sort (global 60 km, finfilter senere pr submode)
       const nearbyCandidates = placesWithDistance
-        .filter(p => p.distance <= 60000) // 60 km radius
+        .filter(p => p.distance <= 60000)
         .sort((a, b) => a.distance - b.distance);
 
       if (nearbyCandidates.length === 0) {
@@ -437,11 +453,17 @@ function App() {
           const departures = calls
             .filter(call => {
               const sub = call.serviceJourney?.journeyPattern?.line?.transportSubmode;
-              return sub && !EXCLUDED_SUBMODES.includes(sub);
+              const allowCar = filters.carFerry && sub === TRANSPORT_MODES.LOCAL_CAR_FERRY;
+              const allowPassenger = filters.passengerFerry && PASSENGER_FERRY_SUBMODES.includes(sub);
+              return sub && !EXCLUDED_SUBMODES.includes(sub) && (allowCar || allowPassenger);
             })
             .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime));
-          
-          return { ...place, nextDeparture: departures[0] || null, departures };
+          const sub = departures[0]?.serviceJourney?.journeyPattern?.line?.transportSubmode;
+          // Hvis passasjerbåt og for langt unna (>10km), hopp over
+          if (sub && PASSENGER_FERRY_SUBMODES.includes(sub) && place.distance > 10000) {
+            return { ...place, nextDeparture: null, departures: [], submode: sub };
+          }
+          return { ...place, nextDeparture: departures[0] || null, departures, submode: sub };
         };
         try {
           return await attempt();
@@ -488,10 +510,21 @@ function App() {
       const stopsToProcess = collectedWithDepartures.slice(0, 8);
       const drivingTimePromises = stopsToProcess.map(async (stop) => {
         try {
+          const sub = stop?.nextDeparture?.serviceJourney?.journeyPattern?.line?.transportSubmode || stop?.submode;
+          const isPassengerCard = sub && PASSENGER_FERRY_SUBMODES.includes(sub);
+          if (isPassengerCard) {
+            const distanceMeters = typeof stop.distance === 'number' ? stop.distance : (() => {
+              const dLat = (stop.latitude - origin.lat) * 111000;
+              const dLng = (stop.longitude - origin.lng) * 111000 * Math.cos(origin.lat * Math.PI / 180);
+              return Math.sqrt(dLat * dLat + dLng * dLng);
+            })();
+            const walkingMinutes = Math.max(1, Math.round((distanceMeters / 1.4) / 60)); // 1.4 m/s ≈ 5 km/t
+            return { stop, result: { time: walkingMinutes, distance: distanceMeters, source: 'walking_estimate', hasFerry: false } };
+          }
           const result = await calculateDrivingTime(origin, { lat: stop.latitude, lng: stop.longitude }, { roadOnly: true });
           return { stop, result };
         } catch (error) {
-          console.error(`📍 GPS Search: Error calculating driving time to ${stop.name}:`, error);
+          console.error(`📍 GPS Search: Error calculating travel time to ${stop.name}:`, error);
           return { stop, result: null };
         }
       });
@@ -500,27 +533,18 @@ function App() {
       const drivableStops = [];
       
       for (const { stop, result } of drivingTimeResults) {
-        // Accept only real routing API results; skip if we fell back to simple estimate
-        if (
-          result &&
-          result.source &&
-          (result.source.startsWith('routes_v2') || result.source.startsWith('directions_v1') || result.source.startsWith('here_routing_v8') || result.source === 'haversine') &&
-          typeof result.distance === 'number' &&
-          result.distance > 0 && // Must have a valid distance
-          (result.distance <= 60000 || result.source === 'haversine') // Allow haversine results within luftlinje radius
-        ) {
-          // Check if the route contains ferries despite avoidFerries parameter (only for routing APIs, not haversine)
-          if (result.hasFerry && result.source !== 'haversine') {
-            console.warn(`📍 GPS Search: Skipped ${stop.name} - route contains ferries despite avoidFerries=true`);
-            continue; // Skip this stop and try the next one
-          }
-          
-          setDrivingTimes(prev => ({ ...prev, [stop.id]: result.time }));
-          setDrivingDistances(prev => ({ ...prev, [stop.id]: result.distance }));
-          setDrivingTimeSources(prev => ({ ...prev, [stop.id]: result.source }));
-          localDrivingDistances[stop.id] = result.distance; // Store locally for sorting
-          drivableStops.push(stop);
+        if (!result || typeof result.distance !== 'number' || result.distance <= 0) continue;
+        const sub = stop?.nextDeparture?.serviceJourney?.journeyPattern?.line?.transportSubmode || stop?.submode;
+        const isPassenger = sub && PASSENGER_FERRY_SUBMODES.includes(sub);
+        if (!isPassenger && result.hasFerry && result.source !== 'haversine') {
+          console.warn(`📍 GPS Search: Skipped ${stop.name} - route contains ferries despite avoidFerries=true`);
+          continue;
         }
+        setDrivingTimes(prev => ({ ...prev, [stop.id]: result.time }));
+        setDrivingDistances(prev => ({ ...prev, [stop.id]: result.distance }));
+        setDrivingTimeSources(prev => ({ ...prev, [stop.id]: result.source }));
+        localDrivingDistances[stop.id] = result.distance;
+        drivableStops.push(stop);
       }
       
       // Sort by driving distance
@@ -845,11 +869,6 @@ function App() {
           if (EXCLUDED_SUBMODES.includes(stop.transportSubmode)) {
             return false;
           }
-          const name = (stop.name || '').toLowerCase();
-          // Ekskluder hurtigbåtkai og kystrutekai basert på navn
-          if (name.includes('hurtigbåt') || name.includes('express boat') || name.includes('kystrute')) {
-            return false;
-          }
           
           // Prioriter localCarFerry, men inkluder også andre water transport stops som kan være relevante
           if (stop.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY) return true;
@@ -991,8 +1010,10 @@ function App() {
         const calls = data.stopPlace?.estimatedCalls || [];
         departures = calls
           .filter((call) => {
-            const line = call.serviceJourney?.journeyPattern?.line;
-            return line && line.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY;
+            const sub = call.serviceJourney?.journeyPattern?.line?.transportSubmode;
+            const allowCar = filters.carFerry && sub === TRANSPORT_MODES.LOCAL_CAR_FERRY;
+            const allowPassenger = filters.passengerFerry && PASSENGER_FERRY_SUBMODES.includes(sub);
+            return sub && !EXCLUDED_SUBMODES.includes(sub) && (allowCar || allowPassenger);
           })
           .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime));
       } catch {
@@ -1202,12 +1223,24 @@ function App() {
       const endCoords = { lat: stop.latitude, lng: stop.longitude };
       
       try {
-        // Bruk Google Maps API for mer nøyaktige kjøretider
-        // This function now has its own fallback chain built-in
-        const result = await calculateDrivingTime(startCoords, endCoords, { roadOnly: true });
+        const sub = stop?.nextDeparture?.serviceJourney?.journeyPattern?.line?.transportSubmode;
+        const isPassengerOnly = (filters.passengerFerry && !filters.carFerry) && sub && PASSENGER_FERRY_SUBMODES.includes(sub);
+        let result;
+        if (isPassengerOnly) {
+          // walking estimate 1.4 m/s
+          const dLat = (endCoords.lat - startCoords.lat) * 111000;
+          const dLng = (endCoords.lng - startCoords.lng) * 111000 * Math.cos(startCoords.lat * Math.PI / 180);
+          const distance = Math.sqrt(dLat * dLat + dLng * dLng);
+          const walkingMinutes = Math.max(1, Math.round((distance / 1.4) / 60));
+          result = { time: walkingMinutes, distance, source: 'walking_estimate', hasFerry: false };
+        } else {
+          // Bruk Google Maps API for mer nøyaktige kjøretider
+          // This function now has its own fallback chain built-in
+          result = await calculateDrivingTime(startCoords, endCoords, { roadOnly: true });
+        }
         
         // Skip if route contains ferries
-        if (result.hasFerry) {
+        if (!isPassengerOnly && result.hasFerry) {
           console.warn(`🚢 Driving time calculation: Skipped ${stop.name} - route contains ferries`);
           return;
         }
@@ -1271,7 +1304,10 @@ function App() {
             ...queryParams
           });
       const callsLine = dataLine.stopPlace?.estimatedCalls || [];
-      const anyFerry = callsLine.find(call => call.serviceJourney?.journeyPattern?.line?.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY);
+      const anyFerry = callsLine.find(call => {
+        const sub = call.serviceJourney?.journeyPattern?.line?.transportSubmode;
+        return sub === TRANSPORT_MODES.LOCAL_CAR_FERRY || PASSENGER_FERRY_SUBMODES.includes(sub);
+      });
       const line = anyFerry?.serviceJourney?.journeyPattern?.line;
 
       if (line && Array.isArray(line.quays) && line.quays.length >= 2) {
@@ -1446,10 +1482,13 @@ function App() {
                cleanTarget.includes(cleanDest);
       });
 
-      // Get the line and its quays: prefer a matching departure; fallback to any local car ferry call
+      // Get the line and its quays: prefer a matching departure; fallback to any local car or passenger ferry call
       let line = matchingDepartures[0]?.serviceJourney?.journeyPattern?.line;
       if (!line) {
-        const anyFerryCall = calls.find(call => call.serviceJourney?.journeyPattern?.line?.transportSubmode === TRANSPORT_MODES.LOCAL_CAR_FERRY);
+        const anyFerryCall = calls.find(call => {
+          const sub = call.serviceJourney?.journeyPattern?.line?.transportSubmode;
+          return sub === TRANSPORT_MODES.LOCAL_CAR_FERRY || PASSENGER_FERRY_SUBMODES.includes(sub);
+        });
         if (anyFerryCall) {
           line = anyFerryCall.serviceJourney?.journeyPattern?.line;
         }
@@ -1549,7 +1588,10 @@ function App() {
         // Check if this is a relevant water ferry (broaden beyond only localCarFerry)
         const submode = journeyPattern.line?.transportSubmode;
         const mode = journeyPattern.line?.transportMode;
-        const isRelevantFerry = mode === TRANSPORT_MODES.WATER && !EXCLUDED_SUBMODES.includes(submode);
+        const isRelevantFerry = mode === TRANSPORT_MODES.WATER && !EXCLUDED_SUBMODES.includes(submode) && (
+          (filters.carFerry && submode === TRANSPORT_MODES.LOCAL_CAR_FERRY) ||
+          (filters.passengerFerry && PASSENGER_FERRY_SUBMODES.includes(submode))
+        );
         if (!isRelevantFerry) return false;
         
         // QUAY-ONLY: Check if the line has quays that match the parent stop
@@ -1745,6 +1787,49 @@ function App() {
           </div>
         </div>
 
+        {/* Filter checkboxes: midtstilles under søkefeltet */}
+        <div className="w-full max-w-[350px] sm:max-w-md px-3 sm:px-4 -mt-6 mb-6">
+          <div className="flex items-center justify-center">
+            <div className="inline-flex items-stretch bg-white/95 backdrop-blur-md shadow-lg border border-fuchsia-200 rounded-xl overflow-hidden">
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={!!filters.carFerry}
+                onClick={() => setFilters(prev => ({ ...prev, carFerry: !prev.carFerry }))}
+                className="flex items-center gap-2 px-3 py-1.5 focus:outline-none"
+                title="Bilferge"
+              >
+                <span className="w-4 h-4 rounded-[4px] border border-gray-400 bg-white flex items-center justify-center">
+                  {filters.carFerry ? (
+                    <svg viewBox="0 0 24 24" className="w-3 h-3 text-black-400" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                  ) : null}
+                </span>
+                <span className="text-black-400 font-thin">Bilferge</span>
+              </button>
+              <div className="w-px" />
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={!!filters.passengerFerry}
+                onClick={() => setFilters(prev => ({ ...prev, passengerFerry: !prev.passengerFerry }))}
+                className="flex items-center gap-2 px-3 py-1.5 focus:outline-none"
+                title="Hurtigbåt"
+              >
+                <span className="w-4 h-4 rounded-[4px] border border-gray-400 bg-white flex items-center justify-center">
+                  {filters.passengerFerry ? (
+                    <svg viewBox="0 0 24 24" className="w-3 h-3 text-black-400" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                  ) : null}
+                </span>
+                <span className="text-black-400 font-thin">Passasjerbåt</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* GPS Location Display */}
         {mode === 'gps' && locationName && (
           <div className="text-base sm:text-lg text-white mb-4 text-center px-3">
@@ -1927,49 +2012,40 @@ function App() {
                     <hr className="border-gray-300 my-2" />
                     
                     {/* Kjøretidsbeskrivelse rett etter fergekainavn */}
-                    {showDrivingTimes && drivingTimes[stopData.id] && location && (
-                      <div className="mt-2 text-sm text-gray-600 leading-relaxed">
-                        <div dangerouslySetInnerHTML={{
-                          __html: generateTravelDescription(
-                            (drivingDistances[stopData.id] ?? distance),
-                            drivingTimes[stopData.id],
-                            nextDeparture ? calculateTimeDiff(nextDeparture.aimedDepartureTime || nextDeparture.aimed) : 0,
-                            // Send alle tilgjengelige avganger for denne fergekaien
-                            (() => {
-                              const allAvailableDepartures = [];
-                              
-                              // Legg til avganger fra departuresMap hvis tilgjengelig
-                              if (departuresMap[stopData.id]) {
-                                allAvailableDepartures.push(...departuresMap[stopData.id]);
-                              }
-                              
-                              // Legg til avganger fra stop.departures hvis tilgjengelig (for søk-format)
-                              if (stop.departures && Array.isArray(stop.departures)) {
-                                allAvailableDepartures.push(...stop.departures);
-                              }
-                              
-                              // Legg til neste avgang og senere avganger hvis tilgjengelig
-                              if (nextDeparture) {
-                                allAvailableDepartures.push(nextDeparture);
-                              }
-                              if (laterDepartures && Array.isArray(laterDepartures)) {
-                                allAvailableDepartures.push(...laterDepartures);
-                              }
-                              
-                              // Fjern duplikater basert på aimedDepartureTime
-                              const uniqueDepartures = allAvailableDepartures.filter((dep, index, self) => 
-                                index === self.findIndex(d => 
-                                  (d.aimedDepartureTime || d.aimed) === (dep.aimedDepartureTime || dep.aimed)
-                                )
-                              );
-                              
-                              return uniqueDepartures;
-                            })(),
-                            false
-                          )
-                        }} />
-                      </div>
-                    )}
+                    {showDrivingTimes && drivingTimes[stopData.id] && location && (() => {
+                      const sub = (stopData?.nextDeparture?.serviceJourney?.journeyPattern?.line?.transportSubmode) || (departures?.[0]?.serviceJourney?.journeyPattern?.line?.transportSubmode) || stopData?.submode || null;
+                      const isPassengerOnly = sub && PASSENGER_FERRY_SUBMODES.includes(sub);
+                      if (isPassengerOnly) {
+                        return (
+                          <div className="mt-2 text-sm text-gray-600 leading-relaxed">
+                            {`Det tar ca ${formatMinutes(drivingTimes[stopData.id])} å gå.`}
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="mt-2 text-sm text-gray-600 leading-relaxed">
+                          <div dangerouslySetInnerHTML={{
+                            __html: generateTravelDescription(
+                              (drivingDistances[stopData.id] ?? distance),
+                              drivingTimes[stopData.id],
+                              nextDeparture ? calculateTimeDiff(nextDeparture.aimedDepartureTime || nextDeparture.aimed) : 0,
+                              (() => {
+                                const allAvailableDepartures = [];
+                                if (departuresMap[stopData.id]) allAvailableDepartures.push(...departuresMap[stopData.id]);
+                                if (stop.departures && Array.isArray(stop.departures)) allAvailableDepartures.push(...stop.departures);
+                                if (nextDeparture) allAvailableDepartures.push(nextDeparture);
+                                if (laterDepartures && Array.isArray(laterDepartures)) allAvailableDepartures.push(...laterDepartures);
+                                const uniqueDepartures = allAvailableDepartures.filter((dep, index, self) =>
+                                  index === self.findIndex(d => (d.aimedDepartureTime || d.aimed) === (dep.aimedDepartureTime || dep.aimed))
+                                );
+                                return uniqueDepartures;
+                              })(),
+                              false
+                            )
+                          }} />
+                        </div>
+                      );
+                    })()}
                   
                   {nextDeparture ? (
                     <>

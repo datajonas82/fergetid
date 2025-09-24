@@ -1715,8 +1715,8 @@ function App() {
                       }
                     }}
                     onKeyDown={handleKeyDown}
-                    placeholder="Søk fergekai eller klikk GPS"
-                    className="w-full px-4 py-3 rounded-lg bg-white/90 backdrop-blur-md shadow-lg border border-fuchsia-200 focus:border-fuchsia-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-200"
+                    placeholder="Søk fergekai eller klikk på GPS-ikonet"
+                    className="w-full px-4 py-3 rounded-lg bg-white/90 backdrop-blur-md shadow-lg border border-fuchsia-200 focus:border-fuchsia-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-200 placeholder:text-gray-600 placeholder:opacity-90"
                     style={{
                       position: /iPad|iPhone|iPod/.test(navigator.userAgent) && !showSearchInput ? 'absolute' : 'relative',
                       left: /iPad|iPhone|iPod/.test(navigator.userAgent) && !showSearchInput ? '-9999px' : 'auto',
@@ -1751,7 +1751,7 @@ function App() {
                   }}
                   className="w-full px-4 py-3 rounded-lg bg-white/90 backdrop-blur-md shadow-lg border border-fuchsia-200 hover:border-fuchsia-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-200 text-left text-gray-600"
                 >
-                  Søk fergekai eller klikk GPS
+                  Søk fergekai eller klikk på GPS-ikonet  
                 </button>
               </div>
             )}
@@ -1790,7 +1790,7 @@ function App() {
         {/* Filter checkboxes: midtstilles under søkefeltet */}
         <div className="w-full max-w-[350px] sm:max-w-md px-3 sm:px-4 -mt-6 mb-6">
           <div className="flex items-center justify-center">
-            <div className="inline-flex items-stretch bg-white/95 backdrop-blur-md shadow-lg border border-fuchsia-200 rounded-xl overflow-hidden">
+            <div className="inline-flex items-stretch bg-white/95 backdrop-blur-md shadow-lg border border-fuchsia-200 rounded-xl overflow-hidden transform scale-[0.8]">
               <button
                 type="button"
                 role="checkbox"
@@ -1806,7 +1806,7 @@ function App() {
                     </svg>
                   ) : null}
                 </span>
-                <span className="text-black-400 font-thin">Bilferge</span>
+                <span className="text-gray-500 font-thin">Bilferge</span>
               </button>
               <div className="w-px" />
               <button
@@ -1824,7 +1824,7 @@ function App() {
                     </svg>
                   ) : null}
                 </span>
-                <span className="text-black-400 font-thin">Passasjerferge</span>
+                <span className="text-gray-500 font-thin">Passasjerferge</span>
               </button>
             </div>
           </div>

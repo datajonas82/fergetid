@@ -1719,7 +1719,7 @@ function App() {
                     }}
                     onKeyDown={handleKeyDown}
                     placeholder="Søk fergekai eller klikk på GPS-ikonet"
-                    className="w-full px-4 py-3 rounded-lg bg-white/90 backdrop-blur-md shadow-lg border border-fuchsia-200 focus:border-fuchsia-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-200 placeholder:text-gray-600 placeholder:opacity-90"
+                    className="w-full px-4 py-3 rounded-lg bg-white/90 backdrop-blur-md shadow-lg border border-fuchsia-200 focus:border-fuchsia-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-200 placeholder:text-sm placeholder:text-gray-600 placeholder:opacity-90"
                     style={{
                       position: /iPad|iPhone|iPod/.test(navigator.userAgent) && !showSearchInput ? 'absolute' : 'relative',
                       left: /iPad|iPhone|iPod/.test(navigator.userAgent) && !showSearchInput ? '-9999px' : 'auto',
@@ -1752,7 +1752,7 @@ function App() {
                     // Auto-focus input after a short delay to ensure it's visible
                     setTimeout(() => searchInputRef.current?.focus(), 150);
                   }}
-                  className="w-full px-4 py-3 rounded-lg bg-white/90 backdrop-blur-md shadow-lg border border-fuchsia-200 hover:border-fuchsia-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-200 text-left text-gray-600"
+                  className="w-full px-4 py-3 rounded-lg bg-white/90 backdrop-blur-md shadow-lg border border-fuchsia-200 hover:border-fuchsia-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-200 text-left text-gray-600 "
                 >
                   Søk fergekai eller klikk på GPS-ikonet  
                 </button>
@@ -1817,7 +1817,7 @@ function App() {
         {/* Filter Menu - shown below search field */}
         {showHamburgerMenu && (
           <div className="w-full max-w-[350px] sm:max-w-md mb-6 px-3 sm:px-4 -mt-3">
-            <div className="bg-white/15 backdrop-blur-md rounded-xl shadow-lg border-2 border-fuchsia-200 p-4 transform transition-all duration-300 ease-out">
+            <div className="bg-black/15 backdrop-blur-md rounded-xl shadow-lg border-2 border-fuchsia-200 p-4 transform transition-all duration-300 ease-out">
               <div className="flex gap-2">
                 {/* Car Ferry Filter */}
                 <button

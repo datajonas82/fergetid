@@ -228,6 +228,9 @@ function App() {
 
   const [showSearchInput, setShowSearchInput] = useState(!/iPad|iPhone|iPod/.test(navigator.userAgent));
 
+  // Hamburger menu state
+  const [showHamburgerMenu, setShowHamburgerMenu] = useState(false);
+
   // GPS state
   const [location, setLocation] = useState(null);
   const [locationName, setLocationName] = useState('');
@@ -1784,51 +1787,144 @@ function App() {
                 <line x1="20" y1="12" x2="24" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
               </svg>
             </button>
+            
+            {/* Hamburger Menu Button */}
+            <button
+              type="button"
+              onClick={() => setShowHamburgerMenu(!showHamburgerMenu)}
+              className="px-4 py-3 bg-transparent hover:bg-white/20 backdrop-blur-md text-white font-semibold rounded-lg shadow-lg transition-colors border border-white focus:border-white focus:outline-none focus:ring-2 focus:ring-white/50"
+              title="Meny"
+            >
+              <svg 
+                width="24" 
+                height="24" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                className="text-white"
+              >
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+            </button>
           </div>
         </div>
 
-        {/* Filter checkboxes: midtstilles under søkefeltet */}
-        <div className="w-full max-w-[350px] sm:max-w-md px-3 sm:px-4 -mt-6 mb-6">
-          <div className="flex items-center justify-center">
-            <div className="inline-flex items-stretch bg-white/95 backdrop-blur-md shadow-lg border border-fuchsia-200 rounded-xl overflow-hidden transform scale-[0.8]">
-              <button
-                type="button"
-                role="checkbox"
-                aria-checked={!!filters.carFerry}
-                onClick={() => setFilters(prev => ({ ...prev, carFerry: !prev.carFerry }))}
-                className="flex items-center gap-2 px-3 py-1.5 focus:outline-none"
-                title="Bilferge"
-              >
-                <span className="w-4 h-4 rounded-[4px] border border-gray-400 bg-white flex items-center justify-center">
-                  {filters.carFerry ? (
-                    <svg viewBox="0 0 24 24" className="w-3 h-3 text-black-400" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M20 6L9 17l-5-5" />
-                    </svg>
-                  ) : null}
-                </span>
-                <span className="text-gray-500 font-thin">Bilferge</span>
-              </button>
-              <div className="w-px" />
-              <button
-                type="button"
-                role="checkbox"
-                aria-checked={!!filters.passengerFerry}
-                onClick={() => setFilters(prev => ({ ...prev, passengerFerry: !prev.passengerFerry }))}
-                className="flex items-center gap-2 px-3 py-1.5 focus:outline-none"
-                title="Hurtigbåt"
-              >
-                <span className="w-4 h-4 rounded-[4px] border border-gray-400 bg-white flex items-center justify-center">
-                  {filters.passengerFerry ? (
-                    <svg viewBox="0 0 24 24" className="w-3 h-3 text-black-400" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M20 6L9 17l-5-5" />
-                    </svg>
-                  ) : null}
-                </span>
-                <span className="text-gray-500 font-thin">Passasjerferge</span>
-              </button>
+        {/* Filter Menu - shown below search field */}
+        {showHamburgerMenu && (
+          <div className="w-full max-w-[350px] sm:max-w-md mb-6 px-3 sm:px-4 -mt-3">
+            <div className="bg-white/15 backdrop-blur-md rounded-xl shadow-lg border-2 border-fuchsia-200 p-4 transform transition-all duration-300 ease-out">
+              <div className="flex gap-2">
+                {/* Car Ferry Filter */}
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={!!filters.carFerry}
+                  onClick={() => setFilters(prev => ({ ...prev, carFerry: !prev.carFerry }))}
+                  className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg focus:outline-none transition-colors"
+                  title="Bilferge"
+                >
+                  <span className="w-4 h-4 rounded border border-white bg-white flex items-center justify-center">
+                    {filters.carFerry ? (
+                      <svg viewBox="0 0 24 24" className="w-3 h-3 text-fuchsia-600" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 6L9 17l-5-5" />
+                      </svg>
+                    ) : null}
+                  </span>
+                  <span className="text-white font-medium text-sm">Bilferge</span>
+                </button>
+                
+                {/* Passenger Ferry Filter */}
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={!!filters.passengerFerry}
+                  onClick={() => setFilters(prev => ({ ...prev, passengerFerry: !prev.passengerFerry }))}
+                  className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg focus:outline-none transition-colors"
+                  title="Passasjerferge"
+                >
+                  <span className="w-4 h-4 rounded border border-white bg-white flex items-center justify-center">
+                    {filters.passengerFerry ? (
+                      <svg viewBox="0 0 24 24" className="w-3 h-3 text-fuchsia-600" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 6L9 17l-5-5" />
+                      </svg>
+                    ) : null}
+                  </span>
+                  <span className="text-white font-medium text-sm">Passasjerferge</span>
+                </button>
+              </div>
+              
+              {/* Legal Links */}
+              <div className="mt-4 pt-3 border-t border-white/20">
+                <div className="text-xs text-white/80">
+                  {(() => {
+                    const isIOSApp = typeof window !== 'undefined' && window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'ios';
+                    const termsHref = config?.LEGAL?.getTermsOfUseUrl?.();
+                    const privacyHref = config?.LEGAL?.getPrivacyPolicyUrl?.();
+                    const supportHref = config?.LEGAL?.getSupportUrl?.();
+                    return (
+                      <>
+                        <a
+                          href={termsHref}
+                          onClick={(e) => {
+                            if (!isIOSApp) {
+                              e.preventDefault();
+                              setLegalModalTitle('Bruksvilkår');
+                              const url = termsHref + (termsHref.includes('?') ? '&' : '?') + 'embed=1';
+                              setLegalModalUrl(url);
+                              setLegalModalOpen(true);
+                            }
+                          }}
+                          {...(isIOSApp ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                          className="underline mr-4"
+                        >
+                          Bruksvilkår
+                        </a>
+                        <a
+                          href={privacyHref}
+                          onClick={(e) => {
+                            if (!isIOSApp) {
+                              e.preventDefault();
+                              setLegalModalTitle('Personvernerklæring');
+                              const url = privacyHref + (privacyHref.includes('?') ? '&' : '?') + 'embed=1';
+                              setLegalModalUrl(url);
+                              setLegalModalOpen(true);
+                            }
+                          }}
+                          {...(isIOSApp ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                          className="underline mr-4"
+                        >
+                          Personvernerklæring
+                        </a>
+                        <a
+                          href={supportHref}
+                          onClick={(e) => {
+                            if (!isIOSApp) {
+                              e.preventDefault();
+                              setLegalModalTitle('Support');
+                              const url = supportHref + (supportHref.includes('?') ? '&' : '?') + 'embed=1';
+                              setLegalModalUrl(url);
+                              setLegalModalOpen(true);
+                            }
+                          }}
+                          {...(isIOSApp ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                          className="underline"
+                        >
+                          Support
+                        </a>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
 
         {/* GPS Location Display */}
         {mode === 'gps' && locationName && (
@@ -2007,7 +2103,7 @@ function App() {
                         lineHeight: '1.2'
                       }}
                     >
-                      {cleanDestinationText(stopData.name || '')}
+                      {cleanDestinationText(stopData.name || '').toUpperCase()}
                     </h2>
                     <hr className="border-gray-300 my-2" />
                     
@@ -2116,7 +2212,7 @@ function App() {
                           </div>
                           <div className="flex items-center justify-between">
                             <h3 className="text-lg font-bold text-gray-800">
-                              {cleanDestinationText(destination.name)}
+                              {cleanDestinationText(destination.name).toUpperCase()}
                             </h3>
                           </div>
                           <hr className="border-gray-300 my-2" />
@@ -2185,66 +2281,6 @@ function App() {
         )}
         {/* Footer legal links */}
         <div className="mt-auto w-full flex justify-center pt-8 sm:pt-10 pb-8 sm:pb-10">
-          <div className="text-xs text-white/80">
-            {(() => {
-              const isIOSApp = typeof window !== 'undefined' && window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'ios';
-              const termsHref = config?.LEGAL?.getTermsOfUseUrl?.();
-              const privacyHref = config?.LEGAL?.getPrivacyPolicyUrl?.();
-              const supportHref = config?.LEGAL?.getSupportUrl?.();
-              return (
-                <>
-                  <a
-                    href={termsHref}
-                    onClick={(e) => {
-                      if (!isIOSApp) {
-                        e.preventDefault();
-                        setLegalModalTitle('Bruksvilkår (EULA)');
-                        const url = termsHref + (termsHref.includes('?') ? '&' : '?') + 'embed=1';
-                        setLegalModalUrl(url);
-                        setLegalModalOpen(true);
-                      }
-                    }}
-                    {...(isIOSApp ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-                    className="underline mr-4"
-                  >
-                    Bruksvilkår (EULA)
-                  </a>
-                  <a
-                    href={privacyHref}
-                    onClick={(e) => {
-                      if (!isIOSApp) {
-                        e.preventDefault();
-                        setLegalModalTitle('Personvernerklæring');
-                        const url = privacyHref + (privacyHref.includes('?') ? '&' : '?') + 'embed=1';
-                        setLegalModalUrl(url);
-                        setLegalModalOpen(true);
-                      }
-                    }}
-                    {...(isIOSApp ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-                    className="underline mr-4"
-                  >
-                    Personvernerklæring
-                  </a>
-                  <a
-                    href={supportHref}
-                    onClick={(e) => {
-                      if (!isIOSApp) {
-                        e.preventDefault();
-                        setLegalModalTitle('Support');
-                        const url = supportHref + (supportHref.includes('?') ? '&' : '?') + 'embed=1';
-                        setLegalModalUrl(url);
-                        setLegalModalOpen(true);
-                      }
-                    }}
-                    {...(isIOSApp ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-                    className="underline"
-                  >
-                    Support
-                  </a>
-                </>
-              );
-            })()}
-          </div>
         </div>
         {/* Legal modal (web only) */}
         <LegalModal

@@ -1712,134 +1712,110 @@ function App() {
         {/* Header for minima theme */}
         {theme.layout.hasHeaderBar && (
           <div 
-            className="w-full px-4 py-6"
+            className="w-full"
             style={{ backgroundColor: theme.colors.headerBackground }}
           >
-            <h1 
-              className="text-4xl font-extrabold tracking-tight mb-4 text-center"
-              style={{ 
-                color: theme.colors.textWhite,
-                fontFamily: theme.fonts.primary,
-                fontWeight: theme.fonts.weight.black
-              }}
-            >
-              {APP_NAME}
-            </h1>
+            {/* Title */}
+            <div className="px-4 py-6">
+              <h1 
+                className="text-4xl font-extrabold tracking-tight text-center"
+                style={{ 
+                  color: theme.colors.textWhite,
+                  fontFamily: theme.fonts.primary,
+                  fontWeight: theme.fonts.weight.black
+                }}
+              >
+                {APP_NAME}
+              </h1>
+            </div>
             
-            {/* Search and settings in header */}
-            <div className="flex gap-2 items-center">
-              {showSearchInput ? (
-                <div className="flex-1 relative">
-                  <form autoComplete="off" onSubmit={e => e.preventDefault()}>
-                    <input
-                      ref={searchInputRef}
-                      type="text"
-                      autoComplete="off"
-                      autoCorrect="off"
-                      autoCapitalize="off"
-                      spellCheck="false"
-                      value={query}
-                      onChange={(e) => {
-                        setQuery(e.target.value);
+            {/* Search and settings bar */}
+            <div className="px-4 pb-4">
+              <div className="flex gap-2 items-center">
+                {showSearchInput ? (
+                  <div className="flex-1 relative">
+                    <form autoComplete="off" onSubmit={e => e.preventDefault()}>
+                      <input
+                        ref={searchInputRef}
+                        type="text"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck="false"
+                        value={query}
+                        onChange={(e) => {
+                          setQuery(e.target.value);
+                          if (error) {
+                            setError(null);
+                          }
+                          if (e.target.value.trim()) {
+                            setMode('search');
+                          }
+                        }}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Søk ferjekai"
+                        className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 placeholder:text-sm placeholder:opacity-90"
+                        style={{
+                          backgroundColor: theme.colors.cardBackground,
+                          borderColor: theme.colors.border,
+                          color: theme.colors.textPrimary,
+                          fontFamily: theme.fonts.primary
+                        }}
+                      />
+                    </form>
+                  </div>
+                ) : (
+                  <div className="flex-1">
+                    <button
+                      onClick={() => {
+                        setShowSearchInput(true);
                         if (error) {
                           setError(null);
                         }
-                        if (e.target.value.trim()) {
-                          setMode('search');
-                        }
+                        setTimeout(() => searchInputRef.current?.focus(), 150);
                       }}
-                      onKeyDown={handleKeyDown}
-                      placeholder="Søk ferjekai"
-                      className="w-full px-4 py-3 rounded-lg shadow-lg focus:outline-none focus:ring-2 placeholder:text-sm placeholder:opacity-90"
+                      className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 text-left"
                       style={{
                         backgroundColor: theme.colors.cardBackground,
                         borderColor: theme.colors.border,
-                        color: theme.colors.textPrimary,
+                        color: theme.colors.textSecondary,
                         fontFamily: theme.fonts.primary
                       }}
-                    />
-                  </form>
-                </div>
-              ) : (
-                <div className="flex-1">
-                  <button
-                    onClick={() => {
-                      setShowSearchInput(true);
-                      if (error) {
-                        setError(null);
-                      }
-                      setTimeout(() => searchInputRef.current?.focus(), 150);
-                    }}
-                    className="w-full px-4 py-3 rounded-lg shadow-lg focus:outline-none focus:ring-2 text-left"
-                    style={{
-                      backgroundColor: theme.colors.cardBackground,
-                      borderColor: theme.colors.border,
-                      color: theme.colors.textSecondary,
-                      fontFamily: theme.fonts.primary
-                    }}
+                    >
+                      Søk ferjekai
+                    </button>
+                  </div>
+                )}
+                
+                {/* Settings button only */}
+                <button
+                  type="button"
+                  onClick={() => setShowHamburgerMenu(!showHamburgerMenu)}
+                  className="px-4 py-3 rounded-lg focus:outline-none focus:ring-2"
+                  style={{
+                    backgroundColor: theme.colors.cardBackground,
+                    borderColor: theme.colors.border,
+                    color: theme.colors.primary,
+                    fontFamily: theme.fonts.primary
+                  }}
+                  title="Meny"
+                >
+                  <svg 
+                    width="24" 
+                    height="24" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                    style={{ color: theme.colors.primary }}
                   >
-                    Søk ferjekai
-                  </button>
-                </div>
-              )}
-              
-              <button
-                ref={gpsButtonRef}
-                type="button"
-                onClick={handleGPSLocation}
-                className="px-4 py-3 font-semibold rounded-lg shadow-lg transition-colors focus:outline-none focus:ring-2"
-                style={{
-                  backgroundColor: theme.colors.cardBackground,
-                  borderColor: theme.colors.border,
-                  color: theme.colors.primary,
-                  fontFamily: theme.fonts.primary
-                }}
-                title="Bruk GPS-plassering"
-              >
-                <svg 
-                  width="24" 
-                  height="24" 
-                  viewBox="0 0 24 24" 
-                  fill="currentColor" 
-                  style={{ color: theme.colors.primary }}
-                >
-                  <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2"/>
-                  <circle cx="12" cy="12" r="4" fill="currentColor"/>
-                  <line x1="12" y1="0" x2="12" y2="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  <line x1="12" y1="20" x2="12" y2="24" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  <line x1="0" y1="12" x2="4" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  <line x1="20" y1="12" x2="24" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
-              </button>
-              
-              <button
-                type="button"
-                onClick={() => setShowHamburgerMenu(!showHamburgerMenu)}
-                className="px-4 py-3 font-semibold rounded-lg shadow-lg transition-colors focus:outline-none focus:ring-2"
-                style={{
-                  backgroundColor: theme.colors.cardBackground,
-                  borderColor: theme.colors.border,
-                  color: theme.colors.primary,
-                  fontFamily: theme.fonts.primary
-                }}
-                title="Meny"
-              >
-                <svg 
-                  width="24" 
-                  height="24" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="2" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round"
-                  style={{ color: theme.colors.primary }}
-                >
-                  <line x1="3" y1="6" x2="21" y2="6"/>
-                  <line x1="3" y1="12" x2="21" y2="12"/>
-                  <line x1="3" y1="18" x2="21" y2="18"/>
-                </svg>
-              </button>
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1863,14 +1839,14 @@ function App() {
         {/* Location bar for minima theme */}
         {theme.layout.hasLocationBar && mode === 'gps' && locationName && (
           <div 
-            className="w-full px-4 py-3"
+            className="w-full py-3"
             style={{ 
               backgroundColor: theme.colors.locationBar,
               color: theme.colors.textPrimary,
               fontFamily: theme.fonts.primary
             }}
           >
-            <div className="text-center font-bold">
+            <div className="text-center font-bold px-4">
               Din posisjon er <span className="font-bold">{locationName}</span>
             </div>
           </div>
@@ -1878,6 +1854,44 @@ function App() {
 
         {/* Main content area */}
         <div className="flex-1 flex flex-col items-center pb-16 sm:pb-24">
+          {/* GPS button for minima theme */}
+          {theme.layout.hasHeaderBar && (
+            <div className="w-full max-w-[400px] px-4 py-4">
+              <button
+                ref={gpsButtonRef}
+                type="button"
+                onClick={handleGPSLocation}
+                className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2"
+                style={{
+                  backgroundColor: theme.colors.cardBackground,
+                  borderColor: theme.colors.border,
+                  color: theme.colors.primary,
+                  fontFamily: theme.fonts.primary,
+                  border: `1px solid ${theme.colors.border}`
+                }}
+                title="Bruk GPS-plassering"
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <svg 
+                    width="20" 
+                    height="20" 
+                    viewBox="0 0 24 24" 
+                    fill="currentColor" 
+                    style={{ color: theme.colors.primary }}
+                  >
+                    <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2"/>
+                    <circle cx="12" cy="12" r="4" fill="currentColor"/>
+                    <line x1="12" y1="0" x2="12" y2="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    <line x1="12" y1="20" x2="12" y2="24" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    <line x1="0" y1="12" x2="4" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    <line x1="20" y1="12" x2="24" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                  <span className="font-medium">Bruk GPS-plassering</span>
+                </div>
+              </button>
+            </div>
+          )}
+
           {/* Search Section for OG theme */}
           {!theme.layout.hasHeaderBar && (
             <div className="w-full max-w-[350px] sm:max-w-md mb-8 sm:mb-8 px-3 sm:px-4">
@@ -2377,10 +2391,10 @@ function App() {
                   
                   <div
                     id={'ferry-card-' + stopData.id}
-                    className={`relative p-4 sm:p-5 card-expand w-full shadow-lg border ${
+                    className={`relative p-4 sm:p-5 card-expand w-full shadow-lg ${
                       theme.layout.cardStyle === 'minima' 
-                        ? 'rounded-2xl max-w-[400px]' 
-                        : (distance ? 'rounded-tr-2xl rounded-br-2xl rounded-bl-2xl max-w-[350px] sm:max-w-md' : 'rounded-2xl max-w-[350px] sm:max-w-md')
+                        ? 'rounded-lg max-w-[400px] border-2' 
+                        : (distance ? 'rounded-tr-2xl rounded-br-2xl rounded-bl-2xl max-w-[350px] sm:max-w-md border' : 'rounded-2xl max-w-[350px] sm:max-w-md border')
                     }`}
                     style={{ 
                       minWidth: theme.layout.cardStyle === 'minima' ? '320px' : '280px',
@@ -2532,21 +2546,25 @@ function App() {
                       {inlineDestinations[stopData.id] && inlineDestinations[stopData.id].map((destination, destIndex) => (
                         <div 
                           key={stopData.id + '-' + destination.stopId} 
-                          className={`mt-5 p-4 sm:p-5 rounded-lg shadow-lg relative ${
-                            theme.layout.cardStyle === 'minima' ? '' : 'backdrop-blur-md'
+                          className={`mt-5 p-4 sm:p-5 shadow-lg relative ${
+                            theme.layout.cardStyle === 'minima' ? 'rounded-lg border-2' : 'rounded-lg backdrop-blur-md'
                           }`}
                           style={{
                             backgroundColor: theme.colors.cardBackground,
+                            borderColor: theme.colors.border,
                             fontFamily: theme.fonts.primary
                           }}
                         >
                           <div 
-                            className={`text-sm font-bold px-2 py-1 rounded-full shadow-lg absolute top-[-10px] z-20 ${
-                              theme.layout.cardStyle === 'minima' ? 'left-2' : 'left-0'
+                            className={`text-sm font-bold px-2 py-1 shadow-lg absolute top-[-10px] z-20 ${
+                              theme.layout.cardStyle === 'minima' ? 'left-2 rounded-lg' : 'left-0 rounded-full'
                             }`}
                             style={{
-                              backgroundColor: theme.colors.primary,
-                              color: theme.colors.textWhite,
+                              backgroundColor: theme.layout.cardStyle === 'minima' ? theme.colors.cardBackground : theme.colors.primary,
+                              color: theme.layout.cardStyle === 'minima' ? theme.colors.textPrimary : theme.colors.textWhite,
+                              borderColor: theme.layout.cardStyle === 'minima' ? theme.colors.border : 'transparent',
+                              borderWidth: theme.layout.cardStyle === 'minima' ? '1px' : '0px',
+                              borderStyle: 'solid',
                               fontFamily: theme.fonts.primary
                             }}
                           >

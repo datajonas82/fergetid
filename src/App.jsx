@@ -1711,12 +1711,11 @@ function App() {
       >
         {/* Header for minima theme */}
         {theme.layout.hasHeaderBar && (
-          <div 
-            className="w-full"
-            style={{ backgroundColor: theme.colors.headerBackground }}
-          >
-            {/* Title section */}
-            <div className="w-full py-6 px-4">
+          <div className="w-full flex justify-center px-4">
+            <div 
+              className="w-full max-w-[400px] py-6 px-4 rounded-t-lg"
+              style={{ backgroundColor: theme.colors.headerBackground }}
+            >
               <h1 
                 className="text-4xl font-extrabold tracking-tight text-left"
                 style={{ 
@@ -1728,8 +1727,6 @@ function App() {
                 {APP_NAME}
               </h1>
             </div>
-            
-            {/* Search and settings flyttes ut i et sentrert kort i hovedinnholdet for minima */}
           </div>
         )}
 
@@ -1774,15 +1771,15 @@ function App() {
           {theme.layout.hasHeaderBar && (
             <div className="w-full flex justify-center px-4">
               <div 
-                className="w-full max-w-[400px] p-3 rounded-t-lg shadow-lg flex items-center gap-2"
+                className="w-full max-w-[400px] p-3 rounded-none shadow-lg flex items-center gap-2"
                 style={{ backgroundColor: theme.colors.cardBackground, border: `1px solid ${theme.colors.border}`, borderBottom: 'none' }}
               >
                 {/* Search */}
                 <div className="flex-1 relative">
                   <form autoComplete="off" onSubmit={e => e.preventDefault()}>
-                    <input
+        <input 
                       ref={searchInputRef}
-                      type="text"
+          type="text" 
                       autoComplete="off"
                       autoCorrect="off"
                       autoCapitalize="off"
@@ -1846,63 +1843,63 @@ function App() {
 
           {/* Search Section for OG theme */}
           {!theme.layout.hasHeaderBar && (
-            <div className="w-full max-w-[350px] sm:max-w-md mb-8 sm:mb-8 px-3 sm:px-4">
-              <div className="flex gap-2">
-                {showSearchInput ? (
-                  <div className="flex-1 relative">
-                    <form autoComplete="off" onSubmit={e => e.preventDefault()}>
-                      <input
-                        ref={searchInputRef}
-                        type="text"
-                        autoComplete="off"
-                        autoCorrect="off"
-                        autoCapitalize="off"
-                        spellCheck="false"
-                        value={query}
-                        onChange={(e) => {
-                          setQuery(e.target.value);
-                          if (error) {
-                            setError(null);
-                          }
-                          if (e.target.value.trim()) {
-                            setMode('search');
-                          }
-                        }}
-                        onKeyDown={handleKeyDown}
-                        placeholder="Søk fergekai eller klikk på GPS-ikonet"
+        <div className="w-full max-w-[350px] sm:max-w-md mb-8 sm:mb-8 px-3 sm:px-4">
+          <div className="flex gap-2">
+            {showSearchInput ? (
+              <div className="flex-1 relative">
+                <form autoComplete="off" onSubmit={e => e.preventDefault()}>
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck="false"
+                    value={query}
+                    onChange={(e) => {
+                      setQuery(e.target.value);
+                      if (error) {
+                        setError(null);
+                      }
+                      if (e.target.value.trim()) {
+                        setMode('search');
+                      }
+                    }}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Søk fergekai eller klikk på GPS-ikonet"
                         className="w-full px-4 py-3 rounded-lg backdrop-blur-md shadow-lg focus:outline-none focus:ring-2 placeholder:text-sm placeholder:opacity-90"
-                        style={{
+                    style={{
                           backgroundColor: theme.colors.cardBackground,
                           borderColor: theme.colors.border,
                           color: theme.colors.textPrimary,
                           fontFamily: theme.fonts.primary,
-                          position: /iPad|iPhone|iPod/.test(navigator.userAgent) && !showSearchInput ? 'absolute' : 'relative',
-                          left: /iPad|iPhone|iPod/.test(navigator.userAgent) && !showSearchInput ? '-9999px' : 'auto',
-                          opacity: /iPad|iPhone|iPod/.test(navigator.userAgent) && !showSearchInput ? 0 : 1,
-                          pointerEvents: /iPad|iPhone|iPod/.test(navigator.userAgent) && !showSearchInput ? 'none' : 'auto'
-                        }}
-                        onFocus={() => {
-                          if (error) {
-                            setError(null);
-                          }
-                          if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !showSearchInput) {
-                            setShowSearchInput(true);
-                            setTimeout(() => searchInputRef.current?.focus(), 100);
-                          }
-                        }}
-                      />
-                    </form>
-                  </div>
-                ) : (
-                  <div className="flex-1">
-                    <button
-                      onClick={() => {
+                      position: /iPad|iPhone|iPod/.test(navigator.userAgent) && !showSearchInput ? 'absolute' : 'relative',
+                      left: /iPad|iPhone|iPod/.test(navigator.userAgent) && !showSearchInput ? '-9999px' : 'auto',
+                      opacity: /iPad|iPhone|iPod/.test(navigator.userAgent) && !showSearchInput ? 0 : 1,
+                      pointerEvents: /iPad|iPhone|iPod/.test(navigator.userAgent) && !showSearchInput ? 'none' : 'auto'
+                    }}
+                    onFocus={() => {
+                      if (error) {
+                        setError(null);
+                      }
+                      if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !showSearchInput) {
                         setShowSearchInput(true);
-                        if (error) {
-                          setError(null);
-                        }
-                        setTimeout(() => searchInputRef.current?.focus(), 150);
-                      }}
+                        setTimeout(() => searchInputRef.current?.focus(), 100);
+                      }
+                    }}
+                  />
+                </form>
+              </div>
+            ) : (
+              <div className="flex-1">
+                <button
+                  onClick={() => {
+                    setShowSearchInput(true);
+                    if (error) {
+                      setError(null);
+                    }
+                    setTimeout(() => searchInputRef.current?.focus(), 150);
+                  }}
                       className="w-full px-4 py-3 rounded-lg backdrop-blur-md shadow-lg focus:outline-none focus:ring-2 text-left"
                       style={{
                         backgroundColor: theme.colors.cardBackground,
@@ -1910,16 +1907,16 @@ function App() {
                         color: theme.colors.textSecondary,
                         fontFamily: theme.fonts.primary
                       }}
-                    >
-                      Søk fergekai eller klikk på GPS-ikonet  
-                    </button>
-                  </div>
-                )}
-                
-                <button
-                  ref={gpsButtonRef}
-                  type="button"
-                  onClick={handleGPSLocation}
+                >
+                  Søk fergekai eller klikk på GPS-ikonet  
+                </button>
+              </div>
+            )}
+            
+            <button
+              ref={gpsButtonRef}
+              type="button"
+              onClick={handleGPSLocation}
                   className="px-4 py-3 backdrop-blur-md font-semibold rounded-lg shadow-lg transition-colors focus:outline-none focus:ring-2"
                   style={{
                     backgroundColor: theme.colors.cardBackground,
@@ -1927,53 +1924,53 @@ function App() {
                     color: theme.colors.primary,
                     fontFamily: theme.fonts.primary
                   }}
-                  title="Bruk GPS-plassering"
-                >
-                  <svg 
-                    width="24" 
-                    height="24" 
-                    viewBox="0 0 24 24" 
-                    fill="currentColor" 
+              title="Bruk GPS-plassering"
+            >
+              <svg 
+                width="24" 
+                height="24" 
+                viewBox="0 0 24 24" 
+                fill="currentColor" 
                     style={{ color: theme.colors.primary }}
-                  >
-                    <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2"/>
-                    <circle cx="12" cy="12" r="4" fill="currentColor"/>
-                    <line x1="12" y1="0" x2="12" y2="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                    <line x1="12" y1="20" x2="12" y2="24" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                    <line x1="0" y1="12" x2="4" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                    <line x1="20" y1="12" x2="24" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => setShowHamburgerMenu(!showHamburgerMenu)}
+              >
+                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2"/>
+                <circle cx="12" cy="12" r="4" fill="currentColor"/>
+                <line x1="12" y1="0" x2="12" y2="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="12" y1="20" x2="12" y2="24" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="0" y1="12" x2="4" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="20" y1="12" x2="24" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => setShowHamburgerMenu(!showHamburgerMenu)}
                   className="px-4 py-3 bg-transparent backdrop-blur-md font-semibold rounded-lg shadow-lg transition-colors focus:outline-none focus:ring-2"
                   style={{
                     borderColor: theme.colors.textWhite,
                     color: theme.colors.textWhite,
                     fontFamily: theme.fonts.primary
                   }}
-                  title="Meny"
-                >
-                  <svg 
-                    width="24" 
-                    height="24" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    strokeWidth="2" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round"
+              title="Meny"
+            >
+              <svg 
+                width="24" 
+                height="24" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
                     style={{ color: theme.colors.textWhite }}
-                  >
-                    <line x1="3" y1="6" x2="21" y2="6"/>
-                    <line x1="3" y1="12" x2="21" y2="12"/>
-                    <line x1="3" y1="18" x2="21" y2="18"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
+              >
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        </div>
           )}
 
         {/* Filter Menu - shown below search field */}
@@ -2343,7 +2340,7 @@ function App() {
                   )}
                   
                   <div
-                    id={'ferry-card-' + stopData.id}
+                                          id={'ferry-card-' + stopData.id}
                     className={`relative p-4 sm:p-5 card-expand w-full shadow-lg ${
                       theme.layout.cardStyle === 'minima' 
                         ? 'rounded-lg max-w-[400px] border' 

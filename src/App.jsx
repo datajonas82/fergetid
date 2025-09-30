@@ -1715,8 +1715,8 @@ function App() {
             className="w-full"
             style={{ backgroundColor: theme.colors.headerBackground }}
           >
-            {/* Title */}
-            <div className="px-4 py-6">
+            {/* Title section */}
+            <div className="w-full py-6">
               <h1 
                 className="text-4xl font-extrabold tracking-tight text-center"
                 style={{ 
@@ -1729,8 +1729,8 @@ function App() {
               </h1>
             </div>
             
-            {/* Search and settings bar */}
-            <div className="px-4 pb-4">
+            {/* Search and settings section */}
+            <div className="w-full px-4 pb-4">
               <div className="flex gap-2 items-center">
                 {showSearchInput ? (
                   <div className="flex-1 relative">
@@ -1787,7 +1787,7 @@ function App() {
                   </div>
                 )}
                 
-                {/* Settings button only */}
+                {/* Settings button */}
                 <button
                   type="button"
                   onClick={() => setShowHamburgerMenu(!showHamburgerMenu)}
@@ -1846,7 +1846,7 @@ function App() {
               fontFamily: theme.fonts.primary
             }}
           >
-            <div className="text-center font-bold px-4">
+            <div className="w-full text-center font-bold px-4">
               Din posisjon er <span className="font-bold">{locationName}</span>
             </div>
           </div>
@@ -2266,7 +2266,7 @@ function App() {
         {/* Results */}
         {hasInteracted && !loading && ferryStops.length > 0 && (
           <div 
-            className={`w-full space-y-10 sm:space-y-12 mx-auto ${
+            className={`w-full space-y-6 mx-auto ${
               theme.layout.cardStyle === 'minima' 
                 ? 'max-w-[400px] px-4' 
                 : 'max-w-[350px] sm:max-w-md px-3 sm:px-4 sm:px-0'
@@ -2372,7 +2372,7 @@ function App() {
                   {/* Km-avstand som egen boks over fergekortet */}
                   {distance && (
                     <div 
-                      className={`text-white text-lg font-bold px-2.5 py-1.5 rounded-2xl shadow-lg mb-[-10px] self-start relative z-20 ${
+                      className={`text-white text-lg font-bold px-2.5 py-1.5 rounded-lg shadow-lg mb-[-8px] self-start relative z-20 ${
                         theme.layout.cardStyle === 'minima' ? '-ml-2' : '-ml-4'
                       }`}
                       style={{
@@ -2393,7 +2393,7 @@ function App() {
                     id={'ferry-card-' + stopData.id}
                     className={`relative p-4 sm:p-5 card-expand w-full shadow-lg ${
                       theme.layout.cardStyle === 'minima' 
-                        ? 'rounded-lg max-w-[400px] border-2' 
+                        ? 'rounded-lg max-w-[400px] border' 
                         : (distance ? 'rounded-tr-2xl rounded-br-2xl rounded-bl-2xl max-w-[350px] sm:max-w-md border' : 'rounded-2xl max-w-[350px] sm:max-w-md border')
                     }`}
                     style={{ 
@@ -2546,8 +2546,8 @@ function App() {
                       {inlineDestinations[stopData.id] && inlineDestinations[stopData.id].map((destination, destIndex) => (
                         <div 
                           key={stopData.id + '-' + destination.stopId} 
-                          className={`mt-5 p-4 sm:p-5 shadow-lg relative ${
-                            theme.layout.cardStyle === 'minima' ? 'rounded-lg border-2' : 'rounded-lg backdrop-blur-md'
+                          className={`mt-4 p-4 sm:p-5 shadow-lg relative ${
+                            theme.layout.cardStyle === 'minima' ? 'rounded-lg border' : 'rounded-lg backdrop-blur-md'
                           }`}
                           style={{
                             backgroundColor: theme.colors.cardBackground,
@@ -2556,7 +2556,7 @@ function App() {
                           }}
                         >
                           <div 
-                            className={`text-sm font-bold px-2 py-1 shadow-lg absolute top-[-10px] z-20 ${
+                            className={`text-sm font-bold px-2 py-1 shadow-lg absolute top-[-8px] z-20 ${
                               theme.layout.cardStyle === 'minima' ? 'left-2 rounded-lg' : 'left-0 rounded-full'
                             }`}
                             style={{

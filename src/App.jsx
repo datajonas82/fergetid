@@ -1751,16 +1751,19 @@ function App() {
 
         {/* Location bar for minima theme */}
         {theme.layout.hasLocationBar && mode === 'gps' && locationName && (
-          <div 
-            className="w-full py-3"
-            style={{ 
-              backgroundColor: theme.colors.locationBar,
-              color: theme.colors.textPrimary,
-              fontFamily: theme.fonts.primary
-            }}
-          >
-            <div className="w-full text-center font-bold px-4">
-              Din posisjon er <span className="font-bold">{locationName}</span>
+          <div className="w-full flex justify-center px-4">
+            <div 
+              className="w-full max-w-[400px] py-3 border-x"
+              style={{ 
+                backgroundColor: theme.colors.locationBar,
+                color: theme.colors.textPrimary,
+                fontFamily: theme.fonts.primary,
+                borderColor: theme.colors.border
+              }}
+            >
+              <div className="w-full text-center font-bold px-4">
+                Din posisjon er <span className="font-bold">{locationName}</span>
+              </div>
             </div>
           </div>
         )}
@@ -1771,8 +1774,8 @@ function App() {
           {theme.layout.hasHeaderBar && (
             <div className="w-full flex justify-center px-4">
               <div 
-                className="w-full max-w-[400px] p-3 rounded-lg shadow-lg flex items-center gap-2"
-                style={{ backgroundColor: theme.colors.cardBackground, border: `1px solid ${theme.colors.border}` }}
+                className="w-full max-w-[400px] p-3 rounded-t-lg shadow-lg flex items-center gap-2"
+                style={{ backgroundColor: theme.colors.cardBackground, border: `1px solid ${theme.colors.border}`, borderBottom: 'none' }}
               >
                 {/* Search */}
                 <div className="flex-1 relative">
@@ -2217,13 +2220,14 @@ function App() {
           <div 
             className={`w-full space-y-6 mx-auto ${
               theme.layout.cardStyle === 'minima' 
-                ? 'max-w-[400px] px-4' 
+                ? 'max-w-[400px] px-4 border rounded-b-lg shadow-lg' 
                 : 'max-w-[350px] sm:max-w-md px-3 sm:px-4 sm:px-0'
             }`}
             style={{
               opacity: 1,
               transition: 'opacity 0.3s ease-out',
-              animation: 'fadeIn 0.3s ease-out'
+              animation: 'fadeIn 0.3s ease-out',
+              ...(theme.layout.cardStyle === 'minima' ? { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border, borderTop: 'none' } : {})
             }}
           >
             {(theme.layout.cardStyle === 'minima' ? ferryStops.slice(0, 1) : ferryStops).map((stop, i) => {

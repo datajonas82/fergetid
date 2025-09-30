@@ -33,6 +33,11 @@ export const THEMES = {
         extrabold: 800,
         black: 900
       }
+    },
+    layout: {
+      hasHeaderBar: false,
+      hasLocationBar: false,
+      cardStyle: 'og'
     }
   },
   'minima': {
@@ -70,6 +75,11 @@ export const THEMES = {
         extrabold: 800,
         black: 900
       }
+    },
+    layout: {
+      hasHeaderBar: true,
+      hasLocationBar: true,
+      cardStyle: 'minima'
     }
   }
 };

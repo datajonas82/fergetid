@@ -61,10 +61,46 @@ body {
 
 
 
-/* Modern gradient background */
+/* Modern gradient background - OG Fergetid theme */
 .bg-gradient {
   background: linear-gradient(135deg, #d95cff 0%, #c026d3 50%, #a855f7 100%);
   min-height: 100vh;
+}
+
+/* Minima theme styles */
+.minima-theme {
+  background: #F8F7F0;
+  min-height: 100vh;
+}
+
+.minima-theme .header {
+  background: #1A1A1A;
+}
+
+.minima-theme .location-bar {
+  background: #FFD700;
+  color: #000000;
+}
+
+.minima-theme .card {
+  background: #ffffff;
+  border: 1px solid #CCCCCC;
+}
+
+.minima-theme .text-primary {
+  color: #000000;
+}
+
+.minima-theme .text-secondary {
+  color: #333333;
+}
+
+.minima-theme .departure-time-now {
+  color: #FF0000;
+}
+
+.minima-theme .departure-time-later {
+  color: #008000;
 }
 
 /* Glassmorphism effect for cards */

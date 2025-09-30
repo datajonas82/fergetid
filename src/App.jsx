@@ -46,6 +46,8 @@ import {
 } from './utils/ferryConnections';
 // Removed legacy routeMap import; using only Entur hierarchy-based matching
 
+import { THEMES, getTheme, saveTheme, loadTheme } from './config/themes';
+
 // Hjelpefunksjon for å bestemme hvor mange avganger som skal hentes basert på kjøretid
 const getDepartureQueryParams = (drivingTimeMinutes = 0) => {
   // Hvis kjøretid > 2 timer, hent flere avganger over lengre tidsramme
@@ -230,6 +232,18 @@ function App() {
 
   // Hamburger menu state
   const [showHamburgerMenu, setShowHamburgerMenu] = useState(false);
+
+  // Theme state
+  const [currentTheme, setCurrentTheme] = useState(() => loadTheme());
+
+  // Get current theme object
+  const theme = getTheme(currentTheme);
+
+  // Theme change handler
+  const handleThemeChange = (themeId) => {
+    setCurrentTheme(themeId);
+    saveTheme(themeId);
+  };
 
   // GPS state
   const [location, setLocation] = useState(null);
@@ -1668,9 +1682,19 @@ function App() {
     <>
       {/* Custom Splash Screen */}
       {showCustomSplash && (
-        <div className="fixed inset-0 bg-gradient flex flex-col items-center justify-start pt-20 sm:pt-24 z-50">
+        <div 
+          className="fixed inset-0 flex flex-col items-center justify-start pt-20 sm:pt-24 z-50"
+          style={{ background: theme.colors.background }}
+        >
           <div className="text-center">
-            <h1 className="text-5xl sm:text-7xl font-extrabold text-white tracking-tight mb-8 drop-shadow-lg fergetid-title">
+            <h1 
+              className="text-5xl sm:text-7xl font-extrabold tracking-tight mb-8 drop-shadow-lg fergetid-title"
+              style={{ 
+                color: theme.colors.textWhite,
+                fontFamily: theme.fonts.primary,
+                fontWeight: theme.fonts.weight.black
+              }}
+            >
               FergeTid
             </h1>
             <LoadingSpinner message={"laster"} />
@@ -1678,8 +1702,23 @@ function App() {
         </div>
       )}
 
-      <div className="bg-gradient flex flex-col items-center min-h-screen pb-16 sm:pb-24 pt-20 sm:pt-24">
-        <h1 className="text-5xl sm:text-7xl font-extrabold text-white tracking-tight mb-6 sm:mb-6 drop-shadow-lg fergetid-title">{APP_NAME}</h1>
+      <div 
+        className="flex flex-col items-center min-h-screen pb-16 sm:pb-24 pt-20 sm:pt-24"
+        style={{ 
+          background: theme.colors.background,
+          fontFamily: theme.fonts.primary
+        }}
+      >
+        <h1 
+          className="text-5xl sm:text-7xl font-extrabold tracking-tight mb-6 sm:mb-6 drop-shadow-lg fergetid-title"
+          style={{ 
+            color: theme.colors.textWhite,
+            fontFamily: theme.fonts.primary,
+            fontWeight: theme.fonts.weight.black
+          }}
+        >
+          {APP_NAME}
+        </h1>
       
         {/* Premium fjernet: ingen paywall/CTA */}
       
@@ -1719,8 +1758,12 @@ function App() {
                     }}
                     onKeyDown={handleKeyDown}
                     placeholder="Søk fergekai eller klikk på GPS-ikonet"
-                    className="w-full px-4 py-3 rounded-lg bg-white/90 backdrop-blur-md shadow-lg border border-fuchsia-200 focus:border-fuchsia-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-200 placeholder:text-sm placeholder:text-gray-600 placeholder:opacity-90"
+                    className="w-full px-4 py-3 rounded-lg backdrop-blur-md shadow-lg focus:outline-none focus:ring-2 placeholder:text-sm placeholder:opacity-90"
                     style={{
+                      backgroundColor: theme.colors.cardBackground,
+                      borderColor: theme.colors.border,
+                      color: theme.colors.textPrimary,
+                      fontFamily: theme.fonts.primary,
                       position: /iPad|iPhone|iPod/.test(navigator.userAgent) && !showSearchInput ? 'absolute' : 'relative',
                       left: /iPad|iPhone|iPod/.test(navigator.userAgent) && !showSearchInput ? '-9999px' : 'auto',
                       opacity: /iPad|iPhone|iPod/.test(navigator.userAgent) && !showSearchInput ? 0 : 1,
@@ -1752,7 +1795,13 @@ function App() {
                     // Auto-focus input after a short delay to ensure it's visible
                     setTimeout(() => searchInputRef.current?.focus(), 150);
                   }}
-                  className="w-full px-4 py-3 rounded-lg bg-white/90 backdrop-blur-md shadow-lg border border-fuchsia-200 hover:border-fuchsia-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-200 text-left text-gray-600 "
+                  className="w-full px-4 py-3 rounded-lg backdrop-blur-md shadow-lg focus:outline-none focus:ring-2 text-left"
+                  style={{
+                    backgroundColor: theme.colors.cardBackground,
+                    borderColor: theme.colors.border,
+                    color: theme.colors.textSecondary,
+                    fontFamily: theme.fonts.primary
+                  }}
                 >
                   Søk fergekai eller klikk på GPS-ikonet  
                 </button>
@@ -1763,7 +1812,13 @@ function App() {
               ref={gpsButtonRef}
               type="button"
               onClick={handleGPSLocation}
-              className="px-4 py-3 bg-white/90 hover:bg-white backdrop-blur-md text-fuchsia-600 font-semibold rounded-lg shadow-lg transition-colors border border-fuchsia-200 focus:border-fuchsia-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-200"
+              className="px-4 py-3 backdrop-blur-md font-semibold rounded-lg shadow-lg transition-colors focus:outline-none focus:ring-2"
+              style={{
+                backgroundColor: theme.colors.cardBackground,
+                borderColor: theme.colors.border,
+                color: theme.colors.primary,
+                fontFamily: theme.fonts.primary
+              }}
               title="Bruk GPS-plassering"
             >
               <svg 
@@ -1771,7 +1826,7 @@ function App() {
                 height="24" 
                 viewBox="0 0 24 24" 
                 fill="currentColor" 
-                className="text-fuchsia-600"
+                style={{ color: theme.colors.primary }}
               >
                 {/* Outer circle */}
                 <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2"/>
@@ -1792,7 +1847,12 @@ function App() {
             <button
               type="button"
               onClick={() => setShowHamburgerMenu(!showHamburgerMenu)}
-              className="px-4 py-3 bg-transparent hover:bg-white/20 backdrop-blur-md text-white font-semibold rounded-lg shadow-lg transition-colors border border-white focus:border-white focus:outline-none focus:ring-2 focus:ring-white/50"
+              className="px-4 py-3 bg-transparent backdrop-blur-md font-semibold rounded-lg shadow-lg transition-colors focus:outline-none focus:ring-2"
+              style={{
+                borderColor: theme.colors.textWhite,
+                color: theme.colors.textWhite,
+                fontFamily: theme.fonts.primary
+              }}
               title="Meny"
             >
               <svg 
@@ -1804,7 +1864,7 @@ function App() {
                 strokeWidth="2" 
                 strokeLinecap="round" 
                 strokeLinejoin="round"
-                className="text-white"
+                style={{ color: theme.colors.textWhite }}
               >
                 <line x1="3" y1="6" x2="21" y2="6"/>
                 <line x1="3" y1="12" x2="21" y2="12"/>
@@ -1817,7 +1877,13 @@ function App() {
         {/* Filter Menu - shown below search field */}
         {showHamburgerMenu && (
           <div className="w-full max-w-[350px] sm:max-w-md mb-6 px-3 sm:px-4 -mt-3">
-            <div className="bg-black/15 backdrop-blur-md rounded-xl shadow-lg border-2 border-fuchsia-200 p-4 transform transition-all duration-300 ease-out">
+            <div 
+              className="backdrop-blur-md rounded-xl shadow-lg border-2 p-4 transform transition-all duration-300 ease-out"
+              style={{
+                backgroundColor: theme.colors.cardBackground,
+                borderColor: theme.colors.border
+              }}
+            >
               <div className="flex gap-2">
                 {/* Car Ferry Filter */}
                 <button
@@ -1828,14 +1894,25 @@ function App() {
                   className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg focus:outline-none transition-colors"
                   title="Bilferge"
                 >
-                  <span className="w-4 h-4 rounded border border-white bg-white flex items-center justify-center">
+                  <span 
+                    className="w-4 h-4 rounded border flex items-center justify-center"
+                    style={{
+                      borderColor: theme.colors.textPrimary,
+                      backgroundColor: theme.colors.cardBackground
+                    }}
+                  >
                     {filters.carFerry ? (
-                      <svg viewBox="0 0 24 24" className="w-3 h-3 text-fuchsia-600" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ color: theme.colors.primary }}>
                         <path d="M20 6L9 17l-5-5" />
                       </svg>
                     ) : null}
                   </span>
-                  <span className="text-white font-medium text-sm">Bilferge</span>
+                  <span 
+                    className="font-medium text-sm"
+                    style={{ color: theme.colors.textPrimary, fontFamily: theme.fonts.primary }}
+                  >
+                    Bilferge
+                  </span>
                 </button>
                 
                 {/* Passenger Ferry Filter */}
@@ -1847,20 +1924,62 @@ function App() {
                   className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg focus:outline-none transition-colors"
                   title="Passasjerferge"
                 >
-                  <span className="w-4 h-4 rounded border border-white bg-white flex items-center justify-center">
+                  <span 
+                    className="w-4 h-4 rounded border flex items-center justify-center"
+                    style={{
+                      borderColor: theme.colors.textPrimary,
+                      backgroundColor: theme.colors.cardBackground
+                    }}
+                  >
                     {filters.passengerFerry ? (
-                      <svg viewBox="0 0 24 24" className="w-3 h-3 text-fuchsia-600" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ color: theme.colors.primary }}>
                         <path d="M20 6L9 17l-5-5" />
                       </svg>
                     ) : null}
                   </span>
-                  <span className="text-white font-medium text-sm">Passasjerferge</span>
+                  <span 
+                    className="font-medium text-sm"
+                    style={{ color: theme.colors.textPrimary, fontFamily: theme.fonts.primary }}
+                  >
+                    Passasjerferge
+                  </span>
                 </button>
               </div>
               
+              {/* Theme Selector */}
+              <div className="mt-4 pt-3 border-t" style={{ borderColor: theme.colors.border }}>
+                <div className="text-sm font-medium mb-2" style={{ color: theme.colors.textPrimary, fontFamily: theme.fonts.primary }}>
+                  Tema
+                </div>
+                <div className="flex gap-2">
+                  {Object.values(THEMES).map((themeOption) => (
+                    <button
+                      key={themeOption.id}
+                      type="button"
+                      onClick={() => handleThemeChange(themeOption.id)}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        currentTheme === themeOption.id ? 'ring-2' : ''
+                      }`}
+                      style={{
+                        backgroundColor: currentTheme === themeOption.id ? theme.colors.primary : theme.colors.cardBackground,
+                        color: currentTheme === themeOption.id ? theme.colors.textWhite : theme.colors.textPrimary,
+                        borderColor: theme.colors.border,
+                        fontFamily: theme.fonts.primary,
+                        ringColor: theme.colors.primary
+                      }}
+                    >
+                      {themeOption.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
               {/* Legal Links */}
-              <div className="mt-4 pt-3 border-t border-white/20">
-                <div className="text-xs text-white/80">
+              <div className="mt-4 pt-3 border-t" style={{ borderColor: theme.colors.border }}>
+                <div 
+                  className="text-xs"
+                  style={{ color: theme.colors.textSecondary, fontFamily: theme.fonts.primary }}
+                >
                   {(() => {
                     const isIOSApp = typeof window !== 'undefined' && window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'ios';
                     const termsHref = config?.LEGAL?.getTermsOfUseUrl?.();
@@ -1928,7 +2047,13 @@ function App() {
 
         {/* GPS Location Display */}
         {mode === 'gps' && locationName && (
-          <div className="text-base sm:text-lg text-white mb-4 text-center px-3">
+          <div 
+            className="text-base sm:text-lg mb-4 text-center px-3"
+            style={{ 
+              color: theme.colors.textWhite,
+              fontFamily: theme.fonts.primary
+            }}
+          >
             Din posisjon er <span className="font-bold">{locationName}</span>
           </div>
         )}
@@ -1943,7 +2068,13 @@ function App() {
 
         {/* GPS Status Display */}
         {mode === 'gps' && !locationName && !loading && !error && (
-          <div className="text-sm text-white/80 mb-4 text-center px-3">
+          <div 
+            className="text-sm mb-4 text-center px-3"
+            style={{ 
+              color: theme.colors.textWhite,
+              fontFamily: theme.fonts.primary
+            }}
+          >
             <p>GPS-funksjon aktivert</p>
             <p className="text-xs mt-1">Henter posisjon og fergekaier...</p>
           </div>
@@ -1969,7 +2100,15 @@ function App() {
           )}
         </div>
         {error && (
-          <div className="text-center text-white bg-red-500/20 p-4 rounded-lg mb-6 border border-red-300/30">
+          <div 
+            className="text-center p-4 rounded-lg mb-6 border"
+            style={{
+              color: theme.colors.textWhite,
+              backgroundColor: 'rgba(239, 68, 68, 0.2)',
+              borderColor: 'rgba(252, 165, 165, 0.3)',
+              fontFamily: theme.fonts.primary
+            }}
+          >
             {error}
           </div>
         )}
@@ -2078,7 +2217,13 @@ function App() {
                 <div key={stopData.id} className="flex flex-col">
                   {/* Km-avstand som egen boks over fergekortet */}
                   {distance && (
-                    <div className="bg-blue-500 text-white text-lg font-bold px-2.5 py-1.5 rounded-2xl shadow-lg mb-[-10px] self-start relative z-20 -ml-4">
+                    <div 
+                      className="text-white text-lg font-bold px-2.5 py-1.5 rounded-2xl shadow-lg mb-[-10px] self-start relative z-20 -ml-4"
+                      style={{
+                        backgroundColor: theme.colors.distanceBadge,
+                        fontFamily: theme.fonts.primary
+                      }}
+                    >
                       {(() => {
                         const drivingDistance = drivingDistances[stopData.id];
                         const fallbackDistance = distance;
@@ -2092,20 +2237,28 @@ function App() {
                   )}
                   
                   <div
-                                          id={'ferry-card-' + stopData.id}
-                                          className={'relative ' + (distance ? 'rounded-tr-2xl rounded-br-2xl rounded-bl-2xl' : 'rounded-2xl') + ' p-4 sm:p-5 card-expand w-full max-w-[350px] sm:max-w-md bg-white shadow-lg border border-gray-200'}
-                    style={{ minWidth: '280px' }}
+                    id={'ferry-card-' + stopData.id}
+                    className={'relative ' + (distance ? 'rounded-tr-2xl rounded-br-2xl rounded-bl-2xl' : 'rounded-2xl') + ' p-4 sm:p-5 card-expand w-full max-w-[350px] sm:max-w-md shadow-lg border'}
+                    style={{ 
+                      minWidth: '280px',
+                      backgroundColor: theme.colors.cardBackground,
+                      borderColor: theme.colors.border,
+                      fontFamily: theme.fonts.primary
+                    }}
                   >
                     <h2 
                       className="ferry-quay-name"
                       style={{ 
                         fontSize: getOptimalFontSize(cleanDestinationText(stopData.name || '')),
-                        lineHeight: '1.2'
+                        lineHeight: '1.2',
+                        color: theme.colors.textPrimary,
+                        fontFamily: theme.fonts.primary,
+                        fontWeight: theme.fonts.weight.bold
                       }}
                     >
                       {cleanDestinationText(stopData.name || '').toUpperCase()}
                     </h2>
-                    <hr className="border-gray-300 my-2" />
+                    <hr className="my-2" style={{ borderColor: theme.colors.border }} />
                     
                     {/* Kjøretidsbeskrivelse rett etter fergekainavn */}
                     {showDrivingTimes && drivingTimes[stopData.id] && location && (() => {
@@ -2113,13 +2266,25 @@ function App() {
                       const isPassengerOnly = sub && PASSENGER_FERRY_SUBMODES.includes(sub);
                       if (isPassengerOnly) {
                         return (
-                          <div className="mt-2 text-sm text-gray-600 leading-relaxed">
+                          <div 
+                            className="mt-2 text-sm leading-relaxed"
+                            style={{ 
+                              color: theme.colors.textSecondary,
+                              fontFamily: theme.fonts.primary
+                            }}
+                          >
                             {`Det tar ca ${formatMinutes(drivingTimes[stopData.id])} å gå.`}
                           </div>
                         );
                       }
                       return (
-                        <div className="mt-2 text-sm text-gray-600 leading-relaxed">
+                        <div 
+                          className="mt-2 text-sm leading-relaxed"
+                          style={{ 
+                            color: theme.colors.textSecondary,
+                            fontFamily: theme.fonts.primary
+                          }}
+                        >
                           <div dangerouslySetInnerHTML={{
                             __html: generateTravelDescription(
                               (drivingDistances[stopData.id] ?? distance),
@@ -2181,18 +2346,34 @@ function App() {
                               
                               return (
                                 <li key={dep.aimedDepartureTime + '-' + idx} className="flex items-center py-0.5 leading-snug">
-                                  <span className={`font-bold w-16 text-left text-sm ${strikeClass}`}>
+                                  <span 
+                                    className={`font-bold w-16 text-left text-sm ${strikeClass}`}
+                                    style={{ 
+                                      color: theme.colors.textPrimary,
+                                      fontFamily: theme.fonts.primary
+                                    }}
+                                  >
                                     {dep.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                   </span>
                                   <span className="flex-1 flex justify-start items-center gap-1">
-                                    <span className={`text-sm font-bold align-middle whitespace-nowrap pl-4 ${getDepartureTimeColor(dep.aimedDepartureTime || dep.aimed, drivingTimes[stopData.id], showDrivingTimes, mode)} ${strikeClass}`}>
+                                    <span 
+                                      className={`text-sm font-bold align-middle whitespace-nowrap pl-4 ${strikeClass}`}
+                                      style={{ 
+                                        color: getDepartureTimeColor(dep.aimedDepartureTime || dep.aimed, drivingTimes[stopData.id], showDrivingTimes, mode) === 'text-red-500' ? theme.colors.departureTime.now :
+                                                getDepartureTimeColor(dep.aimedDepartureTime || dep.aimed, drivingTimes[stopData.id], showDrivingTimes, mode) === 'text-yellow-500' ? theme.colors.departureTime.soon :
+                                                theme.colors.departureTime.later,
+                                        fontFamily: theme.fonts.primary
+                                      }}
+                                    >
                                       {formatMinutes(mins)}
                                     </span>
                                   </span>
                                   <span 
-                                    className={`w-24 text-gray-700 text-right font-semibold ${strikeClass}`}
+                                    className={`w-24 text-right font-semibold ${strikeClass}`}
                                     style={{ 
-                                      fontSize: getOptimalFontSize(cleanDestinationText(dep.destinationDisplay?.frontText), 96) // 96px = 6rem = w-24
+                                      fontSize: getOptimalFontSize(cleanDestinationText(dep.destinationDisplay?.frontText), 96), // 96px = 6rem = w-24
+                                      color: theme.colors.textPrimary,
+                                      fontFamily: theme.fonts.primary
                                     }}
                                   >
                                     {cleanDestinationText(dep.destinationDisplay?.frontText)}
@@ -2206,16 +2387,37 @@ function App() {
 
                       {/* debug removed */}
                       {inlineDestinations[stopData.id] && inlineDestinations[stopData.id].map((destination, destIndex) => (
-                                                      <div key={stopData.id + '-' + destination.stopId} className="mt-5 p-4 sm:p-5 rounded-lg bg-gray-100/80 backdrop-blur-md shadow-lg relative">
-                          <div className="bg-purple-100 text-purple-700 text-sm font-bold px-2 py-1 rounded-full shadow-lg absolute top-[-10px] left-0 z-20">
+                        <div 
+                          key={stopData.id + '-' + destination.stopId} 
+                          className="mt-5 p-4 sm:p-5 rounded-lg backdrop-blur-md shadow-lg relative"
+                          style={{
+                            backgroundColor: theme.colors.cardBackground,
+                            fontFamily: theme.fonts.primary
+                          }}
+                        >
+                          <div 
+                            className="text-sm font-bold px-2 py-1 rounded-full shadow-lg absolute top-[-10px] left-0 z-20"
+                            style={{
+                              backgroundColor: theme.colors.primary,
+                              color: theme.colors.textWhite,
+                              fontFamily: theme.fonts.primary
+                            }}
+                          >
                             Retur
                           </div>
                           <div className="flex items-center justify-between">
-                            <h3 className="text-lg font-bold text-gray-800">
+                            <h3 
+                              className="text-lg font-bold"
+                              style={{
+                                color: theme.colors.textPrimary,
+                                fontFamily: theme.fonts.primary,
+                                fontWeight: theme.fonts.weight.bold
+                              }}
+                            >
                               {cleanDestinationText(destination.name).toUpperCase()}
                             </h3>
                           </div>
-                          <hr className="border-gray-300 my-2" />
+                          <hr className="my-2" style={{ borderColor: theme.colors.border }} />
                           <div className="mt-2 text-base sm:text-lg">
                             <ul className="space-y-0">
                               {destination.departures
@@ -2227,18 +2429,32 @@ function App() {
                                 
                                 return (
                                   <li key={'inline-' + destination.stopId + '-' + dep.aimedDepartureTime + '-' + idx} className="flex items-center py-0.5 leading-snug">
-                                    <span className={`font-bold w-16 text-left text-sm ${strikeClass}`}>
+                                    <span 
+                                      className={`font-bold w-16 text-left text-sm ${strikeClass}`}
+                                      style={{ 
+                                        color: theme.colors.textPrimary,
+                                        fontFamily: theme.fonts.primary
+                                      }}
+                                    >
                                       {dep.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </span>
                                     <span className="flex-1 flex justify-start items-center gap-1">
-                                      <span className={`text-sm font-bold align-middle whitespace-nowrap pl-1 text-green-600 ${strikeClass}`}>
+                                      <span 
+                                        className={`text-sm font-bold align-middle whitespace-nowrap pl-1 ${strikeClass}`}
+                                        style={{ 
+                                          color: theme.colors.departureTime.later,
+                                          fontFamily: theme.fonts.primary
+                                        }}
+                                      >
                                         {formatMinutes(mins)}
                                       </span>
                                     </span>
                                     <span 
-                                      className={`w-24 text-gray-700 text-right font-semibold ${strikeClass}`}
+                                      className={`w-24 text-right font-semibold ${strikeClass}`}
                                       style={{ 
-                                        fontSize: getOptimalFontSize(cleanDestinationText(dep.destinationDisplay?.frontText), 96)
+                                        fontSize: getOptimalFontSize(cleanDestinationText(dep.destinationDisplay?.frontText), 96),
+                                        color: theme.colors.textPrimary,
+                                        fontFamily: theme.fonts.primary
                                       }}
                                     >
                                       {cleanDestinationText(dep.destinationDisplay?.frontText)}
@@ -2262,7 +2478,15 @@ function App() {
 
         {/* No results */}
         {hasInteracted && !loading && ferryStops.length === 0 && (
-          <div className="text-center text-white bg-white/10 p-8 rounded-lg border border-white/20">
+          <div 
+            className="text-center p-8 rounded-lg border"
+            style={{
+              color: theme.colors.textWhite,
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              borderColor: 'rgba(255, 255, 255, 0.2)',
+              fontFamily: theme.fonts.primary
+            }}
+          >
             {mode === 'search' 
               ? 'Ingen fergekaier funnet for søket ditt'
               : (

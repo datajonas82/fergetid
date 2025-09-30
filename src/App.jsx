@@ -1729,109 +1729,7 @@ function App() {
               </h1>
             </div>
             
-            {/* Search and settings section */}
-            <div className="w-full px-4 pb-4">
-              <div className="flex gap-2 items-center">
-                {showSearchInput ? (
-                  <div className="flex-1 relative">
-                    <form autoComplete="off" onSubmit={e => e.preventDefault()}>
-                      <input
-                        ref={searchInputRef}
-                        type="text"
-                        autoComplete="off"
-                        autoCorrect="off"
-                        autoCapitalize="off"
-                        spellCheck="false"
-                        value={query}
-                        onChange={(e) => {
-                          setQuery(e.target.value);
-                          if (error) {
-                            setError(null);
-                          }
-                          if (e.target.value.trim()) {
-                            setMode('search');
-                          }
-                        }}
-                        onKeyDown={handleKeyDown}
-                        placeholder="Søk ferjekai"
-                        className="w-full pl-10 pr-4 py-3 rounded-lg focus:outline-none focus:ring-2 placeholder:text-sm placeholder:opacity-90"
-                        style={{
-                          backgroundColor: theme.colors.cardBackground,
-                          borderColor: theme.colors.border,
-                          color: theme.colors.textPrimary,
-                          fontFamily: theme.fonts.primary
-                        }}
-                      />
-                      {/* search icon */}
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        style={{ color: theme.colors.textSecondary, position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }}
-                      >
-                        <circle cx="11" cy="11" r="8" />
-                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                      </svg>
-                    </form>
-                  </div>
-                ) : (
-                  <div className="flex-1">
-                    <button
-                      onClick={() => {
-                        setShowSearchInput(true);
-                        if (error) {
-                          setError(null);
-                        }
-                        setTimeout(() => searchInputRef.current?.focus(), 150);
-                      }}
-                      className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 text-left"
-                      style={{
-                        backgroundColor: theme.colors.cardBackground,
-                        borderColor: theme.colors.border,
-                        color: theme.colors.textSecondary,
-                        fontFamily: theme.fonts.primary
-                      }}
-                    >
-                      Søk ferjekai
-                    </button>
-                  </div>
-                )}
-                
-                {/* Settings button */}
-                <button
-                  type="button"
-                  onClick={() => setShowHamburgerMenu(!showHamburgerMenu)}
-                  className="px-4 py-3 rounded-lg focus:outline-none focus:ring-2"
-                  style={{
-                    backgroundColor: theme.colors.cardBackground,
-                    borderColor: theme.colors.border,
-                    color: theme.colors.primary,
-                    fontFamily: theme.fonts.primary
-                  }}
-                  title="Meny"
-                >
-                  <svg 
-                    width="24" 
-                    height="24" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    strokeWidth="2" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round"
-                    style={{ color: theme.colors.primary }}
-                  >
-                    <circle cx="12" cy="12" r="3" />
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c0 .64.26 1.25.73 1.69.47.45 1.08.69 1.73.69H21a2 2 0 1 1 0 4h-.09c-.58 0-1.14.23-1.51.62-.37.39-.58.91-.58 1.44z" />
-                  </svg>
-                </button>
-              </div>
-            </div>
+            {/* Search and settings flyttes ut i et sentrert kort i hovedinnholdet for minima */}
           </div>
         )}
 
@@ -1869,31 +1767,55 @@ function App() {
 
         {/* Main content area */}
         <div className="flex-1 flex flex-col items-center pb-16 sm:pb-24">
-          {/* GPS button for minima theme */}
+          {/* Search + settings + GPS i et sentrert kort (minima) */}
           {theme.layout.hasHeaderBar && (
-            <div className="w-full max-w-[400px] px-4 py-4">
-              <button
-                ref={gpsButtonRef}
-                type="button"
-                onClick={handleGPSLocation}
-                className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2"
-                style={{
-                  backgroundColor: theme.colors.cardBackground,
-                  borderColor: theme.colors.border,
-                  color: theme.colors.primary,
-                  fontFamily: theme.fonts.primary,
-                  border: `1px solid ${theme.colors.border}`
-                }}
-                title="Bruk GPS-plassering"
+            <div className="w-full flex justify-center px-4">
+              <div 
+                className="w-full max-w-[400px] p-3 rounded-lg shadow-lg flex items-center gap-2"
+                style={{ backgroundColor: theme.colors.cardBackground, border: `1px solid ${theme.colors.border}` }}
               >
-                <div className="flex items-center justify-center gap-2">
-                  <svg 
-                    width="20" 
-                    height="20" 
-                    viewBox="0 0 24 24" 
-                    fill="currentColor" 
-                    style={{ color: theme.colors.primary }}
-                  >
+                {/* Search */}
+                <div className="flex-1 relative">
+                  <form autoComplete="off" onSubmit={e => e.preventDefault()}>
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck="false"
+                      value={query}
+                      onChange={(e) => {
+                        setQuery(e.target.value);
+                        if (error) setError(null);
+                        if (e.target.value.trim()) setMode('search');
+                      }}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Søk ferjekai"
+                      className="w-full pl-10 pr-3 py-2 rounded-md focus:outline-none focus:ring-2 placeholder:text-sm placeholder:opacity-90"
+                      style={{
+                        backgroundColor: theme.colors.cardBackground,
+                        border: `1px solid ${theme.colors.border}`,
+                        color: theme.colors.textPrimary,
+                        fontFamily: theme.fonts.primary
+                      }}
+                    />
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: theme.colors.textSecondary, position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }}>
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                  </form>
+                </div>
+                {/* GPS */}
+                <button
+                  ref={gpsButtonRef}
+                  type="button"
+                  onClick={handleGPSLocation}
+                  className="px-3 py-2 rounded-md focus:outline-none focus:ring-2"
+                  style={{ backgroundColor: theme.colors.cardBackground, border: `1px solid ${theme.colors.border}`, color: theme.colors.primary, fontFamily: theme.fonts.primary }}
+                  title="Bruk GPS-plassering"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ color: theme.colors.primary }}>
                     <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2"/>
                     <circle cx="12" cy="12" r="4" fill="currentColor"/>
                     <line x1="12" y1="0" x2="12" y2="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
@@ -1901,9 +1823,21 @@ function App() {
                     <line x1="0" y1="12" x2="4" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                     <line x1="20" y1="12" x2="24" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                   </svg>
-                  <span className="font-medium">Bruk GPS-plassering</span>
-                </div>
-              </button>
+                </button>
+                {/* Settings */}
+                <button
+                  type="button"
+                  onClick={() => setShowHamburgerMenu(!showHamburgerMenu)}
+                  className="px-3 py-2 rounded-md focus:outline-none focus:ring-2"
+                  style={{ backgroundColor: theme.colors.cardBackground, border: `1px solid ${theme.colors.border}`, color: theme.colors.primary, fontFamily: theme.fonts.primary }}
+                  title="Meny"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: theme.colors.primary }}>
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09c.58 0 1.14-.23 1.51-.62.37-.39.58-.91.58-1.44V9c0-.64-.26-1.25-.73-1.69-.47-.45-1.08-.69-1.73-.69H3a2 2 0 1 1 0-4h.09c.58 0 1.14-.23 1.51-.62.37-.39.58-.91.58-1.44l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06c.36.36.86.57 1.38.57H9c.64 0 1.25-.26 1.69-.73.45-.47.69-1.08.69-1.73V3a2 2 0 1 1 4 0v.09c0 .58.23 1.14.62 1.51.39.37.91.58 1.44.58h.09a2 2 0 1 1 0 4h-.09c-.58 0-1.14.23-1.51.62-.37.39-.58.91-.58 1.44z" />
+                  </svg>
+                </button>
+              </div>
             </div>
           )}
 

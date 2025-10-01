@@ -1721,7 +1721,7 @@ function App() {
                 style={{ 
                   color: theme.colors.textWhite,
                   fontFamily: theme.fonts.primary,
-                  fontWeight: 1000
+                  fontWeight: theme.fonts.weight.extrabold
                 }}
               >
                 {APP_NAME}

@@ -1778,7 +1778,7 @@ function App() {
                       className="w-full pl-10 pr-3 py-2 rounded-md focus:outline-none focus:ring-2 placeholder:text-sm placeholder:opacity-90"
                       style={{
                         backgroundColor: theme.colors.cardBackground,
-                        border: `1.5px solid ${theme.colors.textPrimary}`,
+                        border: `1.25px solid ${theme.colors.textPrimary}`,
                         color: theme.colors.textPrimary,
                         fontFamily: theme.fonts.primary
                       }}
@@ -1815,8 +1815,9 @@ function App() {
                   style={{ backgroundColor: theme.colors.cardBackground, border: `1px solid ${theme.colors.border}`, color: theme.colors.primary, fontFamily: theme.fonts.primary }}
                   title="Meny"
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ color: theme.colors.primary }}>
-                    <path fillRule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.79 1.576l-.071.712c-.06.543-.412 1.017-.909 1.229l-.632.27a1.724 1.724 0 00-.837 2.329l.333.667c.178.356.178.776 0 1.132l-.333.667c-.32.64-.038 1.411.837 2.329l.632.27c.497.212.85.686.909 1.229l.075.757c.094.928.873 1.63 1.806 1.63h1.844c.933 0 1.712-.702 1.806-1.63l.075-.757c.059-.543.412-1.017.909-1.229l.632-.27c.875-.918 1.157-1.689.837-2.329l-.333-.667a1.724 1.724 0 010-1.132l.333-.667a1.724 1.724 0 00-.837-2.329l-.632-.27a1.724 1.724 0 01-1.009-1.342l-.071-.712A1.799 1.799 0 0012.922 2.25h-1.844zM12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z" clipRule="evenodd" />
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: theme.colors.primary }}>
+                    <path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.277c.1.6.52 1.1 1.084 1.333l1.183.493c.536.224.757.86.479 1.359l-.662 1.148a2.25 2.25 0 000 2.308l.662 1.148c.278.499.057 1.135-.479 1.359l-1.183.493a1.5 1.5 0 00-1.084 1.333l-.213 1.277c-.09.542-.56.94-1.11.94h-2.593a1.125 1.125 0 01-1.11-.94l-.213-1.277a1.5 1.5 0 00-1.084-1.333l-1.183-.493c-.536-.224-.757-.86-.479-1.359l.662-1.148a2.25 2.25 0 000-2.308l-.662-1.148c-.278-.499-.057-1.135.479-1.359l1.183-.493c.564-.234.984-.733 1.084-1.333l.213-1.277z" />
+                    <circle cx="12" cy="12" r="3" />
                   </svg>
                 </button>
               </div>
@@ -1833,7 +1834,7 @@ function App() {
                   color: theme.colors.textPrimary,
                   fontFamily: theme.fonts.primary,
                   borderColor: theme.colors.textPrimary,
-                  borderWidth: '1.5px'
+                  borderWidth: '1.25px'
                 }}
               >
                 <div className="w-full text-center font-bold px-4">

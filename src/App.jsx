@@ -1746,24 +1746,7 @@ function App() {
           </div>
         )}
 
-        {/* Location bar for minima theme */}
-        {theme.layout.hasLocationBar && mode === 'gps' && locationName && (
-          <div className="w-full flex justify-center px-4">
-            <div 
-              className="w-full max-w-[400px] py-3 border-x"
-              style={{ 
-                backgroundColor: theme.colors.locationBar,
-                color: theme.colors.textPrimary,
-                fontFamily: theme.fonts.primary,
-                borderColor: theme.colors.border
-              }}
-            >
-              <div className="w-full text-center font-bold px-4">
-                Din posisjon er <span className="font-bold">{locationName}</span>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Location bar for minima theme flyttes nedenfor søkekortet */}
 
         {/* Main content area */}
         <div className="flex-1 flex flex-col items-center pb-16 sm:pb-24">
@@ -1837,6 +1820,25 @@ function App() {
                     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09c.58 0 1.14-.23 1.51-.62.37-.39.58-.91.58-1.44V9c0-.64-.26-1.25-.73-1.69-.47-.45-1.08-.69-1.73-.69H3a2 2 0 1 1 0-4h.09c.58 0 1.14-.23 1.51-.62.37-.39.58-.91.58-1.44l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06c.36.36.86.57 1.38.57H9c.64 0 1.25-.26 1.69-.73.45-.47.69-1.08.69-1.73V3a2 2 0 1 1 4 0v.09c0 .58.23 1.14.62 1.51.39.37.91.58 1.44.58h.09a2 2 0 1 1 0 4h-.09c-.58 0-1.14.23-1.51.62-.37.39-.58.91-.58 1.44z" />
                   </svg>
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Location bar for minima theme (under søkekortet) */}
+          {theme.layout.hasLocationBar && mode === 'gps' && locationName && (
+            <div className="w-full flex justify-center px-4">
+              <div 
+                className="w-full max-w-[400px] py-3 border-x"
+                style={{ 
+                  backgroundColor: theme.colors.locationBar,
+                  color: theme.colors.textPrimary,
+                  fontFamily: theme.fonts.primary,
+                  borderColor: theme.colors.border
+                }}
+              >
+                <div className="w-full text-center font-bold px-4">
+                  Din posisjon er <span className="font-bold">{locationName}</span>
+                </div>
               </div>
             </div>
           )}

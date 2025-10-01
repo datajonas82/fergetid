@@ -1778,7 +1778,7 @@ function App() {
                       className="w-full pl-10 pr-3 py-2 rounded-md focus:outline-none focus:ring-2 placeholder:text-sm placeholder:opacity-90"
                       style={{
                         backgroundColor: theme.colors.cardBackground,
-                        border: `2px solid ${theme.colors.textPrimary}`,
+                        border: `1.5px solid ${theme.colors.textPrimary}`,
                         color: theme.colors.textPrimary,
                         fontFamily: theme.fonts.primary
                       }}
@@ -1833,7 +1833,7 @@ function App() {
                   color: theme.colors.textPrimary,
                   fontFamily: theme.fonts.primary,
                   borderColor: theme.colors.textPrimary,
-                  borderWidth: '2px'
+                  borderWidth: '1.5px'
                 }}
               >
                 <div className="w-full text-center font-bold px-4">

@@ -1717,11 +1717,11 @@ function App() {
               style={{ backgroundColor: theme.colors.headerBackground }}
             >
               <h1 
-                className="text-6xl font-normal tracking-tight text-left"
+                className="text-6xl font-medium tracking-tight text-left"
                 style={{ 
                   color: theme.colors.textWhite,
                   fontFamily: theme.fonts.primary,
-                  fontWeight: theme.fonts.weight.normal
+                  fontWeight: theme.fonts.weight.medium
                 }}
               >
                 {APP_NAME}

@@ -1679,7 +1679,7 @@ function App() {
   };
 
   return (
-    <>
+    <div className="border-[1.25px] border border-black">
       {/* Custom Splash Screen */}
       {showCustomSplash && (
         <div 
@@ -1687,17 +1687,7 @@ function App() {
           style={{ background: theme.colors.background }}
         >
           <div className="text-center">
-            <h1 
-              className="text-5xl sm:text-7xl font-extrabold tracking-tight mb-8 drop-shadow-lg fergetid-title"
-              style={{ 
-                color: theme.colors.textWhite,
-                fontFamily: theme.fonts.primary,
-                fontWeight: theme.fonts.weight.black
-              }}
-            >
-              FergeTid
-            </h1>
-            <LoadingSpinner message={"laster"} />
+            <LoadingSpinner message={"laster"} theme={theme} />
           </div>
         </div>
       )}
@@ -1713,8 +1703,8 @@ function App() {
         {theme.layout.hasHeaderBar && (
           <div className="w-full flex justify-center px-4">
             <div 
-              className="w-full max-w-[400px] py-6 px-4 rounded-t-lg"
-              style={{ backgroundColor: theme.colors.headerBackground }}
+              className="w-full max-w-[400px]"
+              style={{ backgroundColor: theme.colors.headerBackground, padding: '10px 10px', marginTop: 30 }}
             >
               <h1 
                 className="text-6xl font-semibold tracking-tight text-left"
@@ -1732,10 +1722,10 @@ function App() {
 
         {/* Standard header for OG theme */}
         {!theme.layout.hasHeaderBar && (
-          <div className="flex flex-col items-center pt-20 sm:pt-24">
+          <div className="flex flex-col items-center" style={{ paddingTop: 90 }}>
             <h1 
               className="text-5xl sm:text-7xl font-extrabold tracking-tight mb-6 sm:mb-6 drop-shadow-lg fergetid-title"
-              style={{ 
+              style={{
                 color: theme.colors.textWhite,
                 fontFamily: theme.fonts.primary,
                 fontWeight: theme.fonts.weight.black
@@ -1774,8 +1764,8 @@ function App() {
                         if (e.target.value.trim()) setMode('search');
                       }}
                       onKeyDown={handleKeyDown}
-                      placeholder="Søk ferjekai"
-                      className="w-full pl-10 pr-3 py-2 rounded-md focus:outline-none focus:ring-2 placeholder:text-sm placeholder:opacity-90"
+                      placeholder="Søk fergekai eller klikk på GPS-ikonet"
+                      className="w-full pl-10 pr-3 py-2 h-11 rounded-md focus:outline-none focus:ring-2 placeholder:text-sm placeholder:opacity-90"
                       style={{
                         backgroundColor: theme.colors.cardBackground,
                         border: `1.25px solid ${theme.colors.textPrimary}`,
@@ -1794,8 +1784,8 @@ function App() {
                   ref={gpsButtonRef}
                   type="button"
                   onClick={handleGPSLocation}
-                  className="px-3 py-2 rounded-md focus:outline-none focus:ring-2"
-                  style={{ backgroundColor: theme.colors.cardBackground, border: `1px solid ${theme.colors.border}`, color: theme.colors.primary, fontFamily: theme.fonts.primary }}
+                  className="px-3 py-2 h-11 rounded-md focus:outline-none focus:ring-2 flex items-center justify-center"
+                  style={{ backgroundColor: theme.colors.cardBackground, border: `1.25px solid ${theme.colors.textPrimary}`, color: theme.colors.primary, fontFamily: theme.fonts.primary }}
                   title="Bruk GPS-plassering"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ color: theme.colors.primary }}>
@@ -1811,8 +1801,8 @@ function App() {
                 <button
                   type="button"
                   onClick={() => setShowHamburgerMenu(!showHamburgerMenu)}
-                  className="px-3 py-2 rounded-md focus:outline-none focus:ring-2"
-                  style={{ backgroundColor: theme.colors.cardBackground, border: `1px solid ${theme.colors.border}`, color: theme.colors.primary, fontFamily: theme.fonts.primary }}
+                  className="px-3 py-2 h-11 rounded-md focus:outline-none focus:ring-2 flex items-center justify-center"
+                  style={{ backgroundColor: theme.colors.cardBackground, border: `1.25px solid ${theme.colors.textPrimary}`, color: theme.colors.primary, fontFamily: theme.fonts.primary }}
                   title="Meny"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: theme.colors.primary }}>
@@ -1838,7 +1828,7 @@ function App() {
                   borderWidth: '1.25px'
                 }}
               >
-                <div className="w-full text-center font-bold px-4">
+                <div className="w-full text-left px-4">
                   Din posisjon er <span className="font-bold">{locationName}</span>
                 </div>
               </div>
@@ -1979,14 +1969,31 @@ function App() {
 
         {/* Filter Menu - shown below search field */}
         {showHamburgerMenu && (
-          <div className="w-full max-w-[350px] sm:max-w-md mb-6 px-3 sm:px-4 -mt-3">
+          <div className="w-full max-w-[350px] sm:max-w-md mb-6 px-3 sm:px-4" style={{ marginTop: theme.layout.cardStyle === 'minima' ? 12 : -12 }}>
             <div 
-              className="backdrop-blur-md rounded-xl shadow-lg border-2 p-4 transform transition-all duration-300 ease-out"
+              className={`relative backdrop-blur-md shadow-lg border-2 p-4 transform transition-all duration-300 ease-out ${theme.layout.cardStyle === 'minima' ? '' : 'rounded-xl'}`}
               style={{
                 backgroundColor: theme.colors.cardBackground,
                 borderColor: theme.colors.border
               }}
             >
+              {/* Close (X) button */}
+              <button
+                type="button"
+                aria-label="Lukk meny"
+                onClick={() => setShowHamburgerMenu(false)}
+                className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center focus:outline-none"
+                style={{
+                  border: `1.25px solid ${theme.colors.textPrimary}`,
+                  color: theme.colors.textPrimary,
+                  backgroundColor: theme.colors.cardBackground
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
               <div className="flex gap-2">
                 {/* Car Ferry Filter */}
                 <button
@@ -2199,6 +2206,7 @@ function App() {
           {loading && (
             <LoadingSpinner 
               message={location ? "Laster fergekaier..." : "Laster posisjon og fergekaier..."} 
+              theme={theme}
             />
           )}
         </div>
@@ -2218,18 +2226,19 @@ function App() {
 
         {/* Results */}
         {hasInteracted && !loading && ferryStops.length > 0 && (
-          <div 
-            className={`w-full space-y-6 mx-auto ${
-              theme.layout.cardStyle === 'minima' 
-                ? 'max-w-[400px] px-4' 
-                : 'max-w-[350px] sm:max-w-md px-3 sm:px-4 sm:px-0'
-            }`}
-            style={{
-              opacity: 1,
-              transition: 'opacity 0.3s ease-out',
-              animation: 'fadeIn 0.3s ease-out'
-            }}
-          >
+          <div className="w-full flex justify-center px-4">
+            <div 
+              className={`w-full space-y-6 mx-auto max-w-[400px] ${
+                theme.layout.cardStyle === 'minima' 
+                  ? 'mt-2 sm:mt-3' 
+                  : 'mt-6 sm:mt-8'
+              }`}
+              style={{
+                opacity: 1,
+                transition: 'opacity 0.3s ease-out',
+                animation: 'fadeIn 0.3s ease-out'
+              }}
+            >
             {(theme.layout.cardStyle === 'minima' ? ferryStops.slice(0, 8) : ferryStops).map((stop, i) => {
               // Handle both GPS format (with nextDeparture) and search format (with departures array)
               const isGPSFormat = stop.nextDeparture !== undefined;
@@ -2325,8 +2334,10 @@ function App() {
                   {/* Km-avstand som egen boks over fergekortet */}
                   {distance && (
                     <div 
-                      className={`text-white text-lg font-bold px-2.5 py-1.5 rounded-lg shadow-lg mb-[-8px] self-start relative z-20 ${
-                        theme.layout.cardStyle === 'minima' ? '-ml-2' : '-ml-4'
+                      className={`text-white text-lg font-bold shadow-lg self-start relative z-20 ${
+                        theme.layout.cardStyle === 'minima' 
+                          ? 'px-1.5 py-1 ml-0 mb-0' 
+                          : 'px-2.5 py-1.5 rounded-2xl ml-0 mb-[-10px]'
                       }`}
                       style={{
                         backgroundColor: theme.colors.distanceBadge,
@@ -2343,11 +2354,11 @@ function App() {
                   )}
                   
                   <div
-                                          id={'ferry-card-' + stopData.id}
+                    id={'ferry-card-' + stopData.id}
                     className={`relative p-4 sm:p-5 card-expand w-full shadow-lg ${
                       theme.layout.cardStyle === 'minima' 
-                        ? 'rounded-lg max-w-[400px] border' 
-                        : (distance ? 'rounded-tr-2xl rounded-br-2xl rounded-bl-2xl max-w-[350px] sm:max-w-md border' : 'rounded-2xl max-w-[350px] sm:max-w-md border')
+                        ? 'border' 
+                        : (distance ? 'rounded-tr-2xl rounded-br-2xl rounded-bl-2xl border' : 'rounded-2xl border')
                     }`}
                     style={{ 
                       minWidth: theme.layout.cardStyle === 'minima' ? '320px' : '280px',
@@ -2360,7 +2371,7 @@ function App() {
                       className="ferry-quay-name"
                       style={{ 
                         fontSize: getOptimalFontSize(cleanDestinationText(stopData.name || '')),
-                        lineHeight: '1.2',
+                        lineHeight: '1',
                         color: theme.colors.textPrimary,
                         fontFamily: theme.fonts.primary,
                         fontWeight: theme.fonts.weight.bold
@@ -2368,7 +2379,13 @@ function App() {
                     >
                       {cleanDestinationText(stopData.name || '').toUpperCase()}
                     </h2>
-                    <hr className="my-2" style={{ borderColor: theme.colors.border }} />
+                    <hr
+                      style={{
+                        borderColor: theme.colors.border,
+                        marginTop: theme.layout.cardStyle === 'minima' ? 0 : '0,5rem',
+                        marginBottom: theme.layout.cardStyle === 'minima' ? 0 : '0.5rem'
+                      }}
+                    />
                     
                     {/* Kjøretidsbeskrivelse rett etter fergekainavn */}
                     {showDrivingTimes && drivingTimes[stopData.id] && location && (() => {
@@ -2377,7 +2394,7 @@ function App() {
                       if (isPassengerOnly) {
                         return (
                           <div 
-                            className="mt-2 text-sm leading-relaxed"
+                            className="mt-2 mb-4 text-lg leading-tight"
                             style={{ 
                               color: theme.colors.textSecondary,
                               fontFamily: theme.fonts.primary
@@ -2389,7 +2406,7 @@ function App() {
                       }
                       return (
                         <div 
-                          className="mt-2 text-sm leading-relaxed"
+                          className="mt-2 mb-4 text-lg leading-tight"
                           style={{ 
                             color: theme.colors.textSecondary,
                             fontFamily: theme.fonts.primary
@@ -2420,7 +2437,7 @@ function App() {
                   
                   {nextDeparture ? (
                     <>
-                                              <div className="mt-2 text-base sm:text-lg mb-6">
+                      <div className="mt-6 text-base sm:text-lg mb-12">
                           <ul className="space-y-0">
                           {(() => {
                             // Kombiner neste avgang og senere avganger til en liste
@@ -2455,35 +2472,36 @@ function App() {
                               const strikeClass = isMissed ? 'line-through' : '';
                               
                               return (
-                                <li key={dep.aimedDepartureTime + '-' + idx} className="flex items-center py-0.5 leading-snug">
+                                <li key={dep.aimedDepartureTime + '-' + idx} className="flex items-center py-0.5 leading-tight" >
                                   <span 
-                                    className={`font-bold w-16 text-left text-sm ${strikeClass}`}
+                                    className={`font-normal w-16 text-left text-lg ${strikeClass}`}
                                     style={{ 
                                       color: theme.colors.textPrimary,
-                                      fontFamily: theme.fonts.primary
+                                      fontFamily: theme.fonts.primary,
+                                      lineHeight: 1.1
                                     }}
                                   >
                                     {dep.aimed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                   </span>
                                   <span className="flex-1 flex justify-start items-center gap-1">
-                                    <span 
-                                      className={`text-sm font-bold align-middle whitespace-nowrap pl-4 ${strikeClass}`}
-                                      style={{ 
-                                        color: getDepartureTimeColor(dep.aimedDepartureTime || dep.aimed, drivingTimes[stopData.id], showDrivingTimes, mode) === 'text-red-500' ? theme.colors.departureTime.now :
-                                                getDepartureTimeColor(dep.aimedDepartureTime || dep.aimed, drivingTimes[stopData.id], showDrivingTimes, mode) === 'text-yellow-500' ? theme.colors.departureTime.soon :
-                                                theme.colors.departureTime.later,
-                                        fontFamily: theme.fonts.primary
-                                      }}
-                                    >
+                                  <span 
+                                    className={`text-lg font-normal align-middle whitespace-nowrap pl-4 leading-tight ${strikeClass}`}
+                                    style={{ 
+                                      color: isMissed ? theme.colors.departureTime.now : '#16a34a',
+                                      fontFamily: theme.fonts.primary,
+                                      lineHeight: 1.1
+                                    }}
+                                  >
                                       {formatMinutes(mins)}
                                     </span>
                                   </span>
                                   <span 
-                                    className={`w-24 text-right font-semibold ${strikeClass}`}
+                                    className={`w-30 text-right font-normal leading-tight ${strikeClass}`}
                                     style={{ 
                                       fontSize: getOptimalFontSize(cleanDestinationText(dep.destinationDisplay?.frontText), 96), // 96px = 6rem = w-24
                                       color: theme.colors.textPrimary,
-                                      fontFamily: theme.fonts.primary
+                                      fontFamily: theme.fonts.primary,
+                                      lineHeight: 1.1
                                     }}
                                   >
                                     {cleanDestinationText(dep.destinationDisplay?.frontText)}
@@ -2500,7 +2518,7 @@ function App() {
                         <div 
                           key={stopData.id + '-' + destination.stopId} 
                           className={`mt-4 p-4 sm:p-5 shadow-lg relative ${
-                            theme.layout.cardStyle === 'minima' ? 'rounded-lg border' : 'rounded-lg backdrop-blur-md'
+                            theme.layout.cardStyle === 'minima' ? 'border' : 'rounded-lg backdrop-blur-md'
                           }`}
                           style={{
                             backgroundColor: theme.colors.cardBackground,
@@ -2509,23 +2527,24 @@ function App() {
                           }}
                         >
                           <div 
-                            className={`text-sm font-bold px-2 py-1 shadow-lg absolute top-[-8px] z-20 ${
-                              theme.layout.cardStyle === 'minima' ? 'left-2 rounded-lg' : 'left-0 rounded-full'
+                            className={`text-sm font-bold px-2 py-1 shadow-lg absolute z-20 ${
+                              theme.layout.cardStyle === 'minima' ? 'left-0' : 'left-0 rounded-full'
                             }`}
                             style={{
+                              top: '-24px',
                               backgroundColor: theme.layout.cardStyle === 'minima' ? theme.colors.cardBackground : theme.colors.primary,
                               color: theme.layout.cardStyle === 'minima' ? theme.colors.textPrimary : theme.colors.textWhite,
                               borderColor: theme.layout.cardStyle === 'minima' ? theme.colors.border : 'transparent',
                               borderWidth: theme.layout.cardStyle === 'minima' ? '1px' : '0px',
                               borderStyle: 'solid',
-                              fontFamily: theme.fonts.primary
+                              fontFamily: theme.fonts.primary,
+                              boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)'
                             }}
                           >
                             Retur
                           </div>
-                          <div className="flex items-center justify-between">
-                            <h3 
-                              className="text-lg font-bold"
+                          <div className="flex items-center justify-between" style={{ marginTop: theme.layout.cardStyle === 'minima' ? 12 : undefined }}>
+                            <h3 className="text-lg font-bold"
                               style={{
                                 color: theme.colors.textPrimary,
                                 fontFamily: theme.fonts.primary,
@@ -2535,8 +2554,14 @@ function App() {
                               {cleanDestinationText(destination.name).toUpperCase()}
                             </h3>
                           </div>
-                          <hr className="my-2" style={{ borderColor: theme.colors.border }} />
-                          <div className="mt-2 text-base sm:text-lg">
+                          <hr
+                            style={{
+                              borderColor: theme.colors.border,
+                              marginTop: theme.layout.cardStyle === 'minima' ? 4 : '0.5rem',
+                              marginBottom: theme.layout.cardStyle === 'minima' ? 0 : '0.5rem'
+                            }}
+                          />
+                          <div className="mt-2 text-base sm:text-lg" style={{ marginTop: theme.layout.cardStyle === 'minima' ? 12 : undefined, marginBottom: theme.layout.cardStyle === 'minima' ? 16 : undefined }}>
                             <ul className="space-y-0">
                               {destination.departures
                                 .filter(dep => new Date(dep.aimed) > now)
@@ -2546,9 +2571,9 @@ function App() {
                                 const strikeClass = isMissed ? 'line-through' : '';
                                 
                                 return (
-                                  <li key={'inline-' + destination.stopId + '-' + dep.aimedDepartureTime + '-' + idx} className="flex items-center py-0.5 leading-snug">
+                                  <li key={'inline-' + destination.stopId + '-' + dep.aimedDepartureTime + '-' + idx} className="flex items-center py-0 leading-tight" style={{ lineHeight: 1.05 }}>
                                     <span 
-                                      className={`font-bold w-16 text-left text-sm ${strikeClass}`}
+                                      className={`font-normal w-16 text-left text-sm ${strikeClass}`}
                                       style={{ 
                                         color: theme.colors.textPrimary,
                                         fontFamily: theme.fonts.primary
@@ -2558,21 +2583,23 @@ function App() {
                                     </span>
                                     <span className="flex-1 flex justify-start items-center gap-1">
                                       <span 
-                                        className={`text-sm font-bold align-middle whitespace-nowrap pl-1 ${strikeClass}`}
+                                        className={`text-sm font-normal align-middle whitespace-nowrap pl-1 leading-tight ${strikeClass}`}
                                         style={{ 
-                                          color: theme.colors.departureTime.later,
-                                          fontFamily: theme.fonts.primary
+                                          color: isMissed ? theme.colors.departureTime.now : '#16a34a',
+                                          fontFamily: theme.fonts.primary,
+                                          lineHeight: 1.1
                                         }}
                                       >
                                         {formatMinutes(mins)}
                                       </span>
                                     </span>
                                     <span 
-                                      className={`w-24 text-right font-semibold ${strikeClass}`}
+                                      className={`w-30 text-right font-normal leading-tight ${strikeClass}`}
                                       style={{ 
                                         fontSize: getOptimalFontSize(cleanDestinationText(dep.destinationDisplay?.frontText), 96),
                                         color: theme.colors.textPrimary,
-                                        fontFamily: theme.fonts.primary
+                                        fontFamily: theme.fonts.primary,
+                                        lineHeight: 1.1
                                       }}
                                     >
                                       {cleanDestinationText(dep.destinationDisplay?.frontText)}
@@ -2591,6 +2618,7 @@ function App() {
                 </div>
               );
             })}
+            </div>
           </div>
         )}
 
@@ -2634,7 +2662,7 @@ function App() {
           onClose={() => setLegalModalOpen(false)}
         />
       </div>
-    </>
+    </div>
   );
 }
 

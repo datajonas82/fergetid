@@ -2,7 +2,7 @@
 export const THEMES = {
   'og-fergetid': {
     id: 'og-fergetid',
-    name: 'OG Fergetid',
+    name: 'Classic',
     description: 'Det originale FergeTid-designet',
     colors: {
       primary: '#d95cff',
@@ -19,7 +19,7 @@ export const THEMES = {
       departureTime: {
         now: '#ef4444',
         soon: '#f59e0b',
-        later: '#10b981'
+        later: '#16a34a'
       }
     },
     fonts: {
@@ -42,7 +42,7 @@ export const THEMES = {
   },
   'minima': {
     id: 'minima',
-    name: 'minima',
+    name: 'Minima',
     description: 'Minimalistisk design med høy kontrast',
     colors: {
       primary: '#1A1A1A',
@@ -57,11 +57,11 @@ export const THEMES = {
       border: '#CCCCCC',
       shadow: 'rgba(0, 0, 0, 0.1)',
       distanceBadge: '#000000',
-      locationBar: '#FFD700',
+      locationBar: '#fcdd54',
       departureTime: {
         now: '#FF0000',
         soon: '#FF0000',
-        later: '#008000'
+        later: '#16a34a'
       }
     },
     fonts: {

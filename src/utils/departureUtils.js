@@ -287,7 +287,7 @@ export function getOptimalFontSize(text, maxWidth = 320) {
   // For destination texts (small fields)
   if (maxWidth === 96) {
     const baseSize = 14; // Standard size for destinations
-    const maxLength = 10; // Characters before reducing size
+    const maxLength = 20; // Characters before reducing size
     
     if (text.length <= maxLength) {
       return '0.875rem'; // Keep standard size (14px)
@@ -301,16 +301,16 @@ export function getOptimalFontSize(text, maxWidth = 320) {
   }
   
   // For ferry quay card names (large fields)
-  const baseSize = 24; // 1.5rem = 24px
+  const baseSize = 28; // 1.75rem = 28px (increased from 24px)
   const maxLength = 25; // Characters before reducing size
   
   if (text.length <= maxLength) {
-    return '1.5rem'; // Keep standard size
+    return '1.75rem'; // Keep standard size (increased from 1.5rem)
   }
   
   // Calculate reduced size based on text length
   const reduction = Math.min((text.length - maxLength) * 0.8, 8); // Max 8px reduction
-  const newSize = Math.max(baseSize - reduction, 16); // Minimum 16px (1rem)
+  const newSize = Math.max(baseSize - reduction, 18); // Minimum 18px (increased from 16px)
   
   return newSize + 'px';
 }

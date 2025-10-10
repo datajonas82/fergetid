@@ -44,6 +44,12 @@ export const TIME_FORMAT_OPTIONS = {
   minute: '2-digit'
 };
 
+// Universal UI colors (theme-agnostic)
+export const UI_COLORS = {
+  SUCCESS: '#16a34a', // match light green used in travel description
+  DANGER: '#dc2626'  // red for missed
+};
+
 // GPS Search Radius Configuration
 export const GPS_SEARCH_CONFIG = {
   // Main search radius in meters (70 km)

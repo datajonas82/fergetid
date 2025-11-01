@@ -371,11 +371,11 @@ function App() {
           // Only trust cache from the last 30 minutes
           const isFresh = typeof parsed.ts === 'number' && (Date.now() - parsed.ts) <= 30 * 60 * 1000;
           if (isFresh) {
-            // Ensure ferry quays are loaded before computing (wait up to ~2s) using refs
+            // Ensure ferry quays are loaded before computing (wait up to ~500ms) using refs
             const startWait = Date.now();
             while (!ferryStopsLoadedRef.current || !allFerryQuaysRef.current || allFerryQuaysRef.current.length === 0) {
-              await new Promise(resolve => setTimeout(resolve, 150));
-              if (Date.now() - startWait > 2000) break;
+              await new Promise(resolve => setTimeout(resolve, 50));
+              if (Date.now() - startWait > 500) break;
             }
             if (ferryStopsLoadedRef.current && allFerryQuaysRef.current && allFerryQuaysRef.current.length > 0) {
               await computeNearbyAndUpdate(parsed.latitude, parsed.longitude);
@@ -501,7 +501,7 @@ function App() {
       const chunkSize = 20; // Reduced from 30
       const maxCandidates = Math.min(nearbyCandidates.length, 100); // Reduced from 200
       
-      for (let i = 0; i < maxCandidates && collectedWithDepartures.length < 8; i += chunkSize) { // Increased from 5 to 8
+      for (let i = 0; i < maxCandidates && collectedWithDepartures.length < 14; i += chunkSize) { // Collect more to ensure we have enough after filtering
         const chunk = nearbyCandidates.slice(i, i + chunkSize);
         const results = await Promise.all(chunk.map(fetchDepartures));
         for (const res of results) {
@@ -517,14 +517,16 @@ function App() {
         return;
       }
 
-      // Choose stops that are drivable by road (avoid ferries in routing) and compute their driving times/distances
-      // I GPS-funksjonen filtrerer vi bort fergekaier som krever ferge for å komme til
-      // Dette er forskjellig fra søkefunksjonen som viser alle fergekaier
+      // Sort by distance to ensure closest ferry terminals are processed first
+      collectedWithDepartures.sort((a, b) => a.distance - b.distance);
+
+      // Calculate driving times to nearby ferry quays
+      // Note: We don't filter out ferry quays based on hasFerry since these are destinations (users need to get TO the ferry)
       const origin = { lat: latitude, lng: longitude };
       const localDrivingDistances = {}; // Local storage for distances
       
       // Process stops in parallel for better performance
-      const stopsToProcess = collectedWithDepartures.slice(0, 8);
+      const stopsToProcess = collectedWithDepartures.slice(0, 12); // Take the 12 closest after sorting
       const drivingTimePromises = stopsToProcess.map(async (stop) => {
         try {
           const sub = stop?.nextDeparture?.serviceJourney?.journeyPattern?.line?.transportSubmode || stop?.submode;
@@ -553,10 +555,8 @@ function App() {
         if (!result || typeof result.distance !== 'number' || result.distance <= 0) continue;
         const sub = stop?.nextDeparture?.serviceJourney?.journeyPattern?.line?.transportSubmode || stop?.submode;
         const isPassenger = sub && PASSENGER_FERRY_SUBMODES.includes(sub);
-        if (!isPassenger && result.hasFerry && result.source !== 'haversine') {
-          console.warn(`📍 GPS Search: Skipped ${stop.name} - route contains ferries despite avoidFerries=true`);
-          continue;
-        }
+        // For GPS-modus: vis alle fergekaier uavhengig av om de er på øy eller fastland
+        // Fergekaier er destinasjoner - brukere skal til fergen, ikke unngå å kjøre dit
         setDrivingTimes(prev => ({ ...prev, [stop.id]: result.time }));
         setDrivingDistances(prev => ({ ...prev, [stop.id]: result.distance }));
         setDrivingTimeSources(prev => ({ ...prev, [stop.id]: result.source }));
@@ -655,8 +655,8 @@ function App() {
             
             const position = await Geolocation.getCurrentPosition({
               enableHighAccuracy: false,
-              timeout: 3000,
-              maximumAge: 300000
+              timeout: 2000,
+              maximumAge: 300000 // 5 minutter - bruk cached posisjon hvis tilgjengelig
             });
             pos = position;
           } catch (capacitorError) {
@@ -720,8 +720,8 @@ function App() {
           // Use browser geolocation on web
           pos = await new Promise((resolve, reject) => {
             const timeoutId = setTimeout(() => {
-              reject(new Error('Low-accuracy GPS timeout'));
-            }, 4000);
+                reject(new Error('Low-accuracy GPS timeout'));
+            }, 2500);
             
             navigator.geolocation.getCurrentPosition(
               (position) => {
@@ -732,7 +732,7 @@ function App() {
                 clearTimeout(timeoutId);
                 reject(error);
               },
-              { enableHighAccuracy: false, timeout: 3000, maximumAge: 300000 }
+              { enableHighAccuracy: false, timeout: 2000, maximumAge: 300000 }
             );
           });
         }
@@ -743,8 +743,8 @@ function App() {
           try {
             const position = await Geolocation.getCurrentPosition({
               enableHighAccuracy: true,
-              timeout: 10000,
-              maximumAge: 60000
+              timeout: 6000,
+              maximumAge: 300000 // Bruk cached posisjon hvis den er nyere enn 5 min
             });
             pos = position;
           } catch (capacitorError) {
@@ -754,8 +754,8 @@ function App() {
               try {
                 pos = await new Promise((resolve, reject) => {
                   const timeoutId = setTimeout(() => {
-                    reject(new Error('GPS timeout'));
-                  }, 10000);
+                    reject(new Error('High-accuracy GPS timeout (browser fallback 2)'));
+                  }, 6000);
                   
                   navigator.geolocation.getCurrentPosition(
                     (position) => {
@@ -766,7 +766,7 @@ function App() {
                       clearTimeout(timeoutId);
                       reject(error);
                     },
-                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+                    { enableHighAccuracy: true, timeout: 6000, maximumAge: 300000 }
                   );
                 });
                 console.log('📍 GPS Search: Browser geolocation successful');
@@ -807,7 +807,7 @@ function App() {
           pos = await new Promise((resolve, reject) => {
             const timeoutId = setTimeout(() => {
               reject(new Error('High-accuracy GPS timeout'));
-            }, 10000);
+            }, 6000);
             
             navigator.geolocation.getCurrentPosition(
               (position) => {
@@ -818,7 +818,7 @@ function App() {
                 clearTimeout(timeoutId);
                 reject(error);
               },
-              { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+              { enableHighAccuracy: true, timeout: 6000, maximumAge: 300000 }
             );
           });
         }
@@ -828,11 +828,11 @@ function App() {
         const { latitude, longitude } = pos.coords;
         // Sett posisjonen umiddelbart for å oppdatere UI
         setLocation({ latitude, longitude });
-        // Vent kort på fergekaier, men ikke blokkér for lenge (maks ~12s)
+        // Vent kort på fergekaier, men ikke blokkér for lenge (maks ~3s siden cache burde laste raskt)
         const startWaitQuays = Date.now();
         while (!ferryStopsLoaded || !allFerryQuays || allFerryQuays.length === 0) {
-          await new Promise(resolve => setTimeout(resolve, 250));
-          if (Date.now() - startWaitQuays > 12000) break;
+          await new Promise(resolve => setTimeout(resolve, 100));
+          if (Date.now() - startWaitQuays > 3000) break;
         }
         await computeNearbyAndUpdate(latitude, longitude);
 
@@ -877,6 +877,27 @@ function App() {
   // Load all ferry stops function (we'll use quay info from Line.quays for matching)
   const loadAllFerryStops = async () => {
     try {
+      // Try to load from cache first (24-hour cache)
+      const cachedData = localStorage.getItem('ferryStopsCache');
+      const cacheTimestamp = localStorage.getItem('ferryStopsCacheTime');
+      const now = Date.now();
+      const cacheMaxAge = 24 * 60 * 60 * 1000; // 24 timer
+      
+      if (cachedData && cacheTimestamp && (now - parseInt(cacheTimestamp)) < cacheMaxAge) {
+        try {
+          const parsedCache = JSON.parse(cachedData);
+          if (Array.isArray(parsedCache) && parsedCache.length > 0) {
+            setAllFerryQuays(parsedCache);
+            setFerryStopsLoaded(true);
+            console.log('✅ Loaded ferry stops from cache:', parsedCache.length, 'stops');
+            return;
+          }
+        } catch (parseError) {
+          console.warn('Failed to parse cached ferry stops, fetching fresh data');
+        }
+      }
+
+      // Fetch fresh data if cache miss or expired
       const data = await client.request(ALL_FERRY_STOPS_QUERY);
       const allStops = data.stopPlaces || [];
       
@@ -907,6 +928,15 @@ function App() {
         }
         return stop;
       });
+      
+      // Cache the results
+      try {
+        localStorage.setItem('ferryStopsCache', JSON.stringify(stopsWithOverrides));
+        localStorage.setItem('ferryStopsCacheTime', now.toString());
+        console.log('✅ Cached ferry stops:', stopsWithOverrides.length, 'stops');
+      } catch (storageError) {
+        console.warn('Failed to cache ferry stops:', storageError);
+      }
       
       setAllFerryQuays(stopsWithOverrides); // Keep the same state variable name for compatibility
       setFerryStopsLoaded(true);
@@ -1994,6 +2024,11 @@ function App() {
                   <line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
               </button>
+              
+              {/* Ferry Filter Section */}
+              <div className="text-sm font-bold mb-2" style={{ color: theme.colors.textPrimary, fontFamily: theme.fonts.primary }}>
+                Ferge
+              </div>
               <div className="flex gap-2">
                 {/* Car Ferry Filter */}
                 <button
@@ -2058,7 +2093,7 @@ function App() {
               
               {/* Theme Selector */}
               <div className="mt-4 pt-3 border-t" style={{ borderColor: theme.colors.border }}>
-                <div className="text-sm font-medium mb-2" style={{ color: theme.colors.textPrimary, fontFamily: theme.fonts.primary }}>
+                <div className="text-sm font-bold mb-2" style={{ color: theme.colors.textPrimary, fontFamily: theme.fonts.primary }}>
                   Tema
                 </div>
                 <div className="flex gap-2">
@@ -2337,11 +2372,12 @@ function App() {
                       className={`text-white text-lg font-bold shadow-lg self-start relative z-20 ${
                         theme.layout.cardStyle === 'minima' 
                           ? 'px-1.5 py-1 ml-0 mb-0' 
-                          : 'px-2.5 py-1.5 rounded-2xl ml-0 mb-[-10px]'
+                          : 'px-2.5 py-1.5 rounded-2xl mb-[-10px]'
                       }`}
                       style={{
                         backgroundColor: theme.colors.distanceBadge,
-                        fontFamily: theme.fonts.primary
+                        fontFamily: theme.fonts.primary,
+                        marginLeft: theme.layout.cardStyle === 'minima' ? '0' : '-12px'
                       }}
                     >
                       {(() => {

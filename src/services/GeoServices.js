@@ -300,7 +300,7 @@ const calculateDrivingTimeWithGoogle = async (startCoords, endCoords, options = 
     time: durationMinutes, 
     distance: distanceMeters, 
     source: 'google_routes_v2',
-    hasFerry: false // Simplified for fallback
+    hasFerry: false // Google Routes API v2 doesn't return ferry information
   };
 };
 

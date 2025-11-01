@@ -501,7 +501,7 @@ function App() {
       const chunkSize = 20; // Reduced from 30
       const maxCandidates = Math.min(nearbyCandidates.length, 100); // Reduced from 200
       
-      for (let i = 0; i < maxCandidates && collectedWithDepartures.length < 14; i += chunkSize) { // Collect more to ensure we have enough after filtering
+      for (let i = 0; i < maxCandidates && collectedWithDepartures.length < 25; i += chunkSize) { // Collect more to ensure we have enough after filtering
         const chunk = nearbyCandidates.slice(i, i + chunkSize);
         const results = await Promise.all(chunk.map(fetchDepartures));
         for (const res of results) {
@@ -526,7 +526,7 @@ function App() {
       const localDrivingDistances = {}; // Local storage for distances
       
       // Process stops in parallel for better performance
-      const stopsToProcess = collectedWithDepartures.slice(0, 12); // Take the 12 closest after sorting
+      const stopsToProcess = collectedWithDepartures.slice(0, 20); // Take the 20 closest after sorting
       const drivingTimePromises = stopsToProcess.map(async (stop) => {
         try {
           const sub = stop?.nextDeparture?.serviceJourney?.journeyPattern?.line?.transportSubmode || stop?.submode;

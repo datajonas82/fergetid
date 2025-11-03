@@ -1801,38 +1801,40 @@ function App() {
       >
         {/* Header for minima theme */}
         {theme.layout.hasHeaderBar && (
-          <div className="w-full px-0">
-            {/* Extra top padding for iOS notch and status bar */}
-            {isIOS && (
+          <div className="w-full flex justify-center px-0 md:px-4">
+            <div className="w-full max-w-full md:max-w-[400px]">
+              {/* Extra top padding for iOS notch and status bar */}
+              {isIOS && (
+                <div 
+                  className="w-full"
+                  style={{ 
+                    backgroundColor: theme.colors.headerBackground,
+                    height: '25px',
+                    minHeight: '25px'
+                  }}
+                />
+              )}
               <div 
                 className="w-full"
                 style={{ 
-                  backgroundColor: theme.colors.headerBackground,
-                  height: '25px',
-                  minHeight: '25px'
-                }}
-              />
-            )}
-            <div 
-              className="w-full"
-              style={{ 
-                backgroundColor: theme.colors.headerBackground, 
-                padding: isIOS ? 'calc(env(safe-area-inset-top, 0px) + 10px) 10px 10px 10px' : '10px 10px',
-                width: '100%'
-              }}
-            >
-              <h1 
-                className="text-6xl font-semibold tracking-tight"
-                style={{ 
-                  color: theme.colors.textWhite,
-                  fontFamily: theme.fonts.primary,
-                  fontWeight: theme.fonts.weight.semibold,
-                  textAlign: 'left',
+                  backgroundColor: theme.colors.headerBackground, 
+                  padding: isIOS ? 'calc(env(safe-area-inset-top, 0px) + 10px) 10px 10px 10px' : '10px 10px',
                   width: '100%'
                 }}
               >
-                {APP_NAME}
-              </h1>
+                <h1 
+                  className="text-6xl font-semibold tracking-tight"
+                  style={{ 
+                    color: theme.colors.textWhite,
+                    fontFamily: theme.fonts.primary,
+                    fontWeight: theme.fonts.weight.semibold,
+                    textAlign: 'left',
+                    width: '100%'
+                  }}
+                >
+                  {APP_NAME}
+                </h1>
+              </div>
             </div>
           </div>
         )}
@@ -1859,9 +1861,9 @@ function App() {
         <div className="flex-1 flex flex-col items-center pb-16 sm:pb-24">
           {/* Search + settings + GPS i et sentrert kort (minima) */}
           {theme.layout.hasHeaderBar && (
-            <div className="w-full flex justify-center px-0">
+            <div className="w-full flex justify-center px-0 md:px-4">
               <div 
-                className="w-full p-3 rounded-none shadow-lg flex items-center gap-2"
+                className="w-full max-w-full md:max-w-[400px] p-3 rounded-none shadow-lg flex items-center gap-2"
                 style={{ backgroundColor: theme.colors.cardBackground, border: `1px solid ${theme.colors.border}`, borderBottom: 'none' }}
               >
                 {/* Search */}
@@ -1934,9 +1936,9 @@ function App() {
 
           {/* Location bar for minima theme (under søkekortet) */}
           {theme.layout.hasLocationBar && mode === 'gps' && locationName && (
-            <div className="w-full flex justify-center px-0">
+            <div className="w-full flex justify-center px-0 md:px-4">
               <div 
-                className="w-full py-3 border-x"
+                className="w-full max-w-full md:max-w-[400px] py-3 border-x"
                 style={{ 
                   backgroundColor: theme.colors.locationBar,
                   color: theme.colors.textPrimary,
@@ -2348,9 +2350,9 @@ function App() {
 
         {/* Results */}
         {hasInteracted && !loading && ferryStops.length > 0 && (
-          <div className={`w-full flex justify-center ${theme.layout.cardStyle === 'minima' ? 'px-0' : 'px-4'}`}>
+          <div className={`w-full flex justify-center ${theme.layout.cardStyle === 'minima' ? 'px-0 md:px-4' : 'px-4'}`}>
             <div 
-              className={`w-full space-y-6 mx-auto ${theme.layout.cardStyle === 'minima' ? '' : 'max-w-[400px]'} ${
+              className={`w-full space-y-6 mx-auto ${theme.layout.cardStyle === 'minima' ? 'max-w-full md:max-w-[400px]' : 'max-w-[400px]'} ${
                 theme.layout.cardStyle === 'minima' 
                   ? 'mt-2 sm:mt-3' 
                   : 'mt-6 sm:mt-8'

@@ -208,8 +208,33 @@ const STOP_COORDINATE_OVERRIDES = {
 };
 
 // Name-based overrides as fallback (normalized to lowercase)
+// Note: Norwegian special characters (ø, æ, å) should be preserved
 const STOP_COORDINATE_NAME_OVERRIDES = {
-  // Sulesund ferjekai override removed
+  'festøya fergekai': { // Festøya fergekai
+    latitude: 62.3751,
+    longitude: 6.3308,
+  },
+  'festøya ferjekai': { // Festøya ferjekai (alternative stavemåte)
+    latitude: 62.3751,
+    longitude: 6.3308,
+  },
+  'festøya': { // Festøya (uten kai/fergekai)
+    latitude: 62.3751,
+    longitude: 6.3308,
+  },
+  // Try with different variations
+  'festoya fergekai': { // Without special character
+    latitude: 62.3751,
+    longitude: 6.3308,
+  },
+  'festoya ferjekai': {
+    latitude: 62.3751,
+    longitude: 6.3308,
+  },
+  'festoya': {
+    latitude: 62.3751,
+    longitude: 6.3308,
+  },
 };
 
 function App() {
@@ -355,12 +380,10 @@ function App() {
     setSelectedStop(null);
     setMode('gps');
 
-    // Sørg for at fergekaier er i ferd med å lastes om de ikke er det allerede
-    try {
-      if (!ferryStopsLoaded || !allFerryQuays || allFerryQuays.length === 0) {
-        loadAllFerryStops();
-      }
-    } catch (_) {}
+    // Start loading ferry stops in parallel (don't wait)
+    const ferryStopsPromise = (!ferryStopsLoaded || !allFerryQuays || allFerryQuays.length === 0) 
+      ? loadAllFerryStops() 
+      : Promise.resolve();
 
     // Quick-start: use cached last location immediately to render nearby results while fresh GPS resolves
     try {
@@ -371,11 +394,11 @@ function App() {
           // Only trust cache from the last 30 minutes
           const isFresh = typeof parsed.ts === 'number' && (Date.now() - parsed.ts) <= 30 * 60 * 1000;
           if (isFresh) {
-            // Ensure ferry quays are loaded before computing (wait up to ~500ms) using refs
+            // Wait briefly for ferry stops (cache should load very quickly)
             const startWait = Date.now();
             while (!ferryStopsLoadedRef.current || !allFerryQuaysRef.current || allFerryQuaysRef.current.length === 0) {
-              await new Promise(resolve => setTimeout(resolve, 50));
-              if (Date.now() - startWait > 500) break;
+              await new Promise(resolve => setTimeout(resolve, 30)); // Reduced from 50ms
+              if (Date.now() - startWait > 300) break; // Reduced from 500ms
             }
             if (ferryStopsLoadedRef.current && allFerryQuaysRef.current && allFerryQuaysRef.current.length > 0) {
               await computeNearbyAndUpdate(parsed.latitude, parsed.longitude);
@@ -386,7 +409,7 @@ function App() {
       }
     } catch (_) {}
 
-    // Ikke vent på fergekaier her; start GPS umiddelbart og vent kort senere ved behov
+    // Start GPS immediately, don't wait for ferry stops (they'll be ready when needed)
 
     // Helper to compute nearby stops and update UI based on coordinates
     const computeNearbyAndUpdate = async (latitude, longitude) => {
@@ -422,13 +445,16 @@ function App() {
         }
       })();
       
-      // Ensure ferry quays are loaded; try to load if missing (using refs to avoid stale values)
+      // Ensure ferry quays are loaded; wait with shorter intervals and timeout
       if (!allFerryQuaysRef.current || allFerryQuaysRef.current.length === 0) {
-        try { await loadAllFerryStops(); } catch (_) {}
-        // Wait briefly after triggering load
+        try { 
+          loadAllFerryStops(); // Don't await - let it load in background
+        } catch (_) {}
+        // Wait more efficiently with shorter intervals
         const startWaitLoad = Date.now();
-        while ((!allFerryQuaysRef.current || allFerryQuaysRef.current.length === 0) && (Date.now() - startWaitLoad) < 8000) {
-          await new Promise(resolve => setTimeout(resolve, 200));
+        const maxWaitTime = 5000; // Reduced from 8000ms
+        while ((!allFerryQuaysRef.current || allFerryQuaysRef.current.length === 0) && (Date.now() - startWaitLoad) < maxWaitTime) {
+          await new Promise(resolve => setTimeout(resolve, 100)); // Reduced from 200ms
         }
         if (!allFerryQuaysRef.current || allFerryQuaysRef.current.length === 0) {
           console.error('📍 GPS Search: No ferry quays available for distance calculation');
@@ -439,7 +465,15 @@ function App() {
       }
       
       // Step 1: Calculate simple Haversine distance for ALL quays (fast, no network)
-      const placesWithDistance = allFerryQuaysRef.current.map(stop => {
+      // Filter out stops with invalid coordinates first
+      const validQuays = allFerryQuaysRef.current.filter(stop => 
+        typeof stop.latitude === 'number' && 
+        typeof stop.longitude === 'number' && 
+        !isNaN(stop.latitude) && 
+        !isNaN(stop.longitude)
+      );
+      
+      const placesWithDistance = validQuays.map(stop => {
         const dLat = (stop.latitude - latitude) * 111000;
         const dLng = (stop.longitude - longitude) * 111000 * Math.cos(latitude * Math.PI / 180);
         const distance = Math.sqrt(dLat * dLat + dLng * dLng);
@@ -467,6 +501,7 @@ function App() {
             ...queryParams
           });
           const calls = depData.stopPlace?.estimatedCalls || [];
+          
           const departures = calls
             .filter(call => {
               const sub = call.serviceJourney?.journeyPattern?.line?.transportSubmode;
@@ -476,6 +511,7 @@ function App() {
             })
             .sort((a, b) => new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime));
           const sub = departures[0]?.serviceJourney?.journeyPattern?.line?.transportSubmode;
+          
           // Hvis passasjerbåt og for langt unna (>10km), hopp over
           if (sub && PASSENGER_FERRY_SUBMODES.includes(sub) && place.distance > 10000) {
             return { ...place, nextDeparture: null, departures: [], submode: sub };
@@ -527,6 +563,7 @@ function App() {
       
       // Process stops in parallel for better performance
       const stopsToProcess = collectedWithDepartures.slice(0, 20); // Take the 20 closest after sorting
+      
       const drivingTimePromises = stopsToProcess.map(async (stop) => {
         try {
           const sub = stop?.nextDeparture?.serviceJourney?.journeyPattern?.line?.transportSubmode || stop?.submode;
@@ -552,11 +589,28 @@ function App() {
       const drivableStops = [];
       
       for (const { stop, result } of drivingTimeResults) {
-        if (!result || typeof result.distance !== 'number' || result.distance <= 0) continue;
+        // If result is invalid, use haversine fallback for ferry quays (they are destinations, users need to get TO the ferry)
+        if (!result || typeof result.distance !== 'number' || result.distance <= 0) {
+          // Use haversine distance as fallback for ferry quays
+          const dLat = (stop.latitude - origin.lat) * 111000;
+          const dLng = (stop.longitude - origin.lng) * 111000 * Math.cos(origin.lat * Math.PI / 180);
+          const fallbackDistance = Math.sqrt(dLat * dLat + dLng * dLng);
+          const fallbackTime = Math.max(1, Math.round((fallbackDistance / 1000) / 50 * 60)); // 50 km/h default
+          
+          setDrivingTimes(prev => ({ ...prev, [stop.id]: fallbackTime }));
+          setDrivingDistances(prev => ({ ...prev, [stop.id]: fallbackDistance }));
+          setDrivingTimeSources(prev => ({ ...prev, [stop.id]: 'haversine_fallback' }));
+          localDrivingDistances[stop.id] = fallbackDistance;
+          drivableStops.push(stop);
+          continue;
+        }
+        
         const sub = stop?.nextDeparture?.serviceJourney?.journeyPattern?.line?.transportSubmode || stop?.submode;
         const isPassenger = sub && PASSENGER_FERRY_SUBMODES.includes(sub);
+        
         // For GPS-modus: vis alle fergekaier uavhengig av om de er på øy eller fastland
         // Fergekaier er destinasjoner - brukere skal til fergen, ikke unngå å kjøre dit
+        // Even if route contains ferry, we still show it because it's a destination
         setDrivingTimes(prev => ({ ...prev, [stop.id]: result.time }));
         setDrivingDistances(prev => ({ ...prev, [stop.id]: result.distance }));
         setDrivingTimeSources(prev => ({ ...prev, [stop.id]: result.source }));
@@ -570,6 +624,7 @@ function App() {
         const distanceB = localDrivingDistances[b.id] || b.distance;
         return distanceA - distanceB;
       });
+      
       if (finalPlaces.length === 0) {
         setError('Ingen fergekaier tilgjengelige med bil fra din posisjon. Prøv å søke manuelt i stedet.');
         setLoading(false);
@@ -655,8 +710,8 @@ function App() {
             
             const position = await Geolocation.getCurrentPosition({
               enableHighAccuracy: false,
-              timeout: 2000,
-              maximumAge: 300000 // 5 minutter - bruk cached posisjon hvis tilgjengelig
+              timeout: 1500, // Reduced from 2000ms for faster initial response
+              maximumAge: 600000 // 10 minutes - use cached position if available (increased from 5 min)
             });
             pos = position;
           } catch (capacitorError) {
@@ -669,7 +724,7 @@ function App() {
                 pos = await new Promise((resolve, reject) => {
                   const timeoutId = setTimeout(() => {
                     reject(new Error('GPS timeout'));
-                  }, 8000);
+                  }, 3000); // Reduced from 8000ms
                   
                   navigator.geolocation.getCurrentPosition(
                     (position) => {
@@ -680,7 +735,7 @@ function App() {
                       clearTimeout(timeoutId);
                       reject(error);
                     },
-                    { enableHighAccuracy: false, timeout: 3000, maximumAge: 300000 }
+                    { enableHighAccuracy: false, timeout: 2000, maximumAge: 600000 } // Increased cache from 5 to 10 min
                   );
                 });
                 console.log('📍 GPS Search: Browser geolocation successful');
@@ -721,7 +776,7 @@ function App() {
           pos = await new Promise((resolve, reject) => {
             const timeoutId = setTimeout(() => {
                 reject(new Error('Low-accuracy GPS timeout'));
-            }, 2500);
+            }, 2000); // Reduced from 2500ms
             
             navigator.geolocation.getCurrentPosition(
               (position) => {
@@ -732,7 +787,7 @@ function App() {
                 clearTimeout(timeoutId);
                 reject(error);
               },
-              { enableHighAccuracy: false, timeout: 2000, maximumAge: 300000 }
+              { enableHighAccuracy: false, timeout: 1500, maximumAge: 600000 } // Increased cache from 5 to 10 min
             );
           });
         }
@@ -743,8 +798,8 @@ function App() {
           try {
             const position = await Geolocation.getCurrentPosition({
               enableHighAccuracy: true,
-              timeout: 6000,
-              maximumAge: 300000 // Bruk cached posisjon hvis den er nyere enn 5 min
+              timeout: 4000, // Reduced from 6000ms
+              maximumAge: 600000 // Use cached position if newer than 10 min (increased from 5 min)
             });
             pos = position;
           } catch (capacitorError) {
@@ -755,7 +810,7 @@ function App() {
                 pos = await new Promise((resolve, reject) => {
                   const timeoutId = setTimeout(() => {
                     reject(new Error('High-accuracy GPS timeout (browser fallback 2)'));
-                  }, 6000);
+                  }, 4000); // Reduced from 6000ms
                   
                   navigator.geolocation.getCurrentPosition(
                     (position) => {
@@ -766,7 +821,7 @@ function App() {
                       clearTimeout(timeoutId);
                       reject(error);
                     },
-                    { enableHighAccuracy: true, timeout: 6000, maximumAge: 300000 }
+                    { enableHighAccuracy: true, timeout: 4000, maximumAge: 600000 } // Increased cache from 5 to 10 min
                   );
                 });
                 console.log('📍 GPS Search: Browser geolocation successful');
@@ -803,11 +858,11 @@ function App() {
             }
           }
         } else {
-          // Fallback to high-accuracy with shorter cache
+          // Fallback to high-accuracy with longer cache
           pos = await new Promise((resolve, reject) => {
             const timeoutId = setTimeout(() => {
               reject(new Error('High-accuracy GPS timeout'));
-            }, 6000);
+            }, 4000); // Reduced from 6000ms
             
             navigator.geolocation.getCurrentPosition(
               (position) => {
@@ -818,7 +873,7 @@ function App() {
                 clearTimeout(timeoutId);
                 reject(error);
               },
-              { enableHighAccuracy: true, timeout: 6000, maximumAge: 300000 }
+              { enableHighAccuracy: true, timeout: 4000, maximumAge: 600000 } // Increased cache from 5 to 10 min
             );
           });
         }
@@ -828,11 +883,11 @@ function App() {
         const { latitude, longitude } = pos.coords;
         // Sett posisjonen umiddelbart for å oppdatere UI
         setLocation({ latitude, longitude });
-        // Vent kort på fergekaier, men ikke blokkér for lenge (maks ~3s siden cache burde laste raskt)
+        // Wait briefly for ferry stops (cache loads very fast, usually < 100ms)
         const startWaitQuays = Date.now();
         while (!ferryStopsLoaded || !allFerryQuays || allFerryQuays.length === 0) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-          if (Date.now() - startWaitQuays > 3000) break;
+          await new Promise(resolve => setTimeout(resolve, 50)); // Reduced from 100ms
+          if (Date.now() - startWaitQuays > 2000) break; // Reduced from 3000ms
         }
         await computeNearbyAndUpdate(latitude, longitude);
 
@@ -887,9 +942,20 @@ function App() {
         try {
           const parsedCache = JSON.parse(cachedData);
           if (Array.isArray(parsedCache) && parsedCache.length > 0) {
-            setAllFerryQuays(parsedCache);
+            // Apply coordinate overrides to cached data as well (in case cache was created before overrides were added)
+            const cachedWithOverrides = parsedCache.map((stop) => {
+              const idOverride = STOP_COORDINATE_OVERRIDES[stop.id];
+              const normName = (stop.name || '').toLowerCase();
+              const nameOverride = STOP_COORDINATE_NAME_OVERRIDES[normName];
+              if (idOverride || nameOverride) {
+                const override = idOverride || nameOverride;
+                return { ...stop, latitude: override.latitude, longitude: override.longitude };
+              }
+              return stop;
+            });
+            setAllFerryQuays(cachedWithOverrides);
             setFerryStopsLoaded(true);
-            console.log('✅ Loaded ferry stops from cache:', parsedCache.length, 'stops');
+            console.log('✅ Loaded ferry stops from cache:', cachedWithOverrides.length, 'stops');
             return;
           }
         } catch (parseError) {
@@ -953,13 +1019,17 @@ function App() {
 
 
 
-  // Initialize app
+  // Initialize app - load ferry stops immediately on mount for faster GPS response
   useEffect(() => {
-    try {
-      loadAllFerryStops(); // Load all ferry stops on initial app load
-    } catch (error) {
-      console.error('🔄 Error in useEffect:', error);
-    }
+    // Start loading ferry stops immediately, don't block on it
+    const loadFerryStops = async () => {
+      try {
+        await loadAllFerryStops(); // Load all ferry stops on initial app load
+      } catch (error) {
+        console.error('🔄 Error loading ferry stops:', error);
+      }
+    };
+    loadFerryStops(); // Fire and forget - don't await
   }, []);
 
 
@@ -1731,17 +1801,34 @@ function App() {
       >
         {/* Header for minima theme */}
         {theme.layout.hasHeaderBar && (
-          <div className="w-full flex justify-center px-4">
+          <div className="w-full px-0">
+            {/* Extra top padding for iOS notch and status bar */}
+            {isIOS && (
+              <div 
+                className="w-full"
+                style={{ 
+                  backgroundColor: theme.colors.headerBackground,
+                  height: '25px',
+                  minHeight: '25px'
+                }}
+              />
+            )}
             <div 
-              className="w-full max-w-[400px]"
-              style={{ backgroundColor: theme.colors.headerBackground, padding: '10px 10px', marginTop: 30 }}
+              className="w-full"
+              style={{ 
+                backgroundColor: theme.colors.headerBackground, 
+                padding: isIOS ? 'calc(env(safe-area-inset-top, 0px) + 10px) 10px 10px 10px' : '10px 10px',
+                width: '100%'
+              }}
             >
               <h1 
-                className="text-6xl font-semibold tracking-tight text-left"
+                className="text-6xl font-semibold tracking-tight"
                 style={{ 
                   color: theme.colors.textWhite,
                   fontFamily: theme.fonts.primary,
-                  fontWeight: theme.fonts.weight.semibold
+                  fontWeight: theme.fonts.weight.semibold,
+                  textAlign: 'left',
+                  width: '100%'
                 }}
               >
                 {APP_NAME}
@@ -1772,9 +1859,9 @@ function App() {
         <div className="flex-1 flex flex-col items-center pb-16 sm:pb-24">
           {/* Search + settings + GPS i et sentrert kort (minima) */}
           {theme.layout.hasHeaderBar && (
-            <div className="w-full flex justify-center px-4">
+            <div className="w-full flex justify-center px-0">
               <div 
-                className="w-full max-w-[400px] p-3 rounded-none shadow-lg flex items-center gap-2"
+                className="w-full p-3 rounded-none shadow-lg flex items-center gap-2"
                 style={{ backgroundColor: theme.colors.cardBackground, border: `1px solid ${theme.colors.border}`, borderBottom: 'none' }}
               >
                 {/* Search */}
@@ -1847,9 +1934,9 @@ function App() {
 
           {/* Location bar for minima theme (under søkekortet) */}
           {theme.layout.hasLocationBar && mode === 'gps' && locationName && (
-            <div className="w-full flex justify-center px-4">
+            <div className="w-full flex justify-center px-0">
               <div 
-                className="w-full max-w-[400px] py-3 border-x"
+                className="w-full py-3 border-x"
                 style={{ 
                   backgroundColor: theme.colors.locationBar,
                   color: theme.colors.textPrimary,
@@ -1915,7 +2002,7 @@ function App() {
                 </form>
               </div>
             ) : (
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <button
                   onClick={() => {
                     setShowSearchInput(true);
@@ -1924,7 +2011,7 @@ function App() {
                     }
                     setTimeout(() => searchInputRef.current?.focus(), 150);
                   }}
-                      className="w-full px-4 py-3 rounded-lg backdrop-blur-md shadow-lg focus:outline-none focus:ring-2 text-left"
+                      className="w-full px-4 py-3 rounded-lg backdrop-blur-md shadow-lg focus:outline-none focus:ring-2 text-left whitespace-nowrap overflow-hidden text-ellipsis"
                       style={{
                         backgroundColor: theme.colors.cardBackground,
                         borderColor: theme.colors.border,
@@ -2261,9 +2348,9 @@ function App() {
 
         {/* Results */}
         {hasInteracted && !loading && ferryStops.length > 0 && (
-          <div className="w-full flex justify-center px-4">
+          <div className={`w-full flex justify-center ${theme.layout.cardStyle === 'minima' ? 'px-0' : 'px-4'}`}>
             <div 
-              className={`w-full space-y-6 mx-auto max-w-[400px] ${
+              className={`w-full space-y-6 mx-auto ${theme.layout.cardStyle === 'minima' ? '' : 'max-w-[400px]'} ${
                 theme.layout.cardStyle === 'minima' 
                   ? 'mt-2 sm:mt-3' 
                   : 'mt-6 sm:mt-8'
@@ -2502,7 +2589,96 @@ function App() {
                               }
                             }
                             
-                            return relevantDepartures.slice(0, 5).map((dep, idx) => {
+                            // Logikk for å sikre minst én rekbar avgang per destinasjon, og alltid vis minst 5 avganger
+                            if (showDrivingTimes && drivingTimes[stopData.id] && mode === 'gps') {
+                              // Grupper avganger etter destinasjon
+                              const departuresByDestination = {};
+                              relevantDepartures.forEach(dep => {
+                                const destName = cleanDestinationText(dep.destinationDisplay?.frontText || '');
+                                if (!departuresByDestination[destName]) {
+                                  departuresByDestination[destName] = [];
+                                }
+                                departuresByDestination[destName].push(dep);
+                              });
+                              
+                              // For hver destinasjon, identifiser rekbare og ikke-rekbare avganger
+                              const destinations = Object.keys(departuresByDestination);
+                              const prioritizedDepartures = [];
+                              const allDeparturesById = new Map();
+                              
+                              // Først: legg til minst én rekbar avgang per destinasjon (eller første hvis ingen rekbare)
+                              destinations.forEach(destName => {
+                                const destDepartures = departuresByDestination[destName]
+                                  .sort((a, b) => a.aimed - b.aimed); // Sorter etter tid
+                                
+                                // Separer rekbare og ikke-rekbare
+                                const catchable = destDepartures.filter(dep => 
+                                  !isDepartureMissed(dep.aimedDepartureTime || dep.aimed, drivingTimes[stopData.id], showDrivingTimes, mode)
+                                );
+                                
+                                // Hvis det er rekbare avganger, legg til den første rekbare
+                                if (catchable.length > 0) {
+                                  prioritizedDepartures.push(catchable[0]);
+                                  allDeparturesById.set(catchable[0].aimedDepartureTime || catchable[0].aimed, catchable[0]);
+                                } else {
+                                  // Hvis ingen rekbare, vis første avgang uansett (brukeren må vente)
+                                  if (destDepartures.length > 0) {
+                                    prioritizedDepartures.push(destDepartures[0]);
+                                    allDeparturesById.set(destDepartures[0].aimedDepartureTime || destDepartures[0].aimed, destDepartures[0]);
+                                  }
+                                }
+                                
+                                // Legg alle avganger fra denne destinasjonen til totaloversikten (for senere fylling)
+                                destDepartures.forEach(dep => {
+                                  const depKey = dep.aimedDepartureTime || dep.aimed;
+                                  if (!allDeparturesById.has(depKey)) {
+                                    allDeparturesById.set(depKey, dep);
+                                  }
+                                });
+                              });
+                              
+                              // Deretter: fyll opp til minst 5 avganger fra resten
+                              const alreadyIncluded = new Set(
+                                prioritizedDepartures.map(dep => dep.aimedDepartureTime || dep.aimed)
+                              );
+                              
+                              // Sorter alle avganger etter tid
+                              const allSortedDepartures = Array.from(allDeparturesById.values())
+                                .sort((a, b) => a.aimed - b.aimed);
+                              
+                              // Legg til resten av avganger til vi har minst 5 (eller alle hvis det er færre enn 5)
+                              for (const dep of allSortedDepartures) {
+                                const depKey = dep.aimedDepartureTime || dep.aimed;
+                                if (!alreadyIncluded.has(depKey) && prioritizedDepartures.length < 5) {
+                                  prioritizedDepartures.push(dep);
+                                  alreadyIncluded.add(depKey);
+                                }
+                              }
+                              
+                              // Sorter alle avganger etter tid - vis minst 5 hvis tilgjengelig, ellers alle tilgjengelige
+                              relevantDepartures = prioritizedDepartures
+                                .sort((a, b) => a.aimed - b.aimed);
+                              
+                              // Hvis vi har færre enn 5 og det finnes flere avganger, legg til flere fra alle avganger
+                              if (relevantDepartures.length < 5 && futureDepartures.length > relevantDepartures.length) {
+                                const remaining = futureDepartures
+                                  .filter(dep => {
+                                    const depKey = dep.aimedDepartureTime || dep.aimed;
+                                    return !alreadyIncluded.has(depKey);
+                                  })
+                                  .sort((a, b) => a.aimed - b.aimed)
+                                  .slice(0, 5 - relevantDepartures.length);
+                                relevantDepartures = [...relevantDepartures, ...remaining]
+                                  .sort((a, b) => a.aimed - b.aimed);
+                              }
+                            }
+                            
+                            // Sørg for at vi alltid viser minst 5 avganger hvis tilgjengelig
+                            const displayDepartures = relevantDepartures.length >= 5 
+                              ? relevantDepartures.slice(0, 5)
+                              : relevantDepartures;
+                            
+                            return displayDepartures.map((dep, idx) => {
                               const mins = Math.max(0, Math.round((dep.aimed - now) / 60000));
                               const isMissed = isDepartureMissed(dep.aimedDepartureTime || dep.aimed, drivingTimes[stopData.id], showDrivingTimes, mode);
                               const strikeClass = isMissed ? 'line-through' : '';

@@ -84,13 +84,13 @@ const formatWaitTime = (waitMinutes, allDepartures = [], drivingTime = 0) => {
     return '<span style="color: #16a34a; font-weight: bold;">Fergen går akkurat når du kommer frem</span>';
   } else if (waitMinutes < 5) {
     const minuteText = waitMinutes === 1 ? 'minutt' : 'minutter';
-    return `Når du kommer frem må du vente i <span style="color: #16a34a; font-weight: bold;">${waitMinutes} ${minuteText}</span> til neste avgang`;
+    return `Når du kommer til fergekaien må du vente i <span style="color: #16a34a; font-weight: bold;">${waitMinutes} ${minuteText}</span> til neste avgang`;
   } else if (waitMinutes < 15) {
     const minuteText = waitMinutes === 1 ? 'minutt' : 'minutter';
-    return `Når du kommer frem må du vente i <span style="color: #f59e0b; font-weight: bold;">${waitMinutes} ${minuteText}</span> til neste avgang`;
+    return `Når du kommer til fergekaien må du vente i <span style="color: #f59e0b; font-weight: bold;">${waitMinutes} ${minuteText}</span> til neste avgang`;
   } else if (waitMinutes < 25) {
     const minuteText = waitMinutes === 1 ? 'minutt' : 'minutter';
-    return `Når du kommer frem må du vente i <span style="color: #f59e0b; font-weight: bold;">${waitMinutes} ${minuteText}</span> til neste avgang`;
+    return `Når du kommer til fergekaien må du vente i <span style="color: #f59e0b; font-weight: bold;">${waitMinutes} ${minuteText}</span> til neste avgang`;
   } else {
     // For ventetid over 25 minutter, foreslå når man bør starte å kjøre
     const suggestedDepartureTime = calculateSuggestedDepartureTime(allDepartures, drivingTime);
@@ -112,9 +112,9 @@ const formatWaitTime = (waitMinutes, allDepartures = [], drivingTime = 0) => {
     }
     
     if (suggestedDepartureTime) {
-      return `Når du kommer frem må du vente i <span style="color: #f59e0b; font-weight: bold;">${waitTimeText}</span> til neste avgang. <span style="color: #000000;">Start å kjør kl. <span style="font-weight: bold;">${suggestedDepartureTime}</span> for å rekke fergen med <span style="font-weight: bold;">5 minutter</span> margin.</span>`;
+      return `Når du kommer til fergekaien må du vente i <span style="color: #f59e0b; font-weight: bold;">${waitTimeText}</span> til neste avgang. <span style="color: #000000;">Start å kjør kl. <span style="font-weight: bold;">${suggestedDepartureTime}</span> for å rekke fergen med <span style="font-weight: bold;">5 minutter</span> margin.</span>`;
     } else {
-      return `Når du kommer frem må du vente i <span style="color: #f59e0b; font-weight: bold;">${waitTimeText}</span> til neste avgang`;
+      return `Når du kommer til fergekaien må du vente i <span style="color: #f59e0b; font-weight: bold;">${waitTimeText}</span> til neste avgang`;
     }
   }
 };

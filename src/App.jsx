@@ -391,6 +391,7 @@ function App() {
       // Driving time calculation state
     const [showDrivingTimes, setShowDrivingTimes] = useState(true); // Alltid på
     const [drivingTimes, setDrivingTimes] = useState({});
+  const [departureOffsets, setDepartureOffsets] = useState({}); // { [stopId]: pageIndex }
     const [drivingDistances, setDrivingDistances] = useState({});
     const [drivingTimesLoading, setDrivingTimesLoading] = useState({});
     const [drivingTimeSources, setDrivingTimeSources] = useState({});
@@ -447,6 +448,7 @@ function App() {
     setDeparturesMap({});
     setHasInteracted(false);
     setSelectedStop(null);
+    setDepartureOffsets({});
     setMode('gps');
 
     // Start loading ferry stops in parallel (don't wait)
@@ -3063,12 +3065,26 @@ function App() {
                               }
                             }
                             
-                            // Sørg for at vi alltid viser minst 5 avganger hvis tilgjengelig
-                            const displayDepartures = relevantDepartures.length >= 5 
-                              ? relevantDepartures.slice(0, 5)
-                              : relevantDepartures;
-                            
-                            return displayDepartures.map((dep, idx) => {
+                            // Paginering: side 0 bruker prioritert visning, sider > 0 viser alle kronologisk
+                            const PAGE_SIZE = 5;
+                            const currentOffset = departureOffsets[stopData.id] || 0;
+
+                            let displayDepartures;
+                            if (currentOffset === 0) {
+                              displayDepartures = relevantDepartures.length >= PAGE_SIZE
+                                ? relevantDepartures.slice(0, PAGE_SIZE)
+                                : relevantDepartures;
+                            } else {
+                              // Fra side 1+: vis alle fremtidige avganger kronologisk, paginert
+                              displayDepartures = futureDepartures.slice(currentOffset * PAGE_SIZE, (currentOffset + 1) * PAGE_SIZE);
+                            }
+
+                            const hasNextPage = currentOffset === 0
+                              ? futureDepartures.length > PAGE_SIZE
+                              : futureDepartures.length > (currentOffset + 1) * PAGE_SIZE;
+
+                            return (<>
+                              {displayDepartures.map((dep, idx) => {
                               const mins = Math.max(0, Math.round((dep.aimed - now) / 60000));
                               const isMissed = isDepartureMissed(dep.aimedDepartureTime || dep.aimed, drivingTimes[stopData.id], showDrivingTimes, mode);
                               const strikeClass = isMissed ? 'line-through' : '';
@@ -3110,7 +3126,31 @@ function App() {
                                   </span>
                                 </li>
                               );
-                            });
+                            })}
+                              {/* Tidligere / Senere navigation */}
+                              {(currentOffset > 0 || hasNextPage) && (
+                                <li className="flex justify-between items-center pt-2 mt-1" style={{ borderTop: `1px solid ${theme.colors.border}` }}>
+                                  {currentOffset > 0 ? (
+                                    <button
+                                      onClick={() => setDepartureOffsets(prev => ({ ...prev, [stopData.id]: currentOffset - 1 }))}
+                                      className="text-sm font-medium px-2 py-1"
+                                      style={{ color: theme.colors.primary, fontFamily: theme.fonts.primary }}
+                                    >
+                                      ← Tidligere
+                                    </button>
+                                  ) : <span />}
+                                  {hasNextPage && (
+                                    <button
+                                      onClick={() => setDepartureOffsets(prev => ({ ...prev, [stopData.id]: currentOffset + 1 }))}
+                                      className="text-sm font-medium px-2 py-1"
+                                      style={{ color: theme.colors.primary, fontFamily: theme.fonts.primary }}
+                                    >
+                                      Senere →
+                                    </button>
+                                  )}
+                                </li>
+                              )}
+                            </>);
                           })()}
                         </ul>
                       </div>

@@ -302,9 +302,6 @@ function App() {
   // Last GPS fix used for movement detection (auto car mode)
   const lastAutoLocationRef = useRef(null);
 
-  // Track previous distances to detect passed ferries
-  const previousDistancesRef = useRef({}); // { [ferryId]: previousDistance }
-
   // Simulation mode: holds the current simulated {lat, lng}
   const simPositionRef = useRef(null);
 
@@ -735,12 +732,6 @@ function App() {
 
           if (!ferryLat || !ferryLng) return { stop, priority: 1 };
 
-          // Detect if driving distance is increasing (we're moving away from this ferry)
-          const currentDistance = localDrivingDistances[stop.id] || stop.distance;
-          const previousDistance = previousDistancesRef.current[stop.id];
-          const movingAway = previousDistance !== undefined && currentDistance > previousDistance + 50;
-          previousDistancesRef.current[stop.id] = currentDistance;
-
           try {
             const [inDirection, passedByAPI] = await Promise.all([
               carModeService.isInSameDirection(
@@ -757,12 +748,11 @@ function App() {
               )
             ]);
 
-            const passed = movingAway || passedByAPI;
-            const priority = passed ? 2 : inDirection ? 0 : 1;
+            const priority = passedByAPI ? 2 : inDirection ? 0 : 1;
             return { stop, priority };
           } catch (error) {
             console.error('Error checking direction/passed for stop:', stop.id, error);
-            return { stop, priority: movingAway ? 2 : 1 };
+            return { stop, priority: 1 };
           }
         });
 
@@ -770,9 +760,6 @@ function App() {
         for (const { stop, priority } of directionResults) {
           stopDirectionPriority[stop.id] = priority;
         }
-      } else {
-        // When car mode is not active, clear previous distances
-        previousDistancesRef.current = {};
       }
 
       // Sort exclusively by driving time on road (minutes).
@@ -782,8 +769,8 @@ function App() {
         const priorityB = stopDirectionPriority[b.id] ?? 1;
         if (priorityA !== priorityB) return priorityA - priorityB;
 
-        const timeA = localDrivingTimes[a.id] ?? Infinity;
-        const timeB = localDrivingTimes[b.id] ?? Infinity;
+        const timeA = localDrivingTimes[a.id] ?? a.distance;
+        const timeB = localDrivingTimes[b.id] ?? b.distance;
         return timeA - timeB;
       });
       

@@ -3129,7 +3129,7 @@ function App() {
                             })}
                               {/* Tidligere / Senere navigation */}
                               {(currentOffset > 0 || hasNextPage) && (
-                                <li className="flex justify-between items-center pt-2 mt-1" style={{ borderTop: `1px solid ${theme.colors.border}` }}>
+                                <li className="flex justify-between items-center pt-2 mt-1">
                                   {currentOffset > 0 ? (
                                     <button
                                       onClick={() => setDepartureOffsets(prev => ({ ...prev, [stopData.id]: currentOffset - 1 }))}

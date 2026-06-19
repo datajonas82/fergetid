@@ -11,6 +11,7 @@ import LegalModal from './components/LegalModal';
 import { calculateDrivingTime } from './services/GeoServices';
 import { liveModeService } from './services/LiveModeService';
 import { carModeService } from './services/CarModeService';
+import { SIM_ROUTE, isSimulationMode } from './services/SimulationService';
 import { hasLiveModeAccess } from './services/PurchasesService';
 import { 
   ENTUR_ENDPOINT, 
@@ -322,6 +323,9 @@ function App() {
   
   // Track previous distances to detect passed ferries
   const previousDistancesRef = useRef({}); // { [ferryId]: previousDistance }
+
+  // Simulation mode: holds the current simulated {lat, lng}
+  const simPositionRef = useRef(null);
 
   // Pull-to-refresh state
   const pullStartYRef = useRef(null);
@@ -849,11 +853,20 @@ function App() {
       }
     };
 
+    // Simulation short-circuit: skip real GPS when sim mode is active
+    if (import.meta.env.DEV && simPositionRef.current) {
+      const { lat, lng } = simPositionRef.current;
+      setLocation({ latitude: lat, longitude: lng });
+      await computeNearbyAndUpdate(lat, lng);
+      setLoading(false);
+      return;
+    }
+
     try {
       // Try a quick, low-accuracy fix first (uses cached location if available)
       let pos;
       try {
-        
+
         if (isIOS) {
           // Try Capacitor Geolocation plugin first, fallback to browser geolocation with manual instructions
           try {
@@ -1088,6 +1101,45 @@ function App() {
 
 
 
+
+  // GPS simulation effect – activated via ?sim=1 in URL (DEV only)
+  // Steps through SIM_ROUTE every 5 seconds, feeding positions directly into the app.
+  useEffect(() => {
+    if (!isSimulationMode()) return;
+
+    console.log('🚗 SIM MODE active – Grodås → Volda → Ørsta → Festøya');
+
+    // Enable car mode so direction detection kicks in
+    setCarModeActive(true);
+    carModeService.startTracking((direction) => setCarDirection(direction));
+
+    let stepIndex = 0;
+    simPositionRef.current = { lat: SIM_ROUTE[0].lat, lng: SIM_ROUTE[0].lng };
+    carModeService.addPosition(SIM_ROUTE[0].lat, SIM_ROUTE[0].lng);
+
+    // Kick off the first search after ferry stops have had time to load
+    const firstSearch = setTimeout(() => {
+      console.log('🚗 SIM step 0: ' + SIM_ROUTE[0].label);
+      executeGpsSearch();
+    }, 1500);
+
+    const interval = setInterval(() => {
+      stepIndex = Math.min(stepIndex + 1, SIM_ROUTE.length - 1);
+      const wp = SIM_ROUTE[stepIndex];
+      simPositionRef.current = { lat: wp.lat, lng: wp.lng };
+      carModeService.addPosition(wp.lat, wp.lng);
+      console.log('🚗 SIM step ' + stepIndex + ': ' + wp.label + ' (' + wp.lat + ', ' + wp.lng + ')');
+      executeGpsSearch();
+      if (stepIndex >= SIM_ROUTE.length - 1) clearInterval(interval);
+    }, 5000);
+
+    return () => {
+      clearTimeout(firstSearch);
+      clearInterval(interval);
+      simPositionRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load all ferry stops function (we'll use quay info from Line.quays for matching)
   const loadAllFerryStops = async () => {

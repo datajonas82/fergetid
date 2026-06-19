@@ -323,6 +323,40 @@ function App() {
   // Track previous distances to detect passed ferries
   const previousDistancesRef = useRef({}); // { [ferryId]: previousDistance }
 
+  // Pull-to-refresh state
+  const pullStartYRef = useRef(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const PULL_THRESHOLD = 80; // px needed to trigger refresh
+
+  const handleTouchStart = (e) => {
+    // Only activate when scrolled to top
+    if (window.scrollY === 0) {
+      pullStartYRef.current = e.touches[0].clientY;
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (pullStartYRef.current === null) return;
+    const delta = e.touches[0].clientY - pullStartYRef.current;
+    if (delta > 0) {
+      setPullDistance(Math.min(delta, PULL_THRESHOLD * 1.5));
+    }
+  };
+
+  const [refreshCounter, setRefreshCounter] = useState(0);
+
+  const handleTouchEnd = () => {
+    if (pullDistance >= PULL_THRESHOLD && !loading) {
+      if (mode === 'gps') {
+        executeGpsSearch();
+      } else if (hasInteracted && query.trim()) {
+        setRefreshCounter(c => c + 1);
+      }
+    }
+    pullStartYRef.current = null;
+    setPullDistance(0);
+  };
+
 
 
   // Cache for all ferry quays (for autocomplete)
@@ -1394,7 +1428,7 @@ function App() {
     // Debounce search to avoid too many API calls
     const timeoutId = setTimeout(performLiveSearch, 300);
     return () => clearTimeout(timeoutId);
-  }, [query, allFerryQuays, ferryStopsLoaded, mode]);
+  }, [query, allFerryQuays, ferryStopsLoaded, mode, refreshCounter]);
 
   // Fjern feilmeldinger når mode endres til search eller query endres
   useEffect(() => {
@@ -2089,13 +2123,31 @@ function App() {
         </div>
       )}
 
-      <div 
+      <div
         className="flex flex-col min-h-screen"
-        style={{ 
+        style={{
           background: theme.colors.background,
           fontFamily: theme.fonts.primary
         }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
+        {/* Pull-to-refresh indicator */}
+        {pullDistance > 0 && (
+          <div
+            className="flex items-center justify-center transition-all duration-150"
+            style={{
+              height: `${Math.min(pullDistance, PULL_THRESHOLD)}px`,
+              opacity: Math.min(pullDistance / PULL_THRESHOLD, 1),
+              color: theme.colors.textSecondary || '#888',
+              fontSize: '0.85rem',
+              overflow: 'hidden',
+            }}
+          >
+            {pullDistance >= PULL_THRESHOLD ? '↑ Slipp for å oppdatere' : '↓ Dra ned for å oppdatere'}
+          </div>
+        )}
         {/* Header for minima theme */}
         {theme.layout.hasHeaderBar && (
           <div className="w-full flex justify-center px-0 md:px-4">

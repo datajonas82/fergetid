@@ -3134,7 +3134,7 @@ function App() {
                                     <button
                                       onClick={() => setDepartureOffsets(prev => ({ ...prev, [stopData.id]: currentOffset - 1 }))}
                                       className="text-sm font-medium px-2 py-1"
-                                      style={{ color: theme.colors.primary, fontFamily: theme.fonts.primary }}
+                                      style={{ color: theme.colors.textPrimary, fontFamily: theme.fonts.primary, border: '1px solid black', borderRadius: 2 }}
                                     >
                                       ← Tidligere
                                     </button>
@@ -3143,7 +3143,7 @@ function App() {
                                     <button
                                       onClick={() => setDepartureOffsets(prev => ({ ...prev, [stopData.id]: currentOffset + 1 }))}
                                       className="text-sm font-medium px-2 py-1"
-                                      style={{ color: theme.colors.primary, fontFamily: theme.fonts.primary }}
+                                      style={{ color: theme.colors.textPrimary, fontFamily: theme.fonts.primary, border: '1px solid black', borderRadius: 2 }}
                                     >
                                       Senere →
                                     </button>

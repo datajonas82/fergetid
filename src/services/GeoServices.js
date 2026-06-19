@@ -173,61 +173,88 @@ const calculateDrivingTimeWithHERE = async (startCoords, endCoords, options = {}
     endCoords.lng,
     options
   );
-  
+
   if (!url) throw new Error('HERE Routing URL missing (no API key)');
 
   const response = await fetchWithTimeout(url, { method: 'GET' }, 10000);
   if (!response.ok) throw new Error(`HERE Routing API failed: ${response.status}`);
-  
-  const data = await response.json();
-  
 
-  
+  const data = await response.json();
+
   if (!data.routes || data.routes.length === 0) {
     console.warn('HERE API: No routes found, response:', data);
     throw new Error('No routes found in HERE response');
   }
-  
+
   const route = data.routes[0];
-  
-  // Check for ferry violations in the route
+
+  // Check for ferry sections in the route
   let hasFerry = false;
   if (options.roadOnly) {
-    // Check sections for ferry transport
-    const ferrySections = route.sections?.filter(section => 
+    const ferrySections = route.sections?.filter(section =>
       section.transport?.mode === 'ferry'
-    );
-    
+    ) || [];
+
     if (ferrySections.length > 0) {
+      // avoid[features]=ferry returned a ferry route – this can happen when HERE
+      // prefers the ferry even with the avoid flag set. Retry WITHOUT avoidance to
+      // check if the natural (fastest) route is actually road-only. If the natural
+      // route has no ferry sections the destination IS reachable by road.
+      try {
+        const urlNoAvoid = config.HERE_CONFIG.getRoutingUrl(
+          startCoords.lat, startCoords.lng,
+          endCoords.lat, endCoords.lng,
+          { ...options, roadOnly: false }
+        );
+        const retryResponse = await fetchWithTimeout(urlNoAvoid, { method: 'GET' }, 8000);
+        if (retryResponse.ok) {
+          const retryData = await retryResponse.json();
+          const retryRoute = retryData.routes?.[0];
+          if (retryRoute) {
+            const retryFerrySections = retryRoute.sections?.filter(s =>
+              s.transport?.mode === 'ferry'
+            ) || [];
+            if (retryFerrySections.length === 0) {
+              // Natural route has no ferry → road exists, use this result instead
+              const retrySummary = retryRoute.sections?.[0]?.summary;
+              if (retrySummary && retrySummary.length > 0) {
+                return {
+                  time: Math.max(1, Math.round((retrySummary.duration || 0) / 60)),
+                  distance: retrySummary.length,
+                  source: 'here_routing_v8',
+                  hasFerry: false
+                };
+              }
+            }
+          }
+        }
+      } catch (_) {
+        // Retry failed – fall through and treat as hasFerry: true
+      }
       hasFerry = true;
-      // Silent - this is expected behavior, ferry filtering happens in App.jsx
     }
   }
-  
+
   const summary = route.sections?.[0]?.summary;
-  
+
   if (!summary) {
     console.warn('HERE API: No summary found in route:', route);
     throw new Error('No summary found in HERE route');
   }
-  
+
   const durationSeconds = summary.duration || 0;
   const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
   const distanceMeters = summary.length || 0;
-  
-  if (import.meta.env.DEV) {
 
-  }
-  
   // If HERE API returns 0 distance, fall back to haversine
   if (distanceMeters === 0) {
     console.warn('HERE API returned 0 distance, falling back to haversine');
     throw new Error('HERE API returned 0 distance');
   }
-  
-  return { 
-    time: durationMinutes, 
-    distance: distanceMeters, 
+
+  return {
+    time: durationMinutes,
+    distance: distanceMeters,
     source: 'here_routing_v8',
     hasFerry: hasFerry
   };

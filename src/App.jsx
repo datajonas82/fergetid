@@ -3087,7 +3087,7 @@ function App() {
                               {displayDepartures.map((dep, idx) => {
                               const mins = Math.max(0, Math.round((dep.aimed - now) / 60000));
                               const isMissed = isDepartureMissed(dep.aimedDepartureTime || dep.aimed, drivingTimes[stopData.id], showDrivingTimes, mode);
-                              const strikeClass = isMissed ? 'line-through' : '';
+                              const strikeClass = '';
                               
                               return (
                                 <li key={dep.aimedDepartureTime + '-' + idx} className="flex items-center py-0.5 leading-tight" >
@@ -3210,7 +3210,7 @@ function App() {
                                 .slice(0, 5).map((dep, idx) => {
                                 const mins = Math.max(0, Math.round((dep.aimed - now) / 60000));
                                 const isMissed = isDepartureMissed(dep.aimedDepartureTime || dep.aimed, drivingTimes[destination.stopId], showDrivingTimes, mode);
-                                const strikeClass = isMissed ? 'line-through' : '';
+                                const strikeClass = '';
                                 
                                 return (
                                   <li key={'inline-' + destination.stopId + '-' + dep.aimedDepartureTime + '-' + idx} className="flex items-center py-0 leading-tight" style={{ lineHeight: 1.05 }}>

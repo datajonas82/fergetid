@@ -299,30 +299,9 @@ function App() {
   const [carModeActive, setCarModeActive] = useState(false);
   const carModeActiveRef = useRef(false);
   const [carDirection, setCarDirection] = useState(null);
+  // Last GPS fix used for movement detection (auto car mode)
+  const lastAutoLocationRef = useRef(null);
 
-  const handleToggleCarMode = () => {
-    const willBeActive = !carModeActive;
-    carModeActiveRef.current = willBeActive;
-    setCarModeActive(willBeActive);
-
-    if (willBeActive) {
-      carModeService.startTracking((direction) => {
-        setCarDirection(direction);
-      });
-
-      if (location) {
-        carModeService.addPosition(location.latitude, location.longitude);
-      }
-    } else {
-      carModeService.stopTracking();
-      setCarDirection(null);
-    }
-
-    if (mode === 'gps' && location) {
-      executeGpsSearch();
-    }
-  };
-  
   // Track previous distances to detect passed ferries
   const previousDistancesRef = useRef({}); // { [ferryId]: previousDistance }
 
@@ -491,6 +470,23 @@ function App() {
     // Helper to compute nearby stops and update UI based on coordinates
     const computeNearbyAndUpdate = async (latitude, longitude) => {
       setLocation({ latitude, longitude });
+
+      // Auto car mode: activate when movement > 30 m detected between GPS fixes
+      const prev = lastAutoLocationRef.current;
+      if (prev) {
+        const dLat = (latitude - prev.lat) * Math.PI / 180;
+        const dLng = (longitude - prev.lng) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 +
+          Math.cos(prev.lat * Math.PI / 180) * Math.cos(latitude * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+        const distanceMeters = 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        if (distanceMeters > 30 && !carModeActiveRef.current) {
+          carModeActiveRef.current = true;
+          setCarModeActive(true);
+          carModeService.startTracking((direction) => setCarDirection(direction));
+        }
+      }
+      lastAutoLocationRef.current = { lat: latitude, lng: longitude };
 
       // Update car mode service with new position if car mode is active
       if (carModeActiveRef.current) {
@@ -2587,43 +2583,14 @@ function App() {
                 </button>
               </div>
 
-              {/* Car mode */}
-              <div className="mt-4 pt-3 border-t" style={{ borderColor: theme.colors.border }}>
-                <div className="text-sm font-bold mb-2" style={{ color: theme.colors.textPrimary, fontFamily: theme.fonts.primary }}>
-                  Modus
+              {/* Car mode direction indicator (auto, no toggle) */}
+              {carModeActive && carDirection !== null && (
+                <div className="mt-4 pt-3 border-t" style={{ borderColor: theme.colors.border }}>
+                  <span className="text-xs font-semibold" style={{ color: theme.colors.textSecondary, fontFamily: theme.fonts.primary }}>
+                    Retning: {carModeService.getCurrentCardinalDirection() || 'Beregner...'}
+                  </span>
                 </div>
-
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={carModeActive}
-                  onClick={handleToggleCarMode}
-                  className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg focus:outline-none transition-colors"
-                  title="Bil-modus"
-                >
-                  <span className="flex flex-col items-start min-w-0">
-                    <span className="font-medium text-sm" style={{ color: theme.colors.textPrimary, fontFamily: theme.fonts.primary }}>
-                      Bil-modus
-                    </span>
-                    {carModeActive && carDirection !== null && (
-                      <span className="text-xs font-semibold" style={{ color: theme.colors.textSecondary, fontFamily: theme.fonts.primary }}>
-                        Retning: {carModeService.getCurrentCardinalDirection() || 'Beregner...'}
-                      </span>
-                    )}
-                  </span>
-
-                  <span
-                    className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0"
-                    style={{ backgroundColor: carModeActive ? theme.colors.primary : '#9ca3af' }}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${
-                        carModeActive ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </span>
-                </button>
-              </div>
+              )}
               
               {/* Theme Selector */}
               <div className="mt-4 pt-3 border-t" style={{ borderColor: theme.colors.border }}>

@@ -114,10 +114,17 @@ class CarModeService {
       return;
     }
 
+    // In DEV mode, use bearing fallback only (HERE Route Matching gives wrong
+    // direction for simulated GPS points that don't follow actual roads)
+    if (import.meta.env.DEV) {
+      this.calculateDirectionFallback();
+      return;
+    }
+
     // Check rate limiting - don't call HERE API too frequently
     const now = Date.now();
     const timeSinceLastCall = now - this.lastApiCallTime;
-    
+
     if (timeSinceLastCall < this.minApiCallInterval) {
       // Use fallback if API was called recently
       this.calculateDirectionFallback();
@@ -347,8 +354,8 @@ class CarModeService {
     }
 
     const apiKey = config.HERE_CONFIG.getApiKey();
-    if (!apiKey) {
-      // Fallback to bearing-based check if HERE API not available
+    if (!apiKey || import.meta.env.DEV) {
+      // In DEV mode: use bearing-only fallback (HERE gives wrong direction for simulated routes)
       return this.isInSameDirectionFallback(carLat, carLng, ferryLat, ferryLng);
     }
 
@@ -510,8 +517,8 @@ class CarModeService {
     }
 
     const apiKey = config.HERE_CONFIG.getApiKey();
-    if (!apiKey) {
-      // Fallback: check if ferry is behind based on bearing
+    if (!apiKey || import.meta.env.DEV) {
+      // In DEV mode: use bearing-only fallback (HERE gives wrong direction for simulated routes)
       return this.hasPassedFerryFallback(carLat, carLng, ferryLat, ferryLng);
     }
 

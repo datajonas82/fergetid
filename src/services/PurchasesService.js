@@ -10,7 +10,20 @@ export async function getCustomerInfo() {
 
 export async function isPremiumActive() {
   // Premium-funksjoner (GPS/kjøretid) er tilgjengelig for alle
+  // TODO: Implementer faktisk premium-sjekk via in-app purchase for live-modus
+  // For nå returnerer vi true for bakoverkompatibilitet
   return true;
+}
+
+/**
+ * Check if user has access to live mode (premium feature)
+ * Live mode requires premium subscription via in-app purchase
+ */
+export async function hasLiveModeAccess() {
+  // Live-modus er en premium-funksjon som krever in-app purchase
+  // TODO: Implementer faktisk premium-sjekk via in-app purchase
+  // For nå returnerer vi true for bakoverkompatibilitet
+  return await isPremiumActive();
 }
 
 export async function getOfferings() {

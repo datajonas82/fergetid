@@ -141,14 +141,17 @@ export const calculateDrivingTime = async (startCoords, endCoords, options = {})
 
       // Final fallback: simple haversine estimate
       const fallback = calculateHaversineDistance(startCoords, endCoords);
-      drivingTimeCache.set(cacheKey, fallback);
-      return fallback;
+      // For haversine fallback, we can't know if route contains ferries
+      // So we mark as hasFerry: false but this is just an estimate
+      drivingTimeCache.set(cacheKey, { ...fallback, hasFerry: false });
+      return { ...fallback, hasFerry: false };
 
     } catch (error) {
       console.error('All routing APIs failed:', error);
       const fallback = calculateHaversineDistance(startCoords, endCoords);
-      drivingTimeCache.set(cacheKey, fallback);
-      return fallback;
+      // For haversine fallback, we can't know if route contains ferries
+      drivingTimeCache.set(cacheKey, { ...fallback, hasFerry: false });
+      return { ...fallback, hasFerry: false };
     }
   })();
 
@@ -197,11 +200,7 @@ const calculateDrivingTimeWithHERE = async (startCoords, endCoords, options = {}
     
     if (ferrySections.length > 0) {
       hasFerry = true;
-      if (import.meta.env.DEV) {
-        console.warn('🚢 HERE API: Ferry detected despite avoid[features]=ferry:', {
-          ferrySections: ferrySections.length
-        });
-      }
+      // Silent - this is expected behavior, ferry filtering happens in App.jsx
     }
   }
   
@@ -270,12 +269,17 @@ const calculateDrivingTimeWithGoogle = async (startCoords, endCoords, options = 
     units: 'METRIC'
   };
 
+  // Request route information including warnings to detect ferries
+  const fieldMask = options.roadOnly 
+    ? 'routes.duration,routes.distanceMeters,routes.warnings'
+    : 'routes.duration,routes.distanceMeters';
+  
   const response = await fetchWithTimeout(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': apiKey,
-      'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters'
+      'X-Goog-FieldMask': fieldMask
     },
     body: JSON.stringify(requestBody)
   }, 10000);
@@ -290,6 +294,40 @@ const calculateDrivingTimeWithGoogle = async (startCoords, endCoords, options = 
   }
 
   const route = data.routes[0];
+  
+  // Check for ferry transport in route when roadOnly is true
+  let hasFerry = false;
+  if (options.roadOnly) {
+    // When avoidFerries is true, Google Maps API should avoid ferries
+    // However, if no alternative route exists, API might still return a route with ferries
+    // Check warnings for ferry-related messages
+    const warnings = route.warnings || [];
+    const hasFerryWarning = warnings.some(warning => {
+      if (typeof warning === 'string') {
+        const warningText = warning.toLowerCase();
+        return warningText.includes('ferry') || warningText.includes('ferge') || warningText.includes('ferje');
+      }
+      if (warning && typeof warning === 'object') {
+        // Warning might be an object with message or code
+        const warningMsg = (warning.message || warning.code || JSON.stringify(warning)).toLowerCase();
+        return warningMsg.includes('ferry') || warningMsg.includes('ferge') || warningMsg.includes('ferje');
+      }
+      return false;
+    });
+    
+    hasFerry = hasFerryWarning;
+    
+    // Note: Google Routes API v2 doesn't always expose ferry info clearly
+    // When avoidFerries is true and route is returned, we trust it doesn't contain ferries
+    // But if warnings mention ferries, we mark it as hasFerry
+    
+    if (hasFerry && import.meta.env.DEV) {
+      console.warn('🚢 Google Maps API: Ferry detected in route despite avoidFerries:', {
+        warnings: warnings
+      });
+    }
+  }
+  
   const durationSeconds = typeof route.duration === 'string'
     ? parseFloat(route.duration.replace('s', ''))
     : (route.duration?.seconds ?? 0);
@@ -300,7 +338,7 @@ const calculateDrivingTimeWithGoogle = async (startCoords, endCoords, options = 
     time: durationMinutes, 
     distance: distanceMeters, 
     source: 'google_routes_v2',
-    hasFerry: false // Google Routes API v2 doesn't return ferry information
+    hasFerry: hasFerry
   };
 };
 
@@ -315,7 +353,7 @@ const calculateHaversineDistance = (startCoords, endCoords) => {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   const distance = R * c;
   const time = Math.max(1, Math.round((distance / 1000) / 50 * 60)); // 50 km/h default
-  return { time, distance, source: 'haversine' };
+  return { time, distance, source: 'haversine', hasFerry: false }; // Can't determine for haversine
 };
 
 

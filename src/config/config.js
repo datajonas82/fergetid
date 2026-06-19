@@ -58,7 +58,9 @@ export const config = {
       // Ferry avoidance - only use valid parameters
       const avoid = options.roadOnly ? '&avoid[features]=ferry' : '';
       
-      const url = `${config.HERE_CONFIG.ROUTING_BASE_URL}?origin=${origin}&destination=${destination}&transportMode=car&routingMode=fast&return=summary${avoid}&apiKey=${apiKey}`;
+      // Request geometry to get route shape for direction checking
+      const returnParams = options.returnGeometry ? 'summary,geometry' : 'summary';
+      const url = `${config.HERE_CONFIG.ROUTING_BASE_URL}?origin=${origin}&destination=${destination}&transportMode=car&routingMode=fast&return=${returnParams}${avoid}&apiKey=${apiKey}`;
       
       if (import.meta.env.DEV) {
     

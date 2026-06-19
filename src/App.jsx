@@ -2787,8 +2787,8 @@ function App() {
                     const futureCalls = sortedCalls.filter(c => c.aimed > now);
                     
                     if (futureCalls.length > 1) {
-                      // Ta de neste 4 avgangene (ekskluder neste avgang)
-                      laterDepartures = futureCalls.slice(1, 5);
+                      // Ta alle fremtidige avganger (paginering begrenser visningen)
+                      laterDepartures = futureCalls.slice(1);
                     }
                   }
                 }
@@ -2820,15 +2820,15 @@ function App() {
                     // Bruk den første passende avgangen, eller den første tilgjengelige hvis ingen passer
                     if (suitableDepartures.length > 0) {
                       nextDeparture = suitableDepartures[0];
-                      laterDepartures = suitableDepartures.slice(1, 5);
+                      laterDepartures = suitableDepartures.slice(1);
                     } else {
                       nextDeparture = futureCalls[0];
-                      laterDepartures = futureCalls.slice(1, 5);
+                      laterDepartures = futureCalls.slice(1);
                     }
                   } else {
                     // Vanlig logikk for korte kjøreturer
                     nextDeparture = futureCalls[0];
-                    laterDepartures = futureCalls.slice(1, 5);
+                    laterDepartures = futureCalls.slice(1);
                   }
                 }
               }

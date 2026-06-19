@@ -9,6 +9,9 @@ import LegalModal from './components/LegalModal';
 
 
 import { calculateDrivingTime } from './services/GeoServices';
+import { liveModeService } from './services/LiveModeService';
+import { carModeService } from './services/CarModeService';
+import { hasLiveModeAccess } from './services/PurchasesService';
 import { 
   ENTUR_ENDPOINT, 
   TRANSPORT_MODES, 
@@ -288,6 +291,38 @@ function App() {
   const [mode, setMode] = useState('search'); // 'search' or 'gps'
   const [ferryStopsLoaded, setFerryStopsLoaded] = useState(false);
 
+  // Live mode state - track which ferry terminals have live mode enabled
+  const [liveModeActive, setLiveModeActive] = useState({}); // { [ferryTerminalId]: true/false }
+
+  // Car mode state
+  const [carModeActive, setCarModeActive] = useState(false);
+  const [carDirection, setCarDirection] = useState(null);
+
+  const handleToggleCarMode = () => {
+    const willBeActive = !carModeActive;
+    setCarModeActive(willBeActive);
+
+    if (willBeActive) {
+      carModeService.startTracking((direction) => {
+        setCarDirection(direction);
+      });
+
+      if (location) {
+        carModeService.addPosition(location.latitude, location.longitude);
+      }
+    } else {
+      carModeService.stopTracking();
+      setCarDirection(null);
+    }
+
+    if (mode === 'gps' && location) {
+      executeGpsSearch();
+    }
+  };
+  
+  // Track previous distances to detect passed ferries
+  const previousDistancesRef = useRef({}); // { [ferryId]: previousDistance }
+
 
 
   // Cache for all ferry quays (for autocomplete)
@@ -306,7 +341,7 @@ function App() {
   // Filter state for ferry categories
   const [filters, setFilters] = useState({
     carFerry: true, // localCarFerry (Bilferge)
-    passengerFerry: true // localPassengerFerry (Hurtigbåt)
+    passengerFerry: false // localPassengerFerry (Hurtigbåt) - default avkrysset
   });
 
   // Re-run GPS visning når filter endres
@@ -414,6 +449,16 @@ function App() {
     // Helper to compute nearby stops and update UI based on coordinates
     const computeNearbyAndUpdate = async (latitude, longitude) => {
       setLocation({ latitude, longitude });
+
+      // Update car mode service with new position if car mode is active
+      if (carModeActive) {
+        carModeService.addPosition(latitude, longitude);
+        // Update direction state if available
+        const currentDir = carModeService.getCurrentDirection();
+        if (currentDir !== null) {
+          setCarDirection(currentDir);
+        }
+      }
 
       // Non-blocking location name fetch
       (async () => {
@@ -557,13 +602,15 @@ function App() {
       collectedWithDepartures.sort((a, b) => a.distance - b.distance);
 
       // Calculate driving times to nearby ferry quays
-      // Note: We don't filter out ferry quays based on hasFerry since these are destinations (users need to get TO the ferry)
+      // Note: We filter out ferry quays that require a ferry to reach (hasFerry flag)
+      // Passasjerferger vises alltid (de kan gå til)
       const origin = { lat: latitude, lng: longitude };
-      const localDrivingDistances = {}; // Local storage for distances
-      
+      const localDrivingDistances = {}; // Local storage for distances (meters, for display)
+      const localDrivingTimes = {}; // Local storage for driving times (minutes, for sorting)
+
       // Process stops in parallel for better performance
       const stopsToProcess = collectedWithDepartures.slice(0, 20); // Take the 20 closest after sorting
-      
+
       const drivingTimePromises = stopsToProcess.map(async (stop) => {
         try {
           const sub = stop?.nextDeparture?.serviceJourney?.journeyPattern?.line?.transportSubmode || stop?.submode;
@@ -584,10 +631,10 @@ function App() {
           return { stop, result: null };
         }
       });
-      
+
       const drivingTimeResults = await Promise.all(drivingTimePromises);
       const drivableStops = [];
-      
+
       for (const { stop, result } of drivingTimeResults) {
         // If result is invalid, use haversine fallback for ferry quays (they are destinations, users need to get TO the ferry)
         if (!result || typeof result.distance !== 'number' || result.distance <= 0) {
@@ -596,33 +643,110 @@ function App() {
           const dLng = (stop.longitude - origin.lng) * 111000 * Math.cos(origin.lat * Math.PI / 180);
           const fallbackDistance = Math.sqrt(dLat * dLat + dLng * dLng);
           const fallbackTime = Math.max(1, Math.round((fallbackDistance / 1000) / 50 * 60)); // 50 km/h default
-          
+
           setDrivingTimes(prev => ({ ...prev, [stop.id]: fallbackTime }));
           setDrivingDistances(prev => ({ ...prev, [stop.id]: fallbackDistance }));
           setDrivingTimeSources(prev => ({ ...prev, [stop.id]: 'haversine_fallback' }));
           localDrivingDistances[stop.id] = fallbackDistance;
+          localDrivingTimes[stop.id] = fallbackTime;
           drivableStops.push(stop);
           continue;
         }
-        
+
         const sub = stop?.nextDeparture?.serviceJourney?.journeyPattern?.line?.transportSubmode || stop?.submode;
         const isPassenger = sub && PASSENGER_FERRY_SUBMODES.includes(sub);
-        
-        // For GPS-modus: vis alle fergekaier uavhengig av om de er på øy eller fastland
-        // Fergekaier er destinasjoner - brukere skal til fergen, ikke unngå å kjøre dit
-        // Even if route contains ferry, we still show it because it's a destination
+
+        // For passasjerferger: vis alltid (de kan gå til)
+        if (isPassenger) {
+          setDrivingTimes(prev => ({ ...prev, [stop.id]: result.time }));
+          setDrivingDistances(prev => ({ ...prev, [stop.id]: result.distance }));
+          setDrivingTimeSources(prev => ({ ...prev, [stop.id]: result.source }));
+          localDrivingDistances[stop.id] = result.distance;
+          localDrivingTimes[stop.id] = result.time;
+          drivableStops.push(stop);
+          continue;
+        }
+
+        // For bilferger: filtrer bort fergekaier som krever ferge for å komme til
+        // Skip if route contains ferries (hasFerry flag is set)
+        if (result.hasFerry) {
+          if (import.meta.env.DEV) {
+            console.log(`🚢 GPS Search: Skipped ${stop.name} - route contains ferries`);
+          }
+          continue; // Skip this ferry terminal
+        }
+
+        // Route doesn't contain ferries - include it
         setDrivingTimes(prev => ({ ...prev, [stop.id]: result.time }));
         setDrivingDistances(prev => ({ ...prev, [stop.id]: result.distance }));
         setDrivingTimeSources(prev => ({ ...prev, [stop.id]: result.source }));
         localDrivingDistances[stop.id] = result.distance;
+        localDrivingTimes[stop.id] = result.time;
         drivableStops.push(stop);
       }
-      
-      // Sort by driving distance
+
+      // Assign direction priority if car mode is active.
+      // Priority: 0 = ahead (in direction, not passed), 1 = unknown direction, 2 = passed/behind.
+      // All stops are kept visible so the user can still see passed ferries, but they sort to the bottom.
+      const stopDirectionPriority = {}; // stop.id -> 0 | 1 | 2
+
+      if (carModeActive && location) {
+        const directionChecks = drivableStops.map(async (stop) => {
+          const ferryLat = stop.latitude;
+          const ferryLng = stop.longitude;
+
+          if (!ferryLat || !ferryLng) return { stop, priority: 1 };
+
+          // Detect if driving distance is increasing (we're moving away from this ferry)
+          const currentDistance = localDrivingDistances[stop.id] || stop.distance;
+          const previousDistance = previousDistancesRef.current[stop.id];
+          const movingAway = previousDistance !== undefined && currentDistance > previousDistance + 50;
+          previousDistancesRef.current[stop.id] = currentDistance;
+
+          try {
+            const [inDirection, passedByAPI] = await Promise.all([
+              carModeService.isInSameDirection(
+                location.latitude,
+                location.longitude,
+                ferryLat,
+                ferryLng
+              ),
+              carModeService.hasPassedFerry(
+                location.latitude,
+                location.longitude,
+                ferryLat,
+                ferryLng
+              )
+            ]);
+
+            const passed = movingAway || passedByAPI;
+            const priority = passed ? 2 : inDirection ? 0 : 1;
+            return { stop, priority };
+          } catch (error) {
+            console.error('Error checking direction/passed for stop:', stop.id, error);
+            return { stop, priority: movingAway ? 2 : 1 };
+          }
+        });
+
+        const directionResults = await Promise.all(directionChecks);
+        for (const { stop, priority } of directionResults) {
+          stopDirectionPriority[stop.id] = priority;
+        }
+      } else {
+        // When car mode is not active, clear previous distances
+        previousDistancesRef.current = {};
+      }
+
+      // Sort exclusively by driving time on road (minutes).
+      // When car mode is active, also sort by direction priority so ahead-ferries come first.
       const finalPlaces = drivableStops.sort((a, b) => {
-        const distanceA = localDrivingDistances[a.id] || a.distance;
-        const distanceB = localDrivingDistances[b.id] || b.distance;
-        return distanceA - distanceB;
+        const priorityA = stopDirectionPriority[a.id] ?? 1;
+        const priorityB = stopDirectionPriority[b.id] ?? 1;
+        if (priorityA !== priorityB) return priorityA - priorityB;
+
+        const timeA = localDrivingTimes[a.id] ?? Infinity;
+        const timeB = localDrivingTimes[b.id] ?? Infinity;
+        return timeA - timeB;
       });
       
       if (finalPlaces.length === 0) {
@@ -1299,6 +1423,178 @@ function App() {
     };
   }, [showDrivingTimes, location, ferryStops]);
 
+  // Fast GPS updates for direction detection in car mode (every 3 seconds)
+  const carModeFastDirectionRef = useRef(null);
+  useEffect(() => {
+    if (carModeActive && mode === 'gps') {
+      // Fast GPS updates every 3 seconds for quick direction detection
+      carModeFastDirectionRef.current = setInterval(async () => {
+        try {
+          // Get fresh GPS position for direction detection only
+          if (isIOS) {
+            try {
+              const permissionState = await Geolocation.checkPermissions();
+              if (permissionState.location === 'granted') {
+                const position = await Geolocation.getCurrentPosition({
+                  enableHighAccuracy: true,
+                  timeout: 3000,
+                  maximumAge: 2000 // Very fresh position for direction detection
+                });
+                const { latitude, longitude } = position.coords;
+                // Add position to car mode service for direction calculation
+                carModeService.addPosition(latitude, longitude);
+                // Update direction state if available
+                const currentDir = carModeService.getCurrentDirection();
+                if (currentDir !== null) {
+                  setCarDirection(currentDir);
+                }
+              }
+            } catch (error) {
+              // Silently fail - direction detection is non-critical
+            }
+          } else {
+            // Browser geolocation
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                const { latitude, longitude } = position.coords;
+                // Add position to car mode service for direction calculation
+                carModeService.addPosition(latitude, longitude);
+                // Update direction state if available
+                const currentDir = carModeService.getCurrentDirection();
+                if (currentDir !== null) {
+                  setCarDirection(currentDir);
+                }
+              },
+              (error) => {
+                // Silently fail - direction detection is non-critical
+              },
+              { enableHighAccuracy: true, timeout: 3000, maximumAge: 2000 }
+            );
+          }
+        } catch (error) {
+          // Silently fail - direction detection is non-critical
+        }
+      }, 3000); // 3 seconds for fast direction detection
+      
+      return () => {
+        if (carModeFastDirectionRef.current) {
+          clearInterval(carModeFastDirectionRef.current);
+          carModeFastDirectionRef.current = null;
+        }
+      };
+    } else {
+      // Clear interval when car mode is disabled
+      if (carModeFastDirectionRef.current) {
+        clearInterval(carModeFastDirectionRef.current);
+        carModeFastDirectionRef.current = null;
+      }
+    }
+  }, [carModeActive, mode, isIOS]);
+
+  // Car mode auto-update every 15 seconds when active (for full search refresh)
+  const carModeIntervalRef = useRef(null);
+  useEffect(() => {
+    if (carModeActive && mode === 'gps' && location) {
+      // Start interval to update GPS and re-run search every 15 seconds
+      carModeIntervalRef.current = setInterval(async () => {
+        try {
+          // Get fresh GPS position
+          if (isIOS) {
+            try {
+              const permissionState = await Geolocation.checkPermissions();
+              if (permissionState.location === 'granted') {
+                const position = await Geolocation.getCurrentPosition({
+                  enableHighAccuracy: true,
+                  timeout: 5000,
+                  maximumAge: 15000
+                });
+                const { latitude, longitude } = position.coords;
+                setLocation({ latitude, longitude });
+                carModeService.addPosition(latitude, longitude);
+                // Update direction state if available
+                const currentDir = carModeService.getCurrentDirection();
+                if (currentDir !== null) {
+                  setCarDirection(currentDir);
+                }
+                // Re-run GPS search with new position
+                await executeGpsSearch();
+              }
+            } catch (error) {
+              console.error('Error updating GPS in car mode:', error);
+            }
+          } else {
+            // Browser geolocation
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                const { latitude, longitude } = position.coords;
+                setLocation({ latitude, longitude });
+                carModeService.addPosition(latitude, longitude);
+                // Update direction state if available
+                const currentDir = carModeService.getCurrentDirection();
+                if (currentDir !== null) {
+                  setCarDirection(currentDir);
+                }
+                // Re-run GPS search with new position
+                executeGpsSearch();
+              },
+              (error) => {
+                console.error('Error updating GPS in car mode:', error);
+              },
+              { enableHighAccuracy: true, timeout: 5000, maximumAge: 15000 }
+            );
+          }
+        } catch (error) {
+          console.error('Error in car mode auto-update:', error);
+        }
+      }, 15000); // 15 seconds
+      
+      return () => {
+        if (carModeIntervalRef.current) {
+          clearInterval(carModeIntervalRef.current);
+          carModeIntervalRef.current = null;
+        }
+      };
+    } else {
+      // Clear interval when car mode is disabled
+      if (carModeIntervalRef.current) {
+        clearInterval(carModeIntervalRef.current);
+        carModeIntervalRef.current = null;
+      }
+    }
+  }, [carModeActive, mode, location]);
+
+  // Cleanup all intervals on unmount
+  useEffect(() => {
+    return () => {
+      if (carModeFastDirectionRef.current) {
+        clearInterval(carModeFastDirectionRef.current);
+      }
+      if (carModeIntervalRef.current) {
+        clearInterval(carModeIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Cleanup live mode and car mode when component unmounts or ferry stops change
+  useEffect(() => {
+    return () => {
+      // Stop all services on unmount
+      liveModeService.stop();
+      carModeService.stopTracking();
+      if (carModeIntervalRef.current) {
+        clearInterval(carModeIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Stop live mode when ferry stops are cleared (e.g., new search)
+  useEffect(() => {
+    if (ferryStops.length === 0) {
+      // Clear live mode state when ferry stops are cleared
+      setLiveModeActive({});
+      liveModeService.stop();
+    }
+  }, [ferryStops]);
 
 
 
@@ -1778,6 +2074,7 @@ function App() {
     }
   };
 
+
   return (
     <div className="border-[1.25px] border border-black">
       {/* Custom Splash Screen */}
@@ -1942,7 +2239,7 @@ function App() {
                 style={{ 
                   backgroundColor: theme.colors.locationBar,
                   color: theme.colors.textPrimary,
-                  fontFamily: theme.fonts.primary,
+                  fontFamily: theme.colors.primary,
                   borderColor: theme.colors.textPrimary,
                   borderWidth: '1.25px'
                 }}
@@ -2083,6 +2380,7 @@ function App() {
               </svg>
             </button>
           </div>
+          
         </div>
           )}
 
@@ -2176,6 +2474,44 @@ function App() {
                     style={{ color: theme.colors.textPrimary, fontFamily: theme.fonts.primary }}
                   >
                     Passasjerferge
+                  </span>
+                </button>
+              </div>
+
+              {/* Car mode */}
+              <div className="mt-4 pt-3 border-t" style={{ borderColor: theme.colors.border }}>
+                <div className="text-sm font-bold mb-2" style={{ color: theme.colors.textPrimary, fontFamily: theme.fonts.primary }}>
+                  Modus
+                </div>
+
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={carModeActive}
+                  onClick={handleToggleCarMode}
+                  className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg focus:outline-none transition-colors"
+                  title="Bil-modus"
+                >
+                  <span className="flex flex-col items-start min-w-0">
+                    <span className="font-medium text-sm" style={{ color: theme.colors.textPrimary, fontFamily: theme.fonts.primary }}>
+                      Bil-modus
+                    </span>
+                    {carModeActive && carDirection !== null && (
+                      <span className="text-xs font-semibold" style={{ color: theme.colors.textSecondary, fontFamily: theme.fonts.primary }}>
+                        Retning: {carModeService.getCurrentCardinalDirection() || 'Beregner...'}
+                      </span>
+                    )}
+                  </span>
+
+                  <span
+                    className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0"
+                    style={{ backgroundColor: carModeActive ? theme.colors.primary : '#9ca3af' }}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${
+                        carModeActive ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
                   </span>
                 </button>
               </div>

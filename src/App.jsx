@@ -297,10 +297,12 @@ function App() {
 
   // Car mode state
   const [carModeActive, setCarModeActive] = useState(false);
+  const carModeActiveRef = useRef(false);
   const [carDirection, setCarDirection] = useState(null);
 
   const handleToggleCarMode = () => {
     const willBeActive = !carModeActive;
+    carModeActiveRef.current = willBeActive;
     setCarModeActive(willBeActive);
 
     if (willBeActive) {
@@ -491,7 +493,7 @@ function App() {
       setLocation({ latitude, longitude });
 
       // Update car mode service with new position if car mode is active
-      if (carModeActive) {
+      if (carModeActiveRef.current) {
         carModeService.addPosition(latitude, longitude);
         // Update direction state if available
         const currentDir = carModeService.getCurrentDirection();
@@ -730,7 +732,7 @@ function App() {
       // All stops are kept visible so the user can still see passed ferries, but they sort to the bottom.
       const stopDirectionPriority = {}; // stop.id -> 0 | 1 | 2
 
-      if (carModeActive && location) {
+      if (carModeActiveRef.current && latitude && longitude) {
         const directionChecks = drivableStops.map(async (stop) => {
           const ferryLat = stop.latitude;
           const ferryLng = stop.longitude;
@@ -746,14 +748,14 @@ function App() {
           try {
             const [inDirection, passedByAPI] = await Promise.all([
               carModeService.isInSameDirection(
-                location.latitude,
-                location.longitude,
+                latitude,
+                longitude,
                 ferryLat,
                 ferryLng
               ),
               carModeService.hasPassedFerry(
-                location.latitude,
-                location.longitude,
+                latitude,
+                longitude,
                 ferryLat,
                 ferryLng
               )
@@ -1110,6 +1112,7 @@ function App() {
     console.log('🚗 SIM MODE active – Grodås → Volda → Ørsta → Festøya');
 
     // Enable car mode so direction detection kicks in
+    carModeActiveRef.current = true;
     setCarModeActive(true);
     carModeService.startTracking((direction) => setCarDirection(direction));
 

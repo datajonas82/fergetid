@@ -9,14 +9,8 @@ export const SIM_ROUTE = [
   { lat: 62.1870, lng: 6.2300, label: 'Mot Volda' },
   { lat: 62.1680, lng: 6.1560, label: 'Nærmer Volda' },
   { lat: 62.1490, lng: 6.0730, label: 'Volda sentrum' },
-  { lat: 62.1620, lng: 6.0860, label: 'Volda → Ørsta' },
-  { lat: 62.1820, lng: 6.1050, label: 'Mot Ørsta' },
-  { lat: 62.2010, lng: 6.1310, label: 'Ørsta sentrum' },
-  { lat: 62.2200, lng: 6.0900, label: 'Vest for Ørsta' },
-  { lat: 62.2600, lng: 6.0400, label: 'Mot Festøya' },
-  { lat: 62.3100, lng: 5.9900, label: 'Mot Festøya' },
-  { lat: 62.3450, lng: 5.9600, label: 'Nærmer Festøya' },
-  { lat: 62.3580, lng: 5.9470, label: 'Festøya ferjekai' },
+  { lat: 62.1560, lng: 6.0870, label: '2 km forbi Volda' },
+  { lat: 62.1680, lng: 6.1080, label: '5 km forbi Volda mot Ørsta' },
 ];
 
 export const isSimulationMode = () =>

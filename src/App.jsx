@@ -302,6 +302,13 @@ function App() {
   // Last GPS fix used for movement detection (auto car mode)
   const lastAutoLocationRef = useRef(null);
 
+  // Ref-based in-flight guard for executeGpsSearch. The `loading` state alone isn't
+  // enough: callers like the car-mode interval close over a stale `loading` value
+  // from whenever their effect last ran, so they can slip past a state-based check
+  // and run concurrently with a manual (pull-to-refresh) call — whichever finishes
+  // last then silently overwrites the other's sort order.
+  const gpsSearchInFlightRef = useRef(false);
+
   // Simulation mode: holds the current simulated {lat, lng}
   const simPositionRef = useRef(null);
 
@@ -418,11 +425,15 @@ function App() {
 
   // GPS search function - moved outside useEffect for direct calling
   const executeGpsSearch = async () => {
-    // Prevent multiple simultaneous GPS searches
-    if (loading) {
+    // Prevent multiple simultaneous GPS searches. Checked and set synchronously
+    // (before any await) so manual and automatic refresh triggers can't both slip
+    // through and race each other to setFerryStops with a different sort order.
+    if (gpsSearchInFlightRef.current) {
       return;
     }
-    
+    gpsSearchInFlightRef.current = true;
+
+    try {
     setLoading(true);
     setError(null);
     setQuery('');
@@ -1078,8 +1089,11 @@ function App() {
       
       setError(errorMessage);
       setLoading(false);
-      
 
+
+    }
+    } finally {
+      gpsSearchInFlightRef.current = false;
     }
   };
 

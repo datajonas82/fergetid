@@ -1703,6 +1703,12 @@ function App() {
     await executeGpsSearch();
   };
 
+  // Start GPS-modus automatisk når appen åpnes
+  useEffect(() => {
+    if (isSimulationMode()) return; // Simuleringsmodus styrer GPS selv
+    handleGPSLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
 
 

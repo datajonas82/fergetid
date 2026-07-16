@@ -3,9 +3,102 @@
 
 import { config } from '../config/config';
 
-// In-memory cache and de-duplication for driving time calculations
-const drivingTimeCache = new Map(); // key -> { time, distance, source }
-const pendingDrivingTimePromises = new Map(); // key -> Promise<{ time, distance, source }>
+// ─── Cache configuration ──────────────────────────────────────────────────────
+const CACHE_TTL = 60 * 60 * 1000;  // 1 hour — re-fetch after this
+const POSITION_THRESHOLD = 350;     // metres — re-fetch if moved further than this
+
+const CACHE_STORAGE_KEY = 'fergetid_dtc_v1';
+const FERRY_ONLY_STORAGE_KEY = 'fergetid_ferry_only_v1';
+
+// Position-aware cache: endKey → Array<{ startLat, startLng, result, timestamp }>
+const drivingTimeCache = new Map();
+// In-flight deduplication: exactKey → Promise
+const pendingDrivingTimePromises = new Map();
+// Ferry stop endpoints known to have no road connection (saves one HERE call per refresh)
+const ferryOnlyEndpoints = new Set();
+
+// ─── Internal helpers ─────────────────────────────────────────────────────────
+
+const _distanceMeters = (a, b) => {
+  const R = 6371000;
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLon = (b.lng - a.lng) * Math.PI / 180;
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+};
+
+const getEndKey = (endCoords, options) =>
+  `${endCoords.lat.toFixed(5)},${endCoords.lng.toFixed(5)}|${options?.roadOnly ? 'road' : 'any'}`;
+
+const getExactKey = (startCoords, endCoords, options) =>
+  `${startCoords.lat.toFixed(5)},${startCoords.lng.toFixed(5)}|${getEndKey(endCoords, options)}`;
+
+const findCached = (startCoords, endCoords, options) => {
+  const endKey = getEndKey(endCoords, options);
+  const entries = drivingTimeCache.get(endKey);
+  if (!entries?.length) return null;
+  const now = Date.now();
+  const valid = entries.filter(e => now - e.timestamp < CACHE_TTL);
+  if (valid.length !== entries.length) drivingTimeCache.set(endKey, valid);
+  return (
+    valid.find(e =>
+      _distanceMeters(startCoords, { lat: e.startLat, lng: e.startLng }) <= POSITION_THRESHOLD
+    )?.result ?? null
+  );
+};
+
+const storeCached = (startCoords, endCoords, options, result) => {
+  const endKey = getEndKey(endCoords, options);
+  const existing = (drivingTimeCache.get(endKey) ?? []).filter(
+    e => _distanceMeters(startCoords, { lat: e.startLat, lng: e.startLng }) > POSITION_THRESHOLD
+  );
+  existing.push({ startLat: startCoords.lat, startLng: startCoords.lng, result, timestamp: Date.now() });
+  drivingTimeCache.set(endKey, existing);
+  // Haversine results are estimates only — persist real API results
+  if (result.source !== 'haversine') _schedulePersist();
+};
+
+// Debounced write so rapid bursts (8+ stops computed at once) cause only one I/O
+let _persistTimer = null;
+const _schedulePersist = () => {
+  clearTimeout(_persistTimer);
+  _persistTimer = setTimeout(() => {
+    try {
+      const obj = {};
+      for (const [key, entries] of drivingTimeCache) obj[key] = entries;
+      localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(obj));
+    } catch (_) {}
+  }, 500);
+};
+
+const _persistFerryOnly = () => {
+  try {
+    localStorage.setItem(FERRY_ONLY_STORAGE_KEY, JSON.stringify([...ferryOnlyEndpoints]));
+  } catch (_) {}
+};
+
+// ─── Load persisted data on module init ──────────────────────────────────────
+(() => {
+  try {
+    const now = Date.now();
+    const raw = localStorage.getItem(CACHE_STORAGE_KEY);
+    if (raw) {
+      for (const [key, entries] of Object.entries(JSON.parse(raw))) {
+        const valid = entries.filter(e => now - e.timestamp < CACHE_TTL);
+        if (valid.length) drivingTimeCache.set(key, valid);
+      }
+    }
+  } catch (_) {}
+  try {
+    JSON.parse(localStorage.getItem(FERRY_ONLY_STORAGE_KEY) || '[]').forEach(k =>
+      ferryOnlyEndpoints.add(k)
+    );
+  } catch (_) {}
+})();
+
+// ─── Shared fetch utility ─────────────────────────────────────────────────────
 
 const fetchWithTimeout = async (url, options = {}, timeoutMs = 10000) => {
   const controller = new AbortController();
@@ -18,23 +111,16 @@ const fetchWithTimeout = async (url, options = {}, timeoutMs = 10000) => {
   }
 };
 
-const getCacheKey = (startCoords, endCoords, options) => {
-  const s = `${startCoords.lat.toFixed(5)},${startCoords.lng.toFixed(5)}`;
-  const e = `${endCoords.lat.toFixed(5)},${endCoords.lng.toFixed(5)}`;
-  const flags = options?.roadOnly ? 'road' : 'any';
-  return `${s}|${e}|${flags}`;
-};
-
 // Function to check if route description contains ferry references
 const checkRouteForFerries = (routeDescription) => {
   if (!routeDescription) return false;
-  
+
   const ferryKeywords = [
     'ferry', 'ferge', 'ferje', 'ferry crossing', 'fergeoverfart',
     'ferry terminal', 'fergekai', 'ferjekai', 'ferry route',
     'this route includes a ferry', 'ferry service', 'fergeforbindelse'
   ];
-  
+
   const lowerDescription = routeDescription.toLowerCase();
   return ferryKeywords.some(keyword => lowerDescription.includes(keyword));
 };
@@ -63,7 +149,7 @@ const getRouteDescription = async (startCoords, endCoords, options = {}) => {
       endCoords.lng,
       options
     );
-    
+
     if (!url) return null;
 
     const response = await fetchWithTimeout(url, { method: 'GET' }, 8000);
@@ -74,16 +160,16 @@ const getRouteDescription = async (startCoords, endCoords, options = {}) => {
 
     const route = data.routes[0];
     const legs = route.legs || [];
-    
+
     // Combine all step descriptions
-    const stepDescriptions = legs.flatMap(leg => 
+    const stepDescriptions = legs.flatMap(leg =>
       (leg.steps || []).map(step => step.html_instructions || step.maneuver?.instruction || '')
     );
-    
+
     // Also include route warnings and summary
     const warnings = route.warnings || [];
     const summary = route.summary || '';
-    
+
     const fullDescription = [
       summary,
       ...warnings,
@@ -101,18 +187,17 @@ const getRouteDescription = async (startCoords, endCoords, options = {}) => {
   }
 };
 
-// Calculate driving time and distance using HERE Routing API v8 (primary) with Google Maps as fallback
+// ─── Public API ───────────────────────────────────────────────────────────────
+
 export const calculateDrivingTime = async (startCoords, endCoords, options = {}) => {
-  const cacheKey = getCacheKey(startCoords, endCoords, options);
+  // 1. Position-aware cache lookup (hit if moved <350m from a cached position)
+  const cached = findCached(startCoords, endCoords, options);
+  if (cached) return cached;
 
-  // Serve from cache if available
-  if (drivingTimeCache.has(cacheKey)) {
-    return drivingTimeCache.get(cacheKey);
-  }
-
-  // Return the same in-flight promise if already fetching
-  if (pendingDrivingTimePromises.has(cacheKey)) {
-    return await pendingDrivingTimePromises.get(cacheKey);
+  // 2. De-duplicate identical in-flight requests
+  const exactKey = getExactKey(startCoords, endCoords, options);
+  if (pendingDrivingTimePromises.has(exactKey)) {
+    return await pendingDrivingTimePromises.get(exactKey);
   }
 
   const promise = (async () => {
@@ -121,7 +206,15 @@ export const calculateDrivingTime = async (startCoords, endCoords, options = {})
       if (config.HERE_CONFIG.isConfigured()) {
         try {
           const hereResult = await calculateDrivingTimeWithHERE(startCoords, endCoords, options);
-          drivingTimeCache.set(cacheKey, hereResult);
+          // Remember ferry-only stops so the double-call is skipped next time
+          if (hereResult.hasFerry && options.roadOnly) {
+            const ferryEndKey = `${endCoords.lat.toFixed(5)},${endCoords.lng.toFixed(5)}`;
+            if (!ferryOnlyEndpoints.has(ferryEndKey)) {
+              ferryOnlyEndpoints.add(ferryEndKey);
+              _persistFerryOnly();
+            }
+          }
+          storeCached(startCoords, endCoords, options, hereResult);
           return hereResult;
         } catch (hereError) {
           console.warn('HERE Routing API failed, falling back to Google Maps:', hereError);
@@ -132,40 +225,64 @@ export const calculateDrivingTime = async (startCoords, endCoords, options = {})
       if (config.GOOGLE_MAPS_CONFIG.isConfigured()) {
         try {
           const googleResult = await calculateDrivingTimeWithGoogle(startCoords, endCoords, options);
-          drivingTimeCache.set(cacheKey, googleResult);
+          storeCached(startCoords, endCoords, options, googleResult);
           return googleResult;
         } catch (googleError) {
           console.warn('Google Maps API failed, using haversine fallback:', googleError);
         }
       }
 
-      // Final fallback: simple haversine estimate
+      // Final fallback: simple haversine estimate (not persisted to localStorage)
       const fallback = calculateHaversineDistance(startCoords, endCoords);
-      // For haversine fallback, we can't know if route contains ferries
-      // So we mark as hasFerry: false but this is just an estimate
-      drivingTimeCache.set(cacheKey, { ...fallback, hasFerry: false });
-      return { ...fallback, hasFerry: false };
+      const result = { ...fallback, hasFerry: false };
+      storeCached(startCoords, endCoords, options, result);
+      return result;
 
     } catch (error) {
       console.error('All routing APIs failed:', error);
       const fallback = calculateHaversineDistance(startCoords, endCoords);
-      // For haversine fallback, we can't know if route contains ferries
-      drivingTimeCache.set(cacheKey, { ...fallback, hasFerry: false });
-      return { ...fallback, hasFerry: false };
+      const result = { ...fallback, hasFerry: false };
+      storeCached(startCoords, endCoords, options, result);
+      return result;
     }
   })();
 
-  pendingDrivingTimePromises.set(cacheKey, promise);
+  pendingDrivingTimePromises.set(exactKey, promise);
   try {
     return await promise;
   } finally {
-    pendingDrivingTimePromises.delete(cacheKey);
+    pendingDrivingTimePromises.delete(exactKey);
   }
 };
 
 
 // HERE Routing API v8 implementation
 const calculateDrivingTimeWithHERE = async (startCoords, endCoords, options = {}) => {
+  // If this stop is already known to be ferry-only, skip the road-only call and
+  // go straight to unrestricted routing — saves one HERE API call per refresh.
+  const ferryEndKey = `${endCoords.lat.toFixed(5)},${endCoords.lng.toFixed(5)}`;
+  if (options.roadOnly && ferryOnlyEndpoints.has(ferryEndKey)) {
+    const urlNoAvoid = config.HERE_CONFIG.getRoutingUrl(
+      startCoords.lat, startCoords.lng,
+      endCoords.lat, endCoords.lng,
+      { ...options, roadOnly: false }
+    );
+    if (!urlNoAvoid) throw new Error('HERE Routing URL missing (no API key)');
+    const response = await fetchWithTimeout(urlNoAvoid, { method: 'GET' }, 10000);
+    if (!response.ok) throw new Error(`HERE Routing API failed: ${response.status}`);
+    const data = await response.json();
+    if (!data.routes?.length) throw new Error('No routes found in HERE response');
+    const summary = data.routes[0].sections?.[0]?.summary;
+    if (!summary) throw new Error('No summary found in HERE route');
+    if (!summary.length) throw new Error('HERE API returned 0 distance');
+    return {
+      time: Math.max(1, Math.round((summary.duration || 0) / 60)),
+      distance: summary.length,
+      source: 'here_routing_v8',
+      hasFerry: true,
+    };
+  }
+
   const url = config.HERE_CONFIG.getRoutingUrl(
     startCoords.lat,
     startCoords.lng,
@@ -264,9 +381,9 @@ const calculateDrivingTimeWithHERE = async (startCoords, endCoords, options = {}
 const calculateDrivingTimeWithGoogle = async (startCoords, endCoords, options = {}) => {
   const apiKey = config.GOOGLE_MAPS_CONFIG.getApiKey();
   if (!apiKey) throw new Error('Google Maps API key missing');
-  
+
   const url = 'https://routes.googleapis.com/directions/v2:computeRoutes';
-  
+
   const requestBody = {
     origin: {
       location: {
@@ -297,10 +414,10 @@ const calculateDrivingTimeWithGoogle = async (startCoords, endCoords, options = 
   };
 
   // Request route information including warnings to detect ferries
-  const fieldMask = options.roadOnly 
+  const fieldMask = options.roadOnly
     ? 'routes.duration,routes.distanceMeters,routes.warnings'
     : 'routes.duration,routes.distanceMeters';
-  
+
   const response = await fetchWithTimeout(url, {
     method: 'POST',
     headers: {
@@ -321,7 +438,7 @@ const calculateDrivingTimeWithGoogle = async (startCoords, endCoords, options = 
   }
 
   const route = data.routes[0];
-  
+
   // Check for ferry transport in route when roadOnly is true
   let hasFerry = false;
   if (options.roadOnly) {
@@ -341,29 +458,29 @@ const calculateDrivingTimeWithGoogle = async (startCoords, endCoords, options = 
       }
       return false;
     });
-    
+
     hasFerry = hasFerryWarning;
-    
+
     // Note: Google Routes API v2 doesn't always expose ferry info clearly
     // When avoidFerries is true and route is returned, we trust it doesn't contain ferries
     // But if warnings mention ferries, we mark it as hasFerry
-    
+
     if (hasFerry && import.meta.env.DEV) {
       console.warn('🚢 Google Maps API: Ferry detected in route despite avoidFerries:', {
         warnings: warnings
       });
     }
   }
-  
+
   const durationSeconds = typeof route.duration === 'string'
     ? parseFloat(route.duration.replace('s', ''))
     : (route.duration?.seconds ?? 0);
   const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
   const distanceMeters = route.distanceMeters;
-  
-  return { 
-    time: durationMinutes, 
-    distance: distanceMeters, 
+
+  return {
+    time: durationMinutes,
+    distance: distanceMeters,
     source: 'google_routes_v2',
     hasFerry: hasFerry
   };
@@ -382,9 +499,3 @@ const calculateHaversineDistance = (startCoords, endCoords) => {
   const time = Math.max(1, Math.round((distance / 1000) / 50 * 60)); // 50 km/h default
   return { time, distance, source: 'haversine', hasFerry: false }; // Can't determine for haversine
 };
-
-
-
-
-
-

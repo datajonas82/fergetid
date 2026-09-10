@@ -27,6 +27,8 @@ let _purchased = false;
 let _priceString = null;
 let _initialized = false;
 let _Purchases = null;
+let _webPurchased = false; // web: gyldig Vipps-opplåsings-token verifisert
+const WEB_TOKEN_KEY = 'fergetid_vipps_token';
 
 // ─── Endringsvarsling til React ───────────────────────────────────────────────
 const listeners = new Set();
@@ -49,6 +51,13 @@ const forcePaywallDev = () => {
   try {
     return import.meta.env.DEV && new URLSearchParams(window.location.search).has('forcePaywall');
   } catch { return false; }
+};
+
+// Web-betalingsmuren slås på med VITE_WEB_PAYWALL_ENABLED=true. Holdes AV til
+// Vipps er konfigurert i prod, ellers låses eksisterende web-brukere ute uten
+// mulighet til å betale når prøven utløper.
+const webPaywallEnabled = () => {
+  try { return String(import.meta.env.VITE_WEB_PAYWALL_ENABLED) === 'true'; } catch { return false; }
 };
 
 // ─── Prøveperiode ─────────────────────────────────────────────────────────────
@@ -78,22 +87,101 @@ export const getTrialStatus = () => {
   };
 };
 
+// ─── Web-kjøp (Vipps, Fase 2) ─────────────────────────────────────────────────
+const getWebToken = () => {
+  try { return localStorage.getItem(WEB_TOKEN_KEY); } catch { return null; }
+};
+const setWebToken = (t) => {
+  try { localStorage.setItem(WEB_TOKEN_KEY, t); } catch (_) {}
+};
+const clearWebToken = () => {
+  try { localStorage.removeItem(WEB_TOKEN_KEY); } catch (_) {}
+};
+
+const postJson = async (url, body) => {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
+};
+
+// Kalles ved oppstart på web: håndter retur fra Vipps, ellers valider lagret token.
+const _initWebAccess = async () => {
+  // 1. Kom vi tilbake fra Vipps? (…/?vippspay=<reference>)
+  let ref = null;
+  try { ref = new URLSearchParams(window.location.search).get('vippspay'); } catch (_) {}
+  if (ref) {
+    try {
+      const { ok, data } = await postJson('/api/vipps/confirm', { reference: ref });
+      if (ok && data.paid && data.token) {
+        setWebToken(data.token);
+        _webPurchased = true;
+      }
+    } catch (_) { /* nettverksfeil — brukeren kan prøve igjen */ }
+    // Fjern query-paramet så en refresh ikke re-bekrefter
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('vippspay');
+      window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+    } catch (_) {}
+    notify();
+    return;
+  }
+
+  // 2. Lagret token fra før? Valider signaturen mot backend (kan ikke forfalskes lokalt).
+  const token = getWebToken();
+  if (token) {
+    try {
+      const { ok, data } = await postJson('/api/vipps/verify', { token });
+      if (ok && data.valid) _webPurchased = true;
+      else if (ok && !data.valid) clearWebToken(); // definitivt ugyldig → fjern
+      // Ellers (endepunkt nede/nettverk): behold token, prøv igjen senere (fail closed)
+    } catch (_) { /* behold token, prøv igjen senere */ }
+    notify();
+  }
+};
+
+// Start Vipps-betaling: lag payment og send brukeren til Vipps.
+export const startVippsPurchase = async () => {
+  if (isNativeIOS()) return { success: false, reason: 'not_web' };
+  try {
+    const { ok, status, data } = await postJson('/api/vipps/create', {});
+    if (ok && data.redirectUrl) {
+      window.location.href = data.redirectUrl; // navigerer bort; retur håndteres ved neste last
+      return { success: true };
+    }
+    if (status === 503) return { success: false, reason: 'not_configured' };
+    return { success: false, reason: 'error', detail: data };
+  } catch (e) {
+    return { success: false, reason: 'network', detail: String((e && e.message) || e) };
+  }
+};
+
 // ─── Tilgangsstatus (én kilde til sannhet) ────────────────────────────────────
 // unlocked : har brukeren tilgang til GPS/kjøretid nå?
 // source   : 'purchase' | 'trial' | 'web' | 'locked'
 // canPurchase: skal "Kjøp"-knappen vises? (kun iOS i Fase 1)
 export const getAccessState = () => {
   const trial = getTrialStatus();
+  const trialActive = trial.active && !forcePaywallDev(); // ?forcePaywall=1 tvinger locked i dev
   const base = { trial, priceString: _priceString };
 
-  if (isNativeIOS() || forcePaywallDev()) {
+  if (isNativeIOS()) {
     if (_purchased) return { ...base, unlocked: true, source: 'purchase', canPurchase: false, native: true };
-    if (trial.active) return { ...base, unlocked: true, source: 'trial', canPurchase: true, native: true };
+    if (trialActive) return { ...base, unlocked: true, source: 'trial', canPurchase: true, native: true };
     return { ...base, unlocked: false, source: 'locked', canPurchase: true, native: true };
   }
 
-  // Web/PWA i Fase 1: ikke gated ennå (Vipps kommer i Fase 2).
-  return { ...base, unlocked: true, source: 'web', canPurchase: false, native: false };
+  // Web/PWA: gating er av som standard (VITE_WEB_PAYWALL_ENABLED) til Vipps er live,
+  // så eksisterende web-brukere ikke låses ute. forcePaywall tvinger den på i dev.
+  const webGated = webPaywallEnabled() || forcePaywallDev();
+  if (!webGated) return { ...base, unlocked: true, source: 'web', canPurchase: false, native: false };
+  if (_webPurchased) return { ...base, unlocked: true, source: 'purchase', canPurchase: false, native: false };
+  if (trialActive) return { ...base, unlocked: true, source: 'trial', canPurchase: true, native: false };
+  return { ...base, unlocked: false, source: 'locked', canPurchase: true, native: false };
 };
 
 // ─── RevenueCat (lastes kun på native iOS) ────────────────────────────────────
@@ -109,7 +197,10 @@ export const initPurchases = async () => {
   _initialized = true;
   getFirstLaunch(); // stemple prøvestart ved aller første oppstart
 
-  if (!isNativeIOS()) return true;
+  if (!isNativeIOS()) {
+    await _initWebAccess();
+    return true;
+  }
 
   try {
     const apiKey = config.REVENUECAT_CONFIG.getIOSKey();

@@ -12,13 +12,17 @@ export default function ProPaywall({ access, busy, onPurchase, onRestore, onClos
 
   const trial = access?.trial;
   const inTrial = access?.source === 'trial';
+  const isWeb = !access?.native;
   const price = access?.priceString || 'kr 49';
 
   const handlePurchase = async () => {
     setMessage(null);
     const r = await onPurchase();
+    // Ved suksess på web navigerer siden til Vipps (kommer ikke hit).
     if (!r?.success && r?.reason && r.reason !== 'cancelled') {
-      setMessage('Kjøpet kunne ikke fullføres. Prøv igjen.');
+      if (r.reason === 'not_configured') setMessage('Vipps-betaling er ikke satt opp ennå.');
+      else if (r.reason === 'network') setMessage('Fikk ikke kontakt. Sjekk nettet og prøv igjen.');
+      else setMessage(isWeb ? 'Betalingen kunne ikke startes. Prøv igjen.' : 'Kjøpet kunne ikke fullføres. Prøv igjen.');
     }
   };
 
@@ -110,21 +114,23 @@ export default function ProPaywall({ access, busy, onPurchase, onRestore, onClos
             cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.7 : 1,
           }}
         >
-          {busy ? 'Behandler…' : `Kjøp for ${price} — engang`}
+          {busy ? 'Behandler…' : (isWeb ? 'Betal 49 kr med Vipps' : `Kjøp for ${price} — engang`)}
         </button>
 
-        <button
-          onClick={handleRestore}
-          disabled={busy}
-          style={{
-            width: '100%', padding: '0.7rem', marginTop: 10, borderRadius: 12,
-            border: `1px solid ${c.border}`, background: 'transparent',
-            color: c.textSecondary, fontWeight: 600, fontSize: '0.9rem',
-            cursor: busy ? 'default' : 'pointer',
-          }}
-        >
-          Gjenopprett kjøp
-        </button>
+        {!isWeb && (
+          <button
+            onClick={handleRestore}
+            disabled={busy}
+            style={{
+              width: '100%', padding: '0.7rem', marginTop: 10, borderRadius: 12,
+              border: `1px solid ${c.border}`, background: 'transparent',
+              color: c.textSecondary, fontWeight: 600, fontSize: '0.9rem',
+              cursor: busy ? 'default' : 'pointer',
+            }}
+          >
+            Gjenopprett kjøp
+          </button>
+        )}
 
         {inTrial && (
           <button
@@ -144,7 +150,7 @@ export default function ProPaywall({ access, busy, onPurchase, onRestore, onClos
         )}
 
         <p style={{ marginTop: 12, fontSize: '0.75rem', color: c.textSecondary, textAlign: 'center', lineHeight: 1.5 }}>
-          Engangskjøp — ingen abonnement. Betaling via App Store.
+          {isWeb ? 'Engangskjøp — ingen abonnement. Betaling via Vipps.' : 'Engangskjøp — ingen abonnement. Betaling via App Store.'}
         </p>
       </div>
     </div>

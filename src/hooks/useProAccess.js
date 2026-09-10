@@ -7,6 +7,7 @@ import {
   refreshEntitlement,
   purchasePro,
   restorePro,
+  startVippsPurchase,
 } from '../services/PurchasesService';
 
 // React-grensesnitt mot Pro-tilgang: eksponerer nåværende tilgangsstatus,
@@ -45,7 +46,9 @@ export function useProAccess() {
 
   const purchase = useCallback(async () => {
     setBusy(true);
-    const result = await purchasePro();
+    // iOS: Apple IAP via RevenueCat. Web: Vipps (navigerer bort ved suksess).
+    const native = getAccessState().native;
+    const result = native ? await purchasePro() : await startVippsPurchase();
     setBusy(false);
     setAccess(getAccessState());
     if (result.success) setPaywallOpen(false);

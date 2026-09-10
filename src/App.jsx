@@ -6,13 +6,15 @@ import { Geolocation } from '@capacitor/geolocation';
 
 import LoadingSpinner from './components/LoadingSpinner';
 import LegalModal from './components/LegalModal';
+import ProPaywall from './components/ProPaywall';
+import { useProAccess } from './hooks/useProAccess';
 
 
 import { calculateDrivingTime } from './services/GeoServices';
 import { liveModeService } from './services/LiveModeService';
 import { carModeService } from './services/CarModeService';
 import { SIM_ROUTE, isSimulationMode } from './services/SimulationService';
-import { hasLiveModeAccess } from './services/PurchasesService';
+import { getAccessState } from './services/PurchasesService';
 import { 
   ENTUR_ENDPOINT, 
   TRANSPORT_MODES, 
@@ -291,6 +293,10 @@ function App() {
   // Mode state
   const [mode, setMode] = useState('search'); // 'search' or 'gps'
   const [ferryStopsLoaded, setFerryStopsLoaded] = useState(false);
+
+  // Pro-tilgang: GPS + kjøretid krever engangskjøp (49 kr) etter 14 dagers gratis prøve
+  const pro = useProAccess();
+  const didAutoStartRef = useRef(false);
 
   // Live mode state - track which ferry terminals have live mode enabled
   const [liveModeActive, setLiveModeActive] = useState({}); // { [ferryTerminalId]: true/false }
@@ -1702,7 +1708,14 @@ function App() {
     if (loading) {
       return;
     }
-    
+
+    // GPS + kjøretid krever Pro-tilgang (kjøpt eller innenfor prøveperioden).
+    // Uten tilgang: vis betalingsmuren i stedet for å bruke HERE-kall.
+    if (!getAccessState().unlocked) {
+      pro.openPaywall();
+      return;
+    }
+
     // All users: aktiver kjøretidsvisning og kjør GPS-søk
     setShowDrivingTimes(true);
     setError(null);
@@ -1710,12 +1723,16 @@ function App() {
     await executeGpsSearch();
   };
 
-  // Start GPS-modus automatisk når appen åpnes
+  // Start GPS-modus automatisk når appen åpnes – men bare når brukeren har tilgang.
+  // Kjører én gang, når tilgang er avklart (venter på RevenueCat for kjøpte brukere).
   useEffect(() => {
+    if (didAutoStartRef.current) return;
     if (isSimulationMode()) return; // Simuleringsmodus styrer GPS selv
+    if (!pro.access.unlocked) return; // Låst: ingen auto-GPS, brukeren trykker selv
+    didAutoStartRef.current = true;
     handleGPSLocation();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pro.access.unlocked]);
 
 
 
@@ -2178,6 +2195,16 @@ function App() {
 
   return (
     <div className="border-[1.25px] border border-black">
+      {/* Betalingsmur for GPS + kjøretid (engangskjøp, 14 dagers prøve) */}
+      {pro.paywallOpen && (
+        <ProPaywall
+          access={pro.access}
+          busy={pro.busy}
+          onPurchase={pro.purchase}
+          onRestore={pro.restore}
+          onClose={pro.closePaywall}
+        />
+      )}
       {/* Custom Splash Screen */}
       {showCustomSplash && (
         <div 

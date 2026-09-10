@@ -654,8 +654,15 @@ function App() {
       const localDrivingDistances = {}; // Local storage for distances (meters, for display)
       const localDrivingTimes = {}; // Local storage for driving times (minutes, for sorting)
 
-      // Process stops in parallel for better performance
-      const stopsToProcess = collectedWithDepartures.slice(0, 20); // Take the 20 closest after sorting
+      // Process stops in parallel for better performance.
+      // Cost control: only the nearest stops get a HERE Routing call (accurate driving
+      // time + ferry-reachability filtering). 20 was wasteful — since auto-start fires a
+      // GPS search on every app open, each open triggered up to 20 roadOnly calls, each
+      // potentially doubled by the ferry retry. The nearest few by air distance reliably
+      // contain the nearest drivable quays; farther quays sort to the bottom anyway and
+      // rarely matter for "nearest ferry". Tune MAX_ROUTED_STOPS to trade cost vs reach.
+      const MAX_ROUTED_STOPS = 8;
+      const stopsToProcess = collectedWithDepartures.slice(0, MAX_ROUTED_STOPS);
 
       const drivingTimePromises = stopsToProcess.map(async (stop) => {
         try {

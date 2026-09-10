@@ -2558,6 +2558,34 @@ function App() {
                 </svg>
               </button>
               
+              {/* Pro-tilgang: åpner betalingsmuren. Alltid tilgjengelig (også i prøveperioden)
+                  slik at kjøpet kan nås av både brukere og App Review, ikke bare når muren
+                  dukker opp automatisk etter at prøven er over. */}
+              {pro.access.source !== 'purchase' ? (
+                <div className="mb-4">
+                  <div className="text-sm font-bold mb-2" style={{ color: theme.colors.textPrimary, fontFamily: theme.fonts.primary }}>
+                    Pro
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setShowHamburgerMenu(false); pro.openPaywall(); }}
+                    className="w-full px-3 py-2 rounded-lg font-semibold text-white focus:outline-none"
+                    style={{ backgroundColor: theme.colors.primary, fontFamily: theme.fonts.primary }}
+                  >
+                    Lås opp Pro (GPS + kjøretid)
+                  </button>
+                  {pro.access.source === 'trial' && (
+                    <div className="text-xs mt-1" style={{ color: theme.colors.textSecondary, fontFamily: theme.fonts.primary }}>
+                      {pro.access.trial.daysLeft} {pro.access.trial.daysLeft === 1 ? 'dag' : 'dager'} igjen av gratis prøve
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="mb-4 text-sm font-semibold" style={{ color: theme.colors.textPrimary, fontFamily: theme.fonts.primary }}>
+                  ✓ Fergetid Pro er aktivert
+                </div>
+              )}
+
               {/* Ferry Filter Section */}
               <div className="text-sm font-bold mb-2" style={{ color: theme.colors.textPrimary, fontFamily: theme.fonts.primary }}>
                 Ferge

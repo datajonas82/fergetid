@@ -13,6 +13,14 @@ const FIRST_LAUNCH_KEY = 'fergetid_first_launch';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const entitlementId = () => config.REVENUECAT_CONFIG.getEntitlementId(); // 'premium' som standard
+const PRODUCT_ID = 'com.fergetid.app.pro'; // engangskjøpet (non-consumable)
+
+// Velg riktig pakke fra offeringen: match på produkt-ID slik at gamle
+// (utilgjengelige) abonnementspakker i samme offering aldri velges ved en feil.
+const pickProPackage = (offerings) => {
+  const pkgs = offerings?.current?.availablePackages ?? [];
+  return pkgs.find(p => p?.product?.identifier === PRODUCT_ID) ?? pkgs[0] ?? null;
+};
 
 let _rcConfigured = false;
 let _purchased = false;
@@ -141,7 +149,7 @@ const loadPrice = async () => {
   try {
     const Purchases = await loadRC();
     const offerings = await Purchases.getOfferings();
-    const pkg = offerings?.current?.availablePackages?.[0];
+    const pkg = pickProPackage(offerings);
     _priceString = pkg?.product?.priceString || null;
   } catch (_) { /* pris hentes best-effort */ }
 };
@@ -152,7 +160,7 @@ export const purchasePro = async () => {
     if (!_rcConfigured) await initPurchases();
     const Purchases = await loadRC();
     const offerings = await Purchases.getOfferings();
-    const pkg = offerings?.current?.availablePackages?.[0];
+    const pkg = pickProPackage(offerings);
     if (!pkg) return { success: false, reason: 'no_offering' };
     const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg });
     _purchased = !!customerInfo?.entitlements?.active?.[entitlementId()];

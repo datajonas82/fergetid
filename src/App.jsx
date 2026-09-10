@@ -2700,8 +2700,25 @@ function App() {
                     const termsHref = config?.LEGAL?.getTermsOfUseUrl?.();
                     const privacyHref = config?.LEGAL?.getPrivacyPolicyUrl?.();
                     const supportHref = config?.LEGAL?.getSupportUrl?.();
+                    const salesHref = '/salgsvilkar.html';
                     return (
                       <>
+                        <a
+                          href={salesHref}
+                          onClick={(e) => {
+                            if (!isIOSApp) {
+                              e.preventDefault();
+                              setLegalModalTitle('Salgsvilkår');
+                              const url = salesHref + '?embed=1';
+                              setLegalModalUrl(url);
+                              setLegalModalOpen(true);
+                            }
+                          }}
+                          {...(isIOSApp ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                          className="underline mr-4"
+                        >
+                          Salgsvilkår
+                        </a>
                         <a
                           href={termsHref}
                           onClick={(e) => {

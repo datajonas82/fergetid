@@ -1,5 +1,6 @@
 // Car Mode Service - Tracks car direction based on GPS movement using HERE Route Matching API
 import { config } from '../config/config';
+import { hereRoute, hereMatchRoute } from './hereClient';
 
 class CarModeService {
   constructor() {
@@ -185,8 +186,7 @@ class CarModeService {
    * @returns {Promise<number|null>} Direction in degrees or null
    */
   async getDirectionFromHERE(positions) {
-    const apiKey = config.HERE_CONFIG.getApiKey();
-    if (!apiKey || positions.length < 2) {
+    if (positions.length < 2) {
       return null;
     }
 
@@ -198,16 +198,8 @@ class CarModeService {
         return `${pos.lat},${pos.lng},${timestamp}`;
       }).join('\n');
 
-      // Use HERE Route Matching API v8 with CSV format
-      const url = `https://routematching.hereapi.com/v8/match/routelinks?routeMatch=1&mode=fastest;car;traffic:disabled&apikey=${apiKey}&alignToGpsTime=0`;
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/csv'
-        },
-        body: csvTrace
-      });
+      // HERE Route Matching v8 via proxy (nøkkelen ligger server-side)
+      const response = await hereMatchRoute(csvTrace);
 
       if (!response.ok) {
         // Handle rate limiting gracefully
@@ -353,8 +345,7 @@ class CarModeService {
       return true; // If no direction yet, include all ferries
     }
 
-    const apiKey = config.HERE_CONFIG.getApiKey();
-    if (!apiKey || import.meta.env.DEV) {
+    if (import.meta.env.DEV) {
       // In DEV mode: use bearing-only fallback (HERE gives wrong direction for simulated routes)
       return this.isInSameDirectionFallback(carLat, carLng, ferryLat, ferryLng);
     }
@@ -362,22 +353,11 @@ class CarModeService {
     try {
       // Use HERE Routing API to get route from car to ferry
       // Check if the initial route direction aligns with car's current direction
-      const origin = `${carLat},${carLng}`;
-      const destination = `${ferryLat},${ferryLng}`;
-      
-      // Request route with sections to get departure/arrival points for direction checking
-      // HERE API v8 returns sections with departure and arrival places by default
-      const routeUrl = `${config.HERE_CONFIG.ROUTING_BASE_URL}?origin=${origin}&destination=${destination}&transportMode=car&routingMode=fast&return=summary&apiKey=${apiKey}`;
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch(routeUrl, {
-        method: 'GET',
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
+      // HERE Routing via proxy (nøkkelen ligger server-side)
+      const response = await hereRoute(
+        { fromLat: carLat, fromLng: carLng, toLat: ferryLat, toLng: ferryLng },
+        { timeoutMs: 5000 }
+      );
 
       if (!response.ok) {
         throw new Error(`HERE Routing API failed: ${response.status}`);
@@ -516,8 +496,7 @@ class CarModeService {
       return false; // Can't determine if no direction yet
     }
 
-    const apiKey = config.HERE_CONFIG.getApiKey();
-    if (!apiKey || import.meta.env.DEV) {
+    if (import.meta.env.DEV) {
       // In DEV mode: use bearing-only fallback (HERE gives wrong direction for simulated routes)
       return this.hasPassedFerryFallback(carLat, carLng, ferryLat, ferryLng);
     }
@@ -525,20 +504,11 @@ class CarModeService {
     try {
       // Use HERE Routing API to get route from car to ferry
       // If the route would require going backwards, ferry has been passed
-      const origin = `${carLat},${carLng}`;
-      const destination = `${ferryLat},${ferryLng}`;
-      
-      const routeUrl = `${config.HERE_CONFIG.ROUTING_BASE_URL}?origin=${origin}&destination=${destination}&transportMode=car&routingMode=fast&return=summary&apiKey=${apiKey}`;
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // Shorter timeout
-      
-      const response = await fetch(routeUrl, {
-        method: 'GET',
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
+      // HERE Routing via proxy (nøkkelen ligger server-side)
+      const response = await hereRoute(
+        { fromLat: carLat, fromLng: carLng, toLat: ferryLat, toLng: ferryLng },
+        { timeoutMs: 3000 }
+      );
 
       if (!response.ok) {
         throw new Error(`HERE Routing API failed: ${response.status}`);

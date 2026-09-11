@@ -2,6 +2,18 @@
 // Using the latest Google Maps APIs with proper configuration
 
 import { config } from '../config/config';
+import { hereRoute } from './hereClient';
+
+// HERE-ruting via proxyen (/api/here) — nøkkelen ligger server-side.
+const fetchHereRoute = async (startCoords, endCoords, { roadOnly = false } = {}, timeoutMs = 10000) => {
+  const res = await hereRoute({
+    fromLat: startCoords.lat, fromLng: startCoords.lng,
+    toLat: endCoords.lat, toLng: endCoords.lng,
+    roadOnly,
+  }, { timeoutMs });
+  if (!res.ok) throw new Error(`HERE Routing API failed: ${res.status}`);
+  return res.json();
+};
 
 // ─── Cache configuration ──────────────────────────────────────────────────────
 const CACHE_TTL = 60 * 60 * 1000;  // 1 hour — re-fetch after this
@@ -262,17 +274,8 @@ const calculateDrivingTimeWithHERE = async (startCoords, endCoords, options = {}
   // go straight to unrestricted routing — saves one HERE API call per refresh.
   const ferryEndKey = `${endCoords.lat.toFixed(5)},${endCoords.lng.toFixed(5)}`;
   if (options.roadOnly && ferryOnlyEndpoints.has(ferryEndKey)) {
-    const urlNoAvoid = config.HERE_CONFIG.getRoutingUrl(
-      startCoords.lat, startCoords.lng,
-      endCoords.lat, endCoords.lng,
-      { ...options, roadOnly: false }
-    );
-    if (!urlNoAvoid) throw new Error('HERE Routing URL missing (no API key)');
-    const response = await fetchWithTimeout(urlNoAvoid, { method: 'GET' }, 10000);
-    if (!response.ok) throw new Error(`HERE Routing API failed: ${response.status}`);
-    const data = await response.json();
-    if (!data.routes?.length) throw new Error('No routes found in HERE response');
-    const summary = data.routes[0].sections?.[0]?.summary;
+    const data = await fetchHereRoute(startCoords, endCoords, { roadOnly: false });
+    const summary = data.routes?.[0]?.sections?.[0]?.summary;
     if (!summary) throw new Error('No summary found in HERE route');
     if (!summary.length) throw new Error('HERE API returned 0 distance');
     return {
@@ -283,20 +286,7 @@ const calculateDrivingTimeWithHERE = async (startCoords, endCoords, options = {}
     };
   }
 
-  const url = config.HERE_CONFIG.getRoutingUrl(
-    startCoords.lat,
-    startCoords.lng,
-    endCoords.lat,
-    endCoords.lng,
-    options
-  );
-
-  if (!url) throw new Error('HERE Routing URL missing (no API key)');
-
-  const response = await fetchWithTimeout(url, { method: 'GET' }, 10000);
-  if (!response.ok) throw new Error(`HERE Routing API failed: ${response.status}`);
-
-  const data = await response.json();
+  const data = await fetchHereRoute(startCoords, endCoords, { roadOnly: options.roadOnly });
 
   if (!data.routes || data.routes.length === 0) {
     console.warn('HERE API: No routes found, response:', data);
@@ -318,30 +308,22 @@ const calculateDrivingTimeWithHERE = async (startCoords, endCoords, options = {}
       // check if the natural (fastest) route is actually road-only. If the natural
       // route has no ferry sections the destination IS reachable by road.
       try {
-        const urlNoAvoid = config.HERE_CONFIG.getRoutingUrl(
-          startCoords.lat, startCoords.lng,
-          endCoords.lat, endCoords.lng,
-          { ...options, roadOnly: false }
-        );
-        const retryResponse = await fetchWithTimeout(urlNoAvoid, { method: 'GET' }, 8000);
-        if (retryResponse.ok) {
-          const retryData = await retryResponse.json();
-          const retryRoute = retryData.routes?.[0];
-          if (retryRoute) {
-            const retryFerrySections = retryRoute.sections?.filter(s =>
-              s.transport?.mode === 'ferry'
-            ) || [];
-            if (retryFerrySections.length === 0) {
-              // Natural route has no ferry → road exists, use this result instead
-              const retrySummary = retryRoute.sections?.[0]?.summary;
-              if (retrySummary && retrySummary.length > 0) {
-                return {
-                  time: Math.max(1, Math.round((retrySummary.duration || 0) / 60)),
-                  distance: retrySummary.length,
-                  source: 'here_routing_v8',
-                  hasFerry: false
-                };
-              }
+        const retryData = await fetchHereRoute(startCoords, endCoords, { roadOnly: false }, 8000);
+        const retryRoute = retryData.routes?.[0];
+        if (retryRoute) {
+          const retryFerrySections = retryRoute.sections?.filter(s =>
+            s.transport?.mode === 'ferry'
+          ) || [];
+          if (retryFerrySections.length === 0) {
+            // Natural route has no ferry → road exists, use this result instead
+            const retrySummary = retryRoute.sections?.[0]?.summary;
+            if (retrySummary && retrySummary.length > 0) {
+              return {
+                time: Math.max(1, Math.round((retrySummary.duration || 0) / 60)),
+                distance: retrySummary.length,
+                source: 'here_routing_v8',
+                hasFerry: false
+              };
             }
           }
         }

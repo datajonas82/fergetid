@@ -11,6 +11,7 @@ import { useProAccess } from './hooks/useProAccess';
 
 
 import { calculateDrivingTime } from './services/GeoServices';
+import { hereRevGeocode } from './services/hereClient';
 import { liveModeService } from './services/LiveModeService';
 import { carModeService } from './services/CarModeService';
 import { SIM_ROUTE, isSimulationMode } from './services/SimulationService';
@@ -515,9 +516,9 @@ function App() {
       // Non-blocking location name fetch
       (async () => {
         try {
-          const geocodingUrl = config.GOOGLE_MAPS_CONFIG.getGeocodingUrl(latitude, longitude);
-          if (geocodingUrl) {
-            const response = await fetch(geocodingUrl);
+          // Reverse-geocode via HERE-proxy (nøkkelen ligger server-side)
+          const response = await hereRevGeocode(latitude, longitude);
+          if (response.ok) {
             const data = await response.json();
             if (data?.items?.length > 0 || data?.results?.length > 0) {
               setLocationName(extractLocationName(data));

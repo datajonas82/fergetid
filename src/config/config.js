@@ -32,16 +32,12 @@ export const config = {
   
   // HERE API Configuration
   HERE_CONFIG: {
-    // Get HERE API key
-    getApiKey: () => {
-      return import.meta.env.VITE_HERE_API_KEY;
-    },
-    
-    // Check if API key is configured
-    isConfigured: () => {
-      const apiKey = config.HERE_CONFIG.getApiKey();
-      return !!apiKey;
-    },
+    // HERE-nøkkelen ligger IKKE i frontend lenger — den holdes server-side og all
+    // HERE-trafikk går via proxyen /api/here (se src/services/hereClient.js).
+    getApiKey: () => undefined,
+
+    // HERE er alltid tilgjengelig via proxyen.
+    isConfigured: () => true,
     
     ROUTING_BASE_URL: 'https://router.hereapi.com/v8/routes',
     

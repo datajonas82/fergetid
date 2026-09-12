@@ -281,6 +281,37 @@ export const restorePro = async () => {
   }
 };
 
+// ─── Konto-identitet (Fase 3) ─────────────────────────────────────────────────
+// Kobler en innlogget bruker-ID til RevenueCat, så kjøp følger kontoen på tvers
+// av enheter/plattformer. Anonym som standard (ingen innlogging kreves).
+let _appUserId = null;
+
+export const setAppUserId = async (userId) => {
+  _appUserId = userId || null;
+  if (!userId) return;
+  if (isNativeIOS() && _rcConfigured) {
+    try {
+      const Purchases = await loadRC();
+      await Purchases.logIn({ appUserID: userId });
+      await refreshEntitlement();
+    } catch (e) { console.warn('RevenueCat logIn feilet:', e); }
+  }
+  // Web: RevenueCat-identifisering + grant fra Vipps-kjøp kobles på i Fase 3 steg 3.
+  notify();
+};
+
+export const clearAppUser = async () => {
+  _appUserId = null;
+  if (isNativeIOS() && _rcConfigured) {
+    try {
+      const Purchases = await loadRC();
+      await Purchases.logOut();
+      await refreshEntitlement();
+    } catch (e) { console.warn('RevenueCat logOut feilet:', e); }
+  }
+  notify();
+};
+
 // ─── Bakoverkompatible eksporter (brukes av LiveMode/WebPaywall) ──────────────
 export const isPremiumActive = async () => getAccessState().unlocked;
 export const hasLiveModeAccess = async () => getAccessState().unlocked;

@@ -7,7 +7,9 @@ import { Geolocation } from '@capacitor/geolocation';
 import LoadingSpinner from './components/LoadingSpinner';
 import LegalModal from './components/LegalModal';
 import ProPaywall from './components/ProPaywall';
+import AuthModal from './components/AuthModal';
 import { useProAccess } from './hooks/useProAccess';
+import { useAuth } from './hooks/useAuth';
 
 
 import { calculateDrivingTime } from './services/GeoServices';
@@ -298,6 +300,10 @@ function App() {
   // Pro-tilgang: GPS + kjøretid krever engangskjøp (49 kr) etter 14 dagers gratis prøve
   const pro = useProAccess();
   const didAutoStartRef = useRef(false);
+
+  // Valgfri innlogging (Fase 3) for å gjenopprette kjøp på tvers av enheter
+  const auth = useAuth();
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   // Live mode state - track which ferry terminals have live mode enabled
   const [liveModeActive, setLiveModeActive] = useState({}); // { [ferryTerminalId]: true/false }
@@ -2206,6 +2212,14 @@ function App() {
           onClose={pro.closePaywall}
         />
       )}
+      {/* Konto-innlogging (Fase 3, valgfri) */}
+      {authModalOpen && (
+        <AuthModal
+          onClose={() => setAuthModalOpen(false)}
+          loginEmail={auth.loginEmail}
+          loginApple={auth.loginApple}
+        />
+      )}
       {/* Custom Splash Screen */}
       {showCustomSplash && (
         <div 
@@ -2584,6 +2598,38 @@ function App() {
               ) : (
                 <div className="mb-4 text-sm font-semibold" style={{ color: theme.colors.textPrimary, fontFamily: theme.fonts.primary }}>
                   ✓ Fergetid Pro er aktivert
+                </div>
+              )}
+
+              {/* Konto: valgfri innlogging for å gjenopprette kjøp på tvers av enheter.
+                  Vises kun når Supabase er konfigurert (Fase 3). */}
+              {auth.configured && (
+                <div className="mb-4">
+                  <div className="text-sm font-bold mb-2" style={{ color: theme.colors.textPrimary, fontFamily: theme.fonts.primary }}>
+                    Konto
+                  </div>
+                  {auth.user ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm truncate" style={{ color: theme.colors.textSecondary }}>{auth.user.email}</span>
+                      <button
+                        type="button"
+                        onClick={() => auth.logout()}
+                        className="px-3 py-1.5 rounded-lg text-sm font-semibold focus:outline-none"
+                        style={{ border: `1px solid ${theme.colors.border}`, color: theme.colors.textPrimary, backgroundColor: theme.colors.cardBackground }}
+                      >
+                        Logg ut
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => { setShowHamburgerMenu(false); setAuthModalOpen(true); }}
+                      className="w-full px-3 py-2 rounded-lg font-semibold focus:outline-none"
+                      style={{ border: `1px solid ${theme.colors.primary}`, color: theme.colors.primary, backgroundColor: theme.colors.cardBackground, fontFamily: theme.fonts.primary }}
+                    >
+                      Logg inn for å synke kjøp
+                    </button>
+                  )}
                 </div>
               )}
 

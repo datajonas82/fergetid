@@ -6,6 +6,7 @@ import {
   onAuthChange,
   signInWithEmail,
   signInWithApple,
+  signInWithGoogle,
   signOut,
 } from '../services/AuthService';
 import { setAppUserId, clearAppUser } from '../services/PurchasesService';
@@ -41,7 +42,8 @@ export function useAuth() {
 
   const loginEmail = useCallback((email) => signInWithEmail(email), []);
   const loginApple = useCallback(() => signInWithApple(), []);
+  const loginGoogle = useCallback(() => signInWithGoogle(), []);
   const logout = useCallback(() => signOut(), []);
 
-  return { configured, user, ready, loginEmail, loginApple, logout };
+  return { configured, user, ready, loginEmail, loginApple, loginGoogle, logout };
 }

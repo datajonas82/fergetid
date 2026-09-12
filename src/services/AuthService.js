@@ -81,6 +81,20 @@ export const signInWithApple = async () => {
   }
 };
 
+// Google (OAuth).
+export const signInWithGoogle = async () => {
+  const c = await ensureClient();
+  if (!c) return { success: false, reason: 'not_configured' };
+  try {
+    const redirectTo = typeof window !== 'undefined' ? window.location.origin : undefined;
+    const { error } = await c.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } });
+    if (error) return { success: false, reason: 'error', error: error.message };
+    return { success: true };
+  } catch (e) {
+    return { success: false, reason: 'error', error: String((e && e.message) || e) };
+  }
+};
+
 export const signOut = async () => {
   const c = await ensureClient();
   if (!c) return;

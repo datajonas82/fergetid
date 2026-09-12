@@ -2218,6 +2218,7 @@ function App() {
           onClose={() => setAuthModalOpen(false)}
           loginEmail={auth.loginEmail}
           loginApple={auth.loginApple}
+          loginGoogle={auth.loginGoogle}
         />
       )}
       {/* Custom Splash Screen */}

@@ -4,7 +4,7 @@ import { getTheme, loadTheme } from '../config/themes';
 
 // Innloggings-modal (Fase 3). Passordløst: e-post magic link + Sign in with Apple.
 // Formålet er å gjenopprette/synke kjøp på tvers av enheter — ikke påkrevd for bruk.
-export default function AuthModal({ onClose, loginEmail, loginApple }) {
+export default function AuthModal({ onClose, loginEmail, loginApple, loginGoogle }) {
   const theme = getTheme(loadTheme());
   const c = theme.colors;
   const [email, setEmail] = useState('');
@@ -34,6 +34,14 @@ export default function AuthModal({ onClose, loginEmail, loginApple }) {
     const r = await loginApple();
     if (!r?.success && r?.reason !== 'cancelled') {
       setMessage('Kunne ikke starte Apple-innlogging.');
+    }
+  };
+
+  const handleGoogle = async () => {
+    setMessage(null);
+    const r = await loginGoogle();
+    if (!r?.success && r?.reason !== 'cancelled') {
+      setMessage('Kunne ikke starte Google-innlogging.');
     }
   };
 
@@ -123,6 +131,18 @@ export default function AuthModal({ onClose, loginEmail, loginApple }) {
               }}
             >
               <span aria-hidden="true" style={{ fontSize: '1.1rem' }}></span> Logg inn med Apple
+            </button>
+
+            <button
+              onClick={handleGoogle}
+              style={{
+                width: '100%', padding: '0.85rem', marginTop: 10, borderRadius: 12,
+                border: `1px solid ${c.border}`, background: '#fff', color: '#3c4043',
+                fontWeight: 600, fontSize: '1rem', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              <span aria-hidden="true" style={{ fontWeight: 700, color: '#4285F4' }}>G</span> Logg inn med Google
             </button>
           </>
         )}

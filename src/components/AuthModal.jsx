@@ -13,6 +13,10 @@ export default function AuthModal({ onClose, loginEmail, loginApple, loginGoogle
 
   const validEmail = /\S+@\S+\.\S+/.test(email.trim());
 
+  // Apple-provider er ikke satt opp ennå (Supabase + Apple Developer). Skjul
+  // knappen til den er konfigurert, så innloggingen er ren (e-post + Google).
+  const appleEnabled = false;
+
   const handleEmail = async (e) => {
     e.preventDefault();
     if (!validEmail || status === 'sending') return;
@@ -122,16 +126,18 @@ export default function AuthModal({ onClose, loginEmail, loginApple, loginGoogle
               <span style={{ flex: 1, height: 1, background: c.border }} />
             </div>
 
-            <button
-              onClick={handleApple}
-              style={{
-                width: '100%', padding: '0.85rem', borderRadius: 12, border: 'none',
-                background: '#000', color: '#fff', fontWeight: 600, fontSize: '1rem',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              }}
-            >
-              <span aria-hidden="true" style={{ fontSize: '1.1rem' }}></span> Logg inn med Apple
-            </button>
+            {appleEnabled && (
+              <button
+                onClick={handleApple}
+                style={{
+                  width: '100%', padding: '0.85rem', marginBottom: 10, borderRadius: 12, border: 'none',
+                  background: '#000', color: '#fff', fontWeight: 600, fontSize: '1rem',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                <span aria-hidden="true" style={{ fontSize: '1.1rem' }}></span> Logg inn med Apple
+              </button>
+            )}
 
             <button
               onClick={handleGoogle}

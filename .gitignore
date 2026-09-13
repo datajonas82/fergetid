@@ -27,3 +27,7 @@ dist-ssr
 .env
 .env.local
 .env.production
+
+# Secrets — Apple Sign in with Apple private signing key (.p8). Never commit.
+*.p8
+AuthKey_*.p8

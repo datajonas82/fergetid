@@ -13,9 +13,9 @@ export default function AuthModal({ onClose, loginEmail, loginApple, loginGoogle
 
   const validEmail = /\S+@\S+\.\S+/.test(email.trim());
 
-  // Apple-provider er ikke satt opp ennå (Supabase + Apple Developer). Skjul
-  // knappen til den er konfigurert, så innloggingen er ren (e-post + Google).
-  const appleEnabled = false;
+  // Apple-provider er konfigurert (Supabase Apple + Services ID app.fergetid +
+  // signeringsnøkkel). Web-OAuth-flyten går via Supabase.
+  const appleEnabled = true;
 
   const handleEmail = async (e) => {
     e.preventDefault();

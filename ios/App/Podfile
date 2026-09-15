@@ -23,4 +23,12 @@ end
 
 post_install do |installer|
   assertDeploymentTarget(installer)
+  # CapacitorCordova's framework headers use double-quoted #includes, which
+  # Xcode treats as an error when the pod is built as a framework (use_frameworks!).
+  # Silence this lint for third-party pod headers we don't control so archiving works.
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
+    end
+  end
 end

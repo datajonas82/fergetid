@@ -208,6 +208,7 @@ export const getAccessState = () => {
 
 // ─── RevenueCat (lastes kun på native iOS) ────────────────────────────────────
 let _RCMod = null;
+let _rcInitError = null; // siste årsak til at RevenueCat ikke ble konfigurert (diagnose)
 const loadRC = async () => {
   if (_Purchases) return _Purchases;
   const mod = await import('@revenuecat/purchases-capacitor');
@@ -229,19 +230,27 @@ export const initPurchases = async () => {
   try {
     const apiKey = config.REVENUECAT_CONFIG.getIOSKey();
     if (!apiKey) {
-      console.warn('RevenueCat: mangler VITE_REVENUECAT_IOS_API_KEY');
+      _rcInitError = 'API-nøkkel mangler i bygget (VITE_REVENUECAT_IOS_API_KEY)';
+      console.warn('RevenueCat: ' + _rcInitError);
       return false;
     }
     const Purchases = await loadRC();
-    // Verbose logg til enhets-konsollen (Console.app) for diagnose.
-    try { await Purchases.setLogLevel({ level: _RCMod?.LOG_LEVEL?.DEBUG ?? 'DEBUG' }); } catch (_) { /* eldre SDK */ }
-    await Purchases.configure({ apiKey });
+    // configure er den kritiske stien — kjør den FØRST, med timeout så en
+    // eventuell henging ikke etterlater appen ukonfigurert uten grunn.
+    await withTimeout(Purchases.configure({ apiKey }), 15000, 'configure');
     _rcConfigured = true;
+    _rcInitError = null;
+    // Verbose logg til enhets-konsollen (Console.app): fire-and-forget ETTER
+    // configure, så den aldri kan blokkere konfigureringen.
+    try { Purchases.setLogLevel?.({ level: _RCMod?.LOG_LEVEL?.DEBUG ?? 'DEBUG' }); } catch (_) { /* ignore */ }
     await refreshEntitlement();
     await loadPrice();
     notify();
     return true;
   } catch (e) {
+    _rcInitError = e?.rcTimeout
+      ? 'configure svarte ikke (tidsavbrudd) — native RevenueCat-kall hang'
+      : ('configure feilet: ' + (e?.code ? e.code + ' — ' : '') + (e?.message || String(e)));
     console.warn('initPurchases feilet:', e);
     return false;
   }
@@ -274,9 +283,12 @@ const loadPrice = async () => {
 export const purchasePro = async () => {
   if (!isNativeIOS()) return { success: false, reason: 'not_native' };
   try {
-    if (!_rcConfigured) await initPurchases();
     if (!_rcConfigured) {
-      return { success: false, reason: 'not_configured', detail: 'RevenueCat ble ikke konfigurert (mangler API-nøkkel?)' };
+      _initialized = false; // tving et nytt konfigurasjonsforsøk ved selve kjøpet
+      await initPurchases();
+    }
+    if (!_rcConfigured) {
+      return { success: false, reason: 'not_configured', detail: _rcInitError || 'RevenueCat ble ikke konfigurert (ukjent årsak)' };
     }
     const Purchases = await loadRC();
 

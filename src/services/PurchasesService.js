@@ -6,6 +6,10 @@
 // Fergetider (Entur) er alltid gratis; GPS + kjøretid er det som gates.
 
 import { Capacitor } from '@capacitor/core';
+// Statisk import (ikke dynamisk): en lazy-chunk kan henge ved lasting i
+// Capacitor-WebViewen, og da henger hele kjøpet før noen timeout rekker å slå
+// inn. Plugin-en er ~6 kB og registrerer bare en bro — trygg å laste på web også.
+import { Purchases as RCPurchases, LOG_LEVEL as RC_LOG_LEVEL } from '@revenuecat/purchases-capacitor';
 import { config } from '../config/config';
 
 const TRIAL_DAYS = 14;
@@ -207,13 +211,12 @@ export const getAccessState = () => {
 };
 
 // ─── RevenueCat (lastes kun på native iOS) ────────────────────────────────────
-let _RCMod = null;
 let _rcInitError = null; // siste årsak til at RevenueCat ikke ble konfigurert (diagnose)
+// Ingen dynamisk lasting lenger — plugin-en er statisk importert, så dette kan
+// verken henge eller feile.
 const loadRC = async () => {
-  if (_Purchases) return _Purchases;
-  const mod = await import('@revenuecat/purchases-capacitor');
-  _RCMod = mod;
-  _Purchases = mod.Purchases;
+  if (!RCPurchases) throw new Error('RevenueCat-plugin ikke tilgjengelig i bygget');
+  _Purchases = RCPurchases;
   return _Purchases;
 };
 
@@ -242,7 +245,7 @@ export const initPurchases = async () => {
     _rcInitError = null;
     // Verbose logg til enhets-konsollen (Console.app): fire-and-forget ETTER
     // configure, så den aldri kan blokkere konfigureringen.
-    try { Purchases.setLogLevel?.({ level: _RCMod?.LOG_LEVEL?.DEBUG ?? 'DEBUG' }); } catch (_) { /* ignore */ }
+    try { Purchases.setLogLevel?.({ level: RC_LOG_LEVEL?.DEBUG ?? 'DEBUG' }); } catch (_) { /* ignore */ }
     // Best-effort og IKKE ventet på: henting av rettighet og pris er ikke
     // nødvendig for å kjøpe, og må aldri kunne blokkere kjøpet. (Dette var
     // årsaken til evig «Behandler…» uten feilmelding i bygg 17.)

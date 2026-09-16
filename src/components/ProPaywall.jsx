@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { getTheme, loadTheme } from '../config/themes';
+import { getTrace, subscribeTrace } from '../services/PurchasesService';
+
+// Diagnose: vis kjøps-sporet på skjermen (kun når VITE_PURCHASE_DEBUG=true).
+const PURCHASE_DEBUG = String(import.meta.env.VITE_PURCHASE_DEBUG) === 'true';
 
 // Betalingsmur for Pro-funksjonene (GPS + kjøretid). Vises når en bruker uten
 // tilgang prøver å bruke GPS, eller kan åpnes manuelt. Engangskjøp (49 kr),
@@ -9,6 +13,12 @@ export default function ProPaywall({ access, busy, onPurchase, onRestore, onClos
   const theme = getTheme(loadTheme());
   const c = theme.colors;
   const [message, setMessage] = useState(null);
+  const [traceLines, setTraceLines] = useState(() => (PURCHASE_DEBUG ? getTrace() : []));
+
+  useEffect(() => {
+    if (!PURCHASE_DEBUG) return undefined;
+    return subscribeTrace(setTraceLines);
+  }, []);
 
   const trial = access?.trial;
   const inTrial = access?.source === 'trial';
@@ -155,6 +165,19 @@ export default function ProPaywall({ access, busy, onPurchase, onRestore, onClos
             background: 'rgba(217,45,45,0.08)', color: '#c0392b',
             fontSize: '0.82rem', textAlign: 'left', whiteSpace: 'pre-line', lineHeight: 1.45,
           }}>{message}</p>
+        )}
+
+        {PURCHASE_DEBUG && (
+          <div style={{
+            marginTop: 12, padding: '0.5rem 0.6rem', borderRadius: 8,
+            background: '#111', color: '#9ef59e',
+            fontFamily: 'ui-monospace, Menlo, monospace', fontSize: '0.62rem',
+            lineHeight: 1.35, maxHeight: 220, overflowY: 'auto',
+            whiteSpace: 'pre-wrap', wordBreak: 'break-word', textAlign: 'left',
+          }}>
+            <div style={{ color: '#fff', fontWeight: 700, marginBottom: 4 }}>Diagnose-spor (kjøp)</div>
+            {traceLines.length ? traceLines.join('\n') : '(ingen spor ennå)'}
+          </div>
         )}
 
         <p style={{ marginTop: 12, fontSize: '0.75rem', color: c.textSecondary, textAlign: 'center', lineHeight: 1.5 }}>

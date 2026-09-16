@@ -1,6 +1,6 @@
 {
   "name": "fergetid-app",
-  "version": "3.8.5",
+  "version": "3.8.6",
   "private": true,
   "scripts": {
     "dev": "vite --config config/vite.config.js",

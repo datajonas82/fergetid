@@ -48,6 +48,32 @@ const withTimeout = (promise, ms, label) => Promise.race([
   }, ms)),
 ]);
 
+// ─── Diagnose-spor (vises på skjermen i betalingsmuren ved VITE_PURCHASE_DEBUG) ─
+// Enhetens konsoll-logg har vist seg upålitelig å lese; sporet lar appen selv
+// vise hvilket steg som var det siste før noe stoppet.
+const _trace = [];
+const _traceListeners = new Set();
+export const trace = (msg) => {
+  const d = new Date();
+  const ts = `${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}.${String(d.getMilliseconds()).padStart(3, '0')}`;
+  _trace.push(`${ts} ${msg}`);
+  if (_trace.length > 60) _trace.shift();
+  try { console.log(`[FT-KJOP] ${msg}`); } catch (_) { /* ignore */ }
+  _traceListeners.forEach((cb) => { try { cb([..._trace]); } catch (_) { /* ignore */ } });
+};
+export const getTrace = () => [..._trace];
+export const subscribeTrace = (cb) => {
+  _traceListeners.add(cb);
+  return () => _traceListeners.delete(cb);
+};
+const platformInfo = () => {
+  try {
+    return `platform=${Capacitor.getPlatform()} native=${Capacitor.isNativePlatform()} plugin=${Capacitor.isPluginAvailable('Purchases')}`;
+  } catch (e) {
+    return `platform=? (${e?.message || e})`;
+  }
+};
+
 let _rcConfigured = false;
 let _purchased = false;
 let _priceString = null;
@@ -221,17 +247,21 @@ const loadRC = async () => {
 };
 
 export const initPurchases = async () => {
-  if (_initialized) return true;
+  trace(`init: kalt (_initialized=${_initialized}, rcConfigured=${_rcConfigured})`);
+  if (_initialized) { trace('init: allerede initialisert → returnerer'); return true; }
   _initialized = true;
   getFirstLaunch(); // stemple prøvestart ved aller første oppstart
+  trace(`init: ${platformInfo()}`);
 
   if (!isNativeIOS()) {
+    trace('init: WEB-gren → konfigurerer IKKE RevenueCat');
     await _initWebAccess();
     return true;
   }
 
   try {
     const apiKey = config.REVENUECAT_CONFIG.getIOSKey();
+    trace(`init: apiKey lengde=${apiKey ? apiKey.length : 0}`);
     if (!apiKey) {
       _rcInitError = 'API-nøkkel mangler i bygget (VITE_REVENUECAT_IOS_API_KEY)';
       console.warn('RevenueCat: ' + _rcInitError);
@@ -240,7 +270,10 @@ export const initPurchases = async () => {
     const Purchases = await loadRC();
     // configure er den kritiske stien — kjør den FØRST, med timeout så en
     // eventuell henging ikke etterlater appen ukonfigurert uten grunn.
+    trace(`init: RCPurchases=${typeof RCPurchases}, configure=${typeof Purchases?.configure}`);
+    trace('init: configure → start');
     await withTimeout(Purchases.configure({ apiKey }), 15000, 'configure');
+    trace('init: configure ✓ OK');
     _rcConfigured = true;
     _rcInitError = null;
     // Verbose logg til enhets-konsollen (Console.app): fire-and-forget ETTER
@@ -257,6 +290,7 @@ export const initPurchases = async () => {
     _rcInitError = e?.rcTimeout
       ? 'configure svarte ikke (tidsavbrudd) — native RevenueCat-kall hang'
       : ('configure feilet: ' + (e?.code ? e.code + ' — ' : '') + (e?.message || String(e)));
+    trace(`init: ✗ ${_rcInitError}`);
     console.warn('initPurchases feilet:', e);
     return false;
   }
@@ -287,22 +321,30 @@ const loadPrice = async () => {
 };
 
 export const purchasePro = async () => {
-  if (!isNativeIOS()) return { success: false, reason: 'not_native' };
+  trace(`kjøp: start (${platformInfo()})`);
+  if (!isNativeIOS()) { trace('kjøp: ✗ ikke iOS → not_native'); return { success: false, reason: 'not_native' }; }
   try {
+    trace(`kjøp: rcConfigured=${_rcConfigured}`);
     if (!_rcConfigured) {
+      trace('kjøp: tvinger ny init');
       _initialized = false; // tving et nytt konfigurasjonsforsøk ved selve kjøpet
       await initPurchases();
+      trace(`kjøp: init ferdig, rcConfigured=${_rcConfigured}`);
     }
     if (!_rcConfigured) {
+      trace(`kjøp: ✗ not_configured: ${_rcInitError}`);
       return { success: false, reason: 'not_configured', detail: _rcInitError || 'RevenueCat ble ikke konfigurert (ukjent årsak)' };
     }
     const Purchases = await loadRC();
 
     // 1) Hent produkter (kan henge hvis StoreKit ikke svarer → timeout).
     let offerings;
+    trace('kjøp: getOfferings → start');
     try {
       offerings = await withTimeout(Purchases.getOfferings(), 12000, 'getOfferings');
+      trace(`kjøp: getOfferings ✓ current=${offerings?.current?.identifier || 'null'} pakker=${(offerings?.current?.availablePackages || []).map((p) => p?.product?.identifier).join(',') || 'ingen'}`);
     } catch (e) {
+      trace(`kjøp: ✗ getOfferings ${e?.message || e}`);
       return {
         success: false, reason: 'error',
         detail: e?.rcTimeout ? 'Tidsavbrudd ved henting av produkter (getOfferings svarte ikke)' : ('getOfferings: ' + (e?.message || e)),
@@ -311,6 +353,7 @@ export const purchasePro = async () => {
 
     // 2) Finn Pro-pakken. Ved feil, ta med diagnose om hva offeringen inneholdt.
     const pkg = pickProPackage(offerings);
+    trace(`kjøp: valgt pakke=${pkg?.product?.identifier || 'INGEN'}`);
     if (!pkg) {
       const cur = offerings?.current;
       const allKeys = Object.keys(offerings?.all || {});
@@ -323,9 +366,12 @@ export const purchasePro = async () => {
 
     // 3) Kjøp (åpner Apple-betalingsruten). Timeout fanger «henger uten popup».
     let customerInfo;
+    trace('kjøp: purchasePackage → start (Apple-ruten skal åpne nå)');
     try {
       ({ customerInfo } = await withTimeout(Purchases.purchasePackage({ aPackage: pkg }), 60000, 'purchasePackage'));
+      trace('kjøp: purchasePackage ✓ ferdig');
     } catch (e) {
+      trace(`kjøp: ✗ purchasePackage ${e?.code || ''} ${e?.message || e}`);
       if (e?.code === 'PURCHASE_CANCELLED' || e?.userCancelled) {
         return { success: false, reason: 'cancelled' };
       }
@@ -341,6 +387,7 @@ export const purchasePro = async () => {
     notify();
     return { success: _purchased };
   } catch (e) {
+    trace(`kjøp: ✗ uventet feil ${e?.message || e}`);
     console.warn('purchasePro feilet:', e);
     return { success: false, reason: 'error', detail: e?.message || String(e) };
   }

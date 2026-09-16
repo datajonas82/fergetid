@@ -8,6 +8,7 @@ import {
   purchasePro,
   restorePro,
   startVippsPurchase,
+  trace,
 } from '../services/PurchasesService';
 
 // React-grensesnitt mot Pro-tilgang: eksponerer nåværende tilgangsstatus,
@@ -48,7 +49,23 @@ export function useProAccess() {
     setBusy(true);
     // iOS: Apple IAP via RevenueCat. Web: Vipps (navigerer bort ved suksess).
     const native = getAccessState().native;
-    const result = native ? await purchasePro() : await startVippsPurchase();
+    trace(`ui: trykket kjøp → ${native ? 'purchasePro (iOS)' : 'startVippsPurchase (web)'}`);
+    let result;
+    try {
+      // Hard sikkerhetsnett: uansett hvor noe måtte henge, skal knappen aldri
+      // bli stående på «Behandler…» for alltid.
+      result = await Promise.race([
+        native ? purchasePro() : startVippsPurchase(),
+        new Promise((resolve) => setTimeout(() => resolve({
+          success: false, reason: 'error',
+          detail: 'Kjøpet svarte ikke innen 100 sek — se sporet under',
+        }), 100000)),
+      ]);
+    } catch (e) {
+      trace(`ui: ✗ kjøp kastet feil ${e?.message || e}`);
+      result = { success: false, reason: 'error', detail: e?.message || String(e) };
+    }
+    trace(`ui: resultat success=${result?.success} reason=${result?.reason || '-'}`);
     setBusy(false);
     setAccess(getAccessState());
     if (result.success) setPaywallOpen(false);

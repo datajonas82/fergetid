@@ -32,7 +32,8 @@ export default function ProPaywall({ access, busy, onPurchase, onRestore, onClos
   const handleRestore = async () => {
     setMessage(null);
     const r = await onRestore();
-    setMessage(r?.success ? 'Kjøp gjenopprettet.' : 'Fant ingen tidligere kjøp å gjenopprette.');
+    if (r?.success) setMessage('Kjøp gjenopprettet.');
+    else setMessage(r?.detail ? `Gjenoppretting feilet.\n\n${r.detail}` : 'Fant ingen tidligere kjøp å gjenopprette.');
   };
 
   const features = [

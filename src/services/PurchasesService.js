@@ -243,8 +243,11 @@ export const initPurchases = async () => {
     // Verbose logg til enhets-konsollen (Console.app): fire-and-forget ETTER
     // configure, så den aldri kan blokkere konfigureringen.
     try { Purchases.setLogLevel?.({ level: _RCMod?.LOG_LEVEL?.DEBUG ?? 'DEBUG' }); } catch (_) { /* ignore */ }
-    await refreshEntitlement();
-    await loadPrice();
+    // Best-effort og IKKE ventet på: henting av rettighet og pris er ikke
+    // nødvendig for å kjøpe, og må aldri kunne blokkere kjøpet. (Dette var
+    // årsaken til evig «Behandler…» uten feilmelding i bygg 17.)
+    refreshEntitlement().catch(() => {});
+    loadPrice().catch(() => {});
     notify();
     return true;
   } catch (e) {
@@ -260,7 +263,7 @@ export const refreshEntitlement = async () => {
   if (!_rcConfigured) return _purchased;
   try {
     const Purchases = await loadRC();
-    const { customerInfo } = await Purchases.getCustomerInfo();
+    const { customerInfo } = await withTimeout(Purchases.getCustomerInfo(), 12000, 'getCustomerInfo');
     _purchased = !!customerInfo?.entitlements?.active?.[entitlementId()];
     notify();
     return _purchased;
@@ -274,7 +277,7 @@ const loadPrice = async () => {
   if (!_rcConfigured) return;
   try {
     const Purchases = await loadRC();
-    const offerings = await Purchases.getOfferings();
+    const offerings = await withTimeout(Purchases.getOfferings(), 12000, 'getOfferings(pris)');
     const pkg = pickProPackage(offerings);
     _priceString = pkg?.product?.priceString || null;
   } catch (_) { /* pris hentes best-effort */ }
@@ -295,7 +298,7 @@ export const purchasePro = async () => {
     // 1) Hent produkter (kan henge hvis StoreKit ikke svarer → timeout).
     let offerings;
     try {
-      offerings = await withTimeout(Purchases.getOfferings(), 20000, 'getOfferings');
+      offerings = await withTimeout(Purchases.getOfferings(), 12000, 'getOfferings');
     } catch (e) {
       return {
         success: false, reason: 'error',
@@ -318,7 +321,7 @@ export const purchasePro = async () => {
     // 3) Kjøp (åpner Apple-betalingsruten). Timeout fanger «henger uten popup».
     let customerInfo;
     try {
-      ({ customerInfo } = await withTimeout(Purchases.purchasePackage({ aPackage: pkg }), 150000, 'purchasePackage'));
+      ({ customerInfo } = await withTimeout(Purchases.purchasePackage({ aPackage: pkg }), 60000, 'purchasePackage'));
     } catch (e) {
       if (e?.code === 'PURCHASE_CANCELLED' || e?.userCancelled) {
         return { success: false, reason: 'cancelled' };
@@ -345,13 +348,16 @@ export const restorePro = async () => {
   try {
     if (!_rcConfigured) await initPurchases();
     const Purchases = await loadRC();
-    const { customerInfo } = await Purchases.restorePurchases();
+    const { customerInfo } = await withTimeout(Purchases.restorePurchases(), 30000, 'restorePurchases');
     _purchased = !!customerInfo?.entitlements?.active?.[entitlementId()];
     notify();
     return { success: _purchased };
   } catch (e) {
     console.warn('restorePro feilet:', e);
-    return { success: false, reason: 'error' };
+    return {
+      success: false, reason: 'error',
+      detail: e?.rcTimeout ? 'Tidsavbrudd i restorePurchases — RevenueCat svarte ikke' : (e?.message || String(e)),
+    };
   }
 };
 

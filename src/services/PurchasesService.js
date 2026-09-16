@@ -238,9 +238,14 @@ export const getAccessState = () => {
 
 // ─── RevenueCat (lastes kun på native iOS) ────────────────────────────────────
 let _rcInitError = null; // siste årsak til at RevenueCat ikke ble konfigurert (diagnose)
-// Ingen dynamisk lasting lenger — plugin-en er statisk importert, så dette kan
-// verken henge eller feile.
-const loadRC = async () => {
+// VIKTIG: ikke gjør dette til en async funksjon som returnerer plugin-objektet.
+// En Capacitor-plugin er en Proxy som svarer på ENHVER egenskap — inkludert
+// `.then` — så `await` på et async-funksjonsresultat som "er" proxyen får
+// JS til å tro den er et Promise og kalle `plugin.then(...)`, som aldri
+// kaller tilbake. Det hang `loadRC()` for alltid i alle tidligere bygg.
+// Plugin-en er nå statisk importert, så vi trenger ikke laste den i det hele
+// tatt — bruk RCPurchases direkte og synkront.
+const loadRC = () => {
   if (!RCPurchases) throw new Error('RevenueCat-plugin ikke tilgjengelig i bygget');
   _Purchases = RCPurchases;
   return _Purchases;
@@ -267,7 +272,7 @@ export const initPurchases = async () => {
       console.warn('RevenueCat: ' + _rcInitError);
       return false;
     }
-    const Purchases = await loadRC();
+    const Purchases = loadRC();
     // configure er den kritiske stien — kjør den FØRST, med timeout så en
     // eventuell henging ikke etterlater appen ukonfigurert uten grunn.
     trace(`init: RCPurchases=${typeof RCPurchases}, configure=${typeof Purchases?.configure}`);
@@ -299,7 +304,7 @@ export const initPurchases = async () => {
 export const refreshEntitlement = async () => {
   if (!_rcConfigured) return _purchased;
   try {
-    const Purchases = await loadRC();
+    const Purchases = loadRC();
     const { customerInfo } = await withTimeout(Purchases.getCustomerInfo(), 12000, 'getCustomerInfo');
     _purchased = !!customerInfo?.entitlements?.active?.[entitlementId()];
     notify();
@@ -313,7 +318,7 @@ export const refreshEntitlement = async () => {
 const loadPrice = async () => {
   if (!_rcConfigured) return;
   try {
-    const Purchases = await loadRC();
+    const Purchases = loadRC();
     const offerings = await withTimeout(Purchases.getOfferings(), 12000, 'getOfferings(pris)');
     const pkg = pickProPackage(offerings);
     _priceString = pkg?.product?.priceString || null;
@@ -335,7 +340,7 @@ export const purchasePro = async () => {
       trace(`kjøp: ✗ not_configured: ${_rcInitError}`);
       return { success: false, reason: 'not_configured', detail: _rcInitError || 'RevenueCat ble ikke konfigurert (ukjent årsak)' };
     }
-    const Purchases = await loadRC();
+    const Purchases = loadRC();
 
     // 1) Hent produkter (kan henge hvis StoreKit ikke svarer → timeout).
     let offerings;
@@ -397,7 +402,7 @@ export const restorePro = async () => {
   if (!isNativeIOS()) return { success: false, reason: 'not_native' };
   try {
     if (!_rcConfigured) await initPurchases();
-    const Purchases = await loadRC();
+    const Purchases = loadRC();
     const { customerInfo } = await withTimeout(Purchases.restorePurchases(), 30000, 'restorePurchases');
     _purchased = !!customerInfo?.entitlements?.active?.[entitlementId()];
     notify();
@@ -421,7 +426,7 @@ export const setAppUserId = async (userId) => {
   if (!userId) return;
   if (isNativeIOS() && _rcConfigured) {
     try {
-      const Purchases = await loadRC();
+      const Purchases = loadRC();
       await Purchases.logIn({ appUserID: userId });
       await refreshEntitlement();
     } catch (e) { console.warn('RevenueCat logIn feilet:', e); }
@@ -434,7 +439,7 @@ export const clearAppUser = async () => {
   _appUserId = null;
   if (isNativeIOS() && _rcConfigured) {
     try {
-      const Purchases = await loadRC();
+      const Purchases = loadRC();
       await Purchases.logOut();
       await refreshEntitlement();
     } catch (e) { console.warn('RevenueCat logOut feilet:', e); }

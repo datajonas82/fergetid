@@ -20,9 +20,12 @@ export default function ProPaywall({ access, busy, onPurchase, onRestore, onClos
     const r = await onPurchase();
     // Ved suksess på web navigerer siden til Vipps (kommer ikke hit).
     if (!r?.success && r?.reason && r.reason !== 'cancelled') {
-      if (r.reason === 'not_configured') setMessage('Vipps-betaling er ikke satt opp ennå.');
-      else if (r.reason === 'network') setMessage('Fikk ikke kontakt. Sjekk nettet og prøv igjen.');
-      else setMessage(isWeb ? 'Betalingen kunne ikke startes. Prøv igjen.' : 'Kjøpet kunne ikke fullføres. Prøv igjen.');
+      let base;
+      if (r.reason === 'not_configured') base = isWeb ? 'Vipps-betaling er ikke satt opp ennå.' : 'Kjøp er ikke satt opp.';
+      else if (r.reason === 'network') base = 'Fikk ikke kontakt. Sjekk nettet og prøv igjen.';
+      else base = isWeb ? 'Betalingen kunne ikke startes.' : 'Kjøpet kunne ikke fullføres.';
+      // Ta med teknisk detalj (diagnose) når den finnes, så feilen er synlig.
+      setMessage(r.detail ? `${base}\n\n${r.detail}` : `${base} Prøv igjen.`);
     }
   };
 
@@ -146,7 +149,11 @@ export default function ProPaywall({ access, busy, onPurchase, onRestore, onClos
         )}
 
         {message && (
-          <p style={{ marginTop: 10, fontSize: '0.85rem', color: c.textSecondary, textAlign: 'center' }}>{message}</p>
+          <p style={{
+            marginTop: 12, padding: '0.6rem 0.7rem', borderRadius: 10,
+            background: 'rgba(217,45,45,0.08)', color: '#c0392b',
+            fontSize: '0.82rem', textAlign: 'left', whiteSpace: 'pre-line', lineHeight: 1.45,
+          }}>{message}</p>
         )}
 
         <p style={{ marginTop: 12, fontSize: '0.75rem', color: c.textSecondary, textAlign: 'center', lineHeight: 1.5 }}>

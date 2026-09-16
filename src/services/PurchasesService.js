@@ -18,9 +18,31 @@ const PRODUCT_ID = 'com.fergetid.app.pro'; // engangskjøpet (non-consumable)
 // Velg riktig pakke fra offeringen: match på produkt-ID slik at gamle
 // (utilgjengelige) abonnementspakker i samme offering aldri velges ved en feil.
 const pickProPackage = (offerings) => {
-  const pkgs = offerings?.current?.availablePackages ?? [];
-  return pkgs.find(p => p?.product?.identifier === PRODUCT_ID) ?? pkgs[0] ?? null;
+  const offeringId = (config.REVENUECAT_CONFIG.getOfferingId && config.REVENUECAT_CONFIG.getOfferingId()) || 'Premium';
+  // Robusthet: se både på default-offeringen (.current) og den navngitte, i
+  // tilfelle default ikke er satt. Prioriter eksakt match på produkt-ID slik at
+  // gamle (utilgjengelige) abonnementspakker aldri velges ved en feil.
+  const pools = [
+    offerings?.current?.availablePackages,
+    offerings?.all?.[offeringId]?.availablePackages,
+  ].filter(Boolean);
+  for (const pkgs of pools) {
+    const hit = pkgs.find(p => p?.product?.identifier === PRODUCT_ID);
+    if (hit) return hit;
+  }
+  for (const pkgs of pools) { if (pkgs[0]) return pkgs[0]; }
+  return null;
 };
+
+// Diagnose-hjelper: sørger for at et kall ikke kan henge i det uendelige.
+const withTimeout = (promise, ms, label) => Promise.race([
+  Promise.resolve(promise),
+  new Promise((_, reject) => setTimeout(() => {
+    const err = new Error(`timeout:${label} (${ms}ms)`);
+    err.rcTimeout = label;
+    reject(err);
+  }, ms)),
+]);
 
 let _rcConfigured = false;
 let _purchased = false;
@@ -185,9 +207,11 @@ export const getAccessState = () => {
 };
 
 // ─── RevenueCat (lastes kun på native iOS) ────────────────────────────────────
+let _RCMod = null;
 const loadRC = async () => {
   if (_Purchases) return _Purchases;
   const mod = await import('@revenuecat/purchases-capacitor');
+  _RCMod = mod;
   _Purchases = mod.Purchases;
   return _Purchases;
 };
@@ -209,6 +233,8 @@ export const initPurchases = async () => {
       return false;
     }
     const Purchases = await loadRC();
+    // Verbose logg til enhets-konsollen (Console.app) for diagnose.
+    try { await Purchases.setLogLevel({ level: _RCMod?.LOG_LEVEL?.DEBUG ?? 'DEBUG' }); } catch (_) { /* eldre SDK */ }
     await Purchases.configure({ apiKey });
     _rcConfigured = true;
     await refreshEntitlement();
@@ -249,20 +275,56 @@ export const purchasePro = async () => {
   if (!isNativeIOS()) return { success: false, reason: 'not_native' };
   try {
     if (!_rcConfigured) await initPurchases();
+    if (!_rcConfigured) {
+      return { success: false, reason: 'not_configured', detail: 'RevenueCat ble ikke konfigurert (mangler API-nøkkel?)' };
+    }
     const Purchases = await loadRC();
-    const offerings = await Purchases.getOfferings();
+
+    // 1) Hent produkter (kan henge hvis StoreKit ikke svarer → timeout).
+    let offerings;
+    try {
+      offerings = await withTimeout(Purchases.getOfferings(), 20000, 'getOfferings');
+    } catch (e) {
+      return {
+        success: false, reason: 'error',
+        detail: e?.rcTimeout ? 'Tidsavbrudd ved henting av produkter (getOfferings svarte ikke)' : ('getOfferings: ' + (e?.message || e)),
+      };
+    }
+
+    // 2) Finn Pro-pakken. Ved feil, ta med diagnose om hva offeringen inneholdt.
     const pkg = pickProPackage(offerings);
-    if (!pkg) return { success: false, reason: 'no_offering' };
-    const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg });
+    if (!pkg) {
+      const cur = offerings?.current;
+      const allKeys = Object.keys(offerings?.all || {});
+      const curPkgs = (cur?.availablePackages || []).map(p => p?.product?.identifier);
+      return {
+        success: false, reason: 'no_offering',
+        detail: `Fant ingen pakke. current=${cur?.identifier || 'null'}, offerings=[${allKeys.join(',')}], pakker=[${curPkgs.join(',') || 'ingen'}]`,
+      };
+    }
+
+    // 3) Kjøp (åpner Apple-betalingsruten). Timeout fanger «henger uten popup».
+    let customerInfo;
+    try {
+      ({ customerInfo } = await withTimeout(Purchases.purchasePackage({ aPackage: pkg }), 150000, 'purchasePackage'));
+    } catch (e) {
+      if (e?.code === 'PURCHASE_CANCELLED' || e?.userCancelled) {
+        return { success: false, reason: 'cancelled' };
+      }
+      return {
+        success: false, reason: 'error',
+        detail: e?.rcTimeout
+          ? 'Betalingsvinduet åpnet seg aldri (tidsavbrudd i purchasePackage) — StoreKit svarte ikke'
+          : ('Kjøp feilet: ' + (e?.code ? e.code + ' — ' : '') + (e?.message || e)),
+      };
+    }
+
     _purchased = !!customerInfo?.entitlements?.active?.[entitlementId()];
     notify();
     return { success: _purchased };
   } catch (e) {
-    if (e?.code === 'PURCHASE_CANCELLED' || e?.userCancelled) {
-      return { success: false, reason: 'cancelled' };
-    }
     console.warn('purchasePro feilet:', e);
-    return { success: false, reason: 'error', error: e?.message };
+    return { success: false, reason: 'error', detail: e?.message || String(e) };
   }
 };
 

@@ -27,6 +27,7 @@ import {
   PASSENGER_FERRY_SUBMODES
 } from './config/constants';
 import { config } from './config/config';
+import { APP_VERSION_LABEL } from './config/version';
 import { 
   formatMinutes, 
   formatDistance, 
@@ -2819,6 +2820,18 @@ function App() {
                     );
                   })()}
                 </div>
+                {APP_VERSION_LABEL && (
+                  <div
+                    className="text-xs mt-2"
+                    style={{
+                      color: theme.colors.textSecondary,
+                      fontFamily: theme.fonts.primary,
+                      opacity: 0.65,
+                    }}
+                  >
+                    Versjon {APP_VERSION_LABEL}
+                  </div>
+                )}
               </div>
             </div>
           </div>

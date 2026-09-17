@@ -252,6 +252,20 @@ const loadRC = () => {
 };
 
 export const initPurchases = async () => {
+  // Diagnose: skiller mellom to Capacitor-scenarioer som gir identisk feil på
+  // JS-siden: (a) native registrerte aldri "Purchases" i det hele tatt, vs.
+  // (b) native registrerte den, men PluginHeaders-oppføringen falt bort stille
+  // (JSONEncoder via try? i Capacitors JSExport.swift) mens selve metodene på
+  // window.Capacitor.Plugins.Purchases likevel ble generert.
+  try {
+    const w = typeof window !== 'undefined' ? window : {};
+    const headerNames = (w.Capacitor?.PluginHeaders || []).map((h) => h.name);
+    const hasRawProxy = !!(w.Capacitor?.Plugins?.Purchases);
+    const rawConfigureType = typeof w.Capacitor?.Plugins?.Purchases?.configure;
+    trace(`init: PluginHeaders=[${headerNames.join(',')}] Plugins.Purchases finnes=${hasRawProxy} .configure=${rawConfigureType}`);
+  } catch (e) {
+    trace(`init: (diagnose-sjekk feilet: ${e?.message || e})`);
+  }
   trace(`init: kalt (_initialized=${_initialized}, rcConfigured=${_rcConfigured})`);
   if (_initialized) { trace('init: allerede initialisert → returnerer'); return true; }
   _initialized = true;

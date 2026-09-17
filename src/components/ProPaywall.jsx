@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { getTheme, loadTheme } from '../config/themes';
-import { getTrace, subscribeTrace } from '../services/PurchasesService';
+import { getTrace, subscribeTrace, trace } from '../services/PurchasesService';
 
 // Diagnose: vis kjøps-sporet på skjermen (kun når VITE_PURCHASE_DEBUG=true).
 const PURCHASE_DEBUG = String(import.meta.env.VITE_PURCHASE_DEBUG) === 'true';
@@ -165,6 +165,34 @@ export default function ProPaywall({ access, busy, onPurchase, onRestore, onClos
             background: 'rgba(217,45,45,0.08)', color: '#c0392b',
             fontSize: '0.82rem', textAlign: 'left', whiteSpace: 'pre-line', lineHeight: 1.45,
           }}>{message}</p>
+        )}
+
+        {PURCHASE_DEBUG && (
+          <button
+            onClick={async () => {
+              trace('rå-test: kaller window.Capacitor.Plugins.Purchases.configure(...) direkte');
+              try {
+                const w = typeof window !== 'undefined' ? window : {};
+                const P = w.Capacitor?.Plugins?.Purchases;
+                trace(`rå-test: Plugins.Purchases typeof=${typeof P}, .then=${typeof P?.then}`);
+                if (!P) { trace('rå-test: ✗ window.Capacitor.Plugins.Purchases finnes ikke'); return; }
+                const res = await Promise.race([
+                  P.configure({ apiKey: 'appl_WVJEzmuEEipqFTjzmNjXBvUEcDR' }),
+                  new Promise((_, rej) => setTimeout(() => rej(new Error('rå-test timeout 8s')), 8000)),
+                ]);
+                trace(`rå-test: ✓ configure OK, resultat=${JSON.stringify(res)}`);
+              } catch (e) {
+                trace(`rå-test: ✗ ${e?.code || ''} ${e?.message || e}`);
+              }
+            }}
+            style={{
+              width: '100%', padding: '0.6rem', marginTop: 12, borderRadius: 10,
+              border: '1px dashed #999', background: 'transparent',
+              color: c.textSecondary, fontSize: '0.8rem', cursor: 'pointer',
+            }}
+          >
+            🔬 Kjør rå-test (window.Capacitor.Plugins.Purchases.configure)
+          </button>
         )}
 
         {PURCHASE_DEBUG && (
